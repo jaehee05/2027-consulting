@@ -540,11 +540,7 @@ function renderAdminScores(){
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
       <td style="text-align:center">${hasMarch?'<span class="bx bg">입력 완료</span>':'<span style="color:#d1d5db">—</span>'}</td>
       <td style="text-align:center">${hasJune?'<span class="bx bg">입력 완료</span>':'<span style="color:#d1d5db">—</span>'}</td>
-      <td style="white-space:nowrap"><div style="display:flex;gap:6px">
-        <button class="btn bs bsm" onclick="openScoreDetail('${s._docId}')">상세</button>
-        <button class="btn bp bsm" onclick="openAdminScoreEdit('${s._docId}','marchScore','scores')">3월</button>
-        <button class="btn bp bsm" onclick="openAdminScoreEdit('${s._docId}','score','scores')">6월</button>
-      </div></td>
+      <td style="white-space:nowrap"><button class="btn bs bsm" onclick="openScoreDetail('${s._docId}')">상세</button></td>
     </tr>`;}).join('');
   const totalMarch=S.students.filter(s=>s.marchScore&&Object.values(s.marchScore).some(v=>v)).length;
   const totalJune=S.students.filter(s=>s.score&&Object.values(s.score).some(v=>v)).length;
