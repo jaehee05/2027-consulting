@@ -883,6 +883,7 @@ function renderRequestsSection(){
       <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.reason||'').replace(/"/g,'&quot;')}">${r.reason||'—'}</td>
       <td style="font-size:11px;color:#6b7280">${r.createdAt?new Date(r.createdAt).toLocaleDateString('ko-KR'):'—'}</td>
       <td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bp bsm" onclick="approveRequest('${r._docId}')">승인</button><button class="btn bd bsm" onclick="rejectRequest('${r._docId}')">거절</button></div></td></tr>`;}).join('');
+  const isAdmin=S.user.type==='admin';
   const resolvedRows=resolved.map(r=>{
     const typeLabel=r.type==='cancel'?'<span class="bx br">취소</span>':'<span class="bx bb">변경</span>';
     const statusLabel=r.status==='approved'?'<span class="bx bg">승인</span>':'<span class="bx bgr">거절</span>';
@@ -890,7 +891,8 @@ function renderRequestsSection(){
       <td style="font-size:12px">${r.currentDateLabel} ${r.currentSlot}</td>
       <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.reason||'').replace(/"/g,'&quot;')}">${r.reason||'—'}</td>
       <td>${statusLabel}${r.status==='rejected'&&r.rejectReason?`<span style="font-size:10px;color:#6b7280;display:block;margin-top:2px" title="${r.rejectReason.replace(/"/g,'&quot;')}">${r.rejectReason.length>10?r.rejectReason.slice(0,10)+'…':r.rejectReason}</span>`:''}</td>
-      <td style="font-size:11px;color:#6b7280">${r.createdAt?new Date(r.createdAt).toLocaleDateString('ko-KR'):'—'}</td></tr>`;}).join('');
+      <td style="font-size:11px;color:#6b7280">${r.createdAt?new Date(r.createdAt).toLocaleDateString('ko-KR'):'—'}</td>
+      ${isAdmin?`<td><button class="btn bd bsm" onclick="deleteRequest('${r._docId}')">삭제</button></td>`:''}</tr>`;}).join('');
   const reqEnabled=S.config.requestEnabled!==false;
   const toggleLabel=reqEnabled?'요청 기능 OFF':'요청 기능 ON';
   const toggleBtn=`<button class="btn ${reqEnabled?'bd':'bp'} bsm" onclick="toggleRequestEnabled()">${toggleLabel}</button>`;
@@ -901,7 +903,7 @@ function renderRequestsSection(){
     </table></div></div>
     ${resolved.length?`<div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bgr">처리 완료</span>최근 처리된 요청</span></div>
     <div class="card np" style="padding:0"><div class="tw"><table>
-      <thead><tr><th>유형</th><th>학생명</th><th>예약</th><th>사유</th><th>결과</th><th>처리일</th></tr></thead>
+      <thead><tr><th>유형</th><th>학생명</th><th>예약</th><th>사유</th><th>결과</th><th>처리일</th>${isAdmin?'<th>관리</th>':''}</tr></thead>
       <tbody>${resolvedRows}</tbody>
     </table></div></div>`:''}`;}
 
@@ -945,6 +947,13 @@ async function confirmReject(reqId){
     req.status='rejected';req.rejectReason=rejectReason;
     closeModal();renderAdminBookings();
   }catch(e){alert('거절 실패: '+e.message);}
+  showLoad(false);}
+
+async function deleteRequest(reqId){
+  if(!confirm('이 요청 기록을 삭제하시겠습니까?'))return;
+  showLoad(true);
+  try{await db.collection('requests').doc(reqId).delete();S.requests=S.requests.filter(r=>r._docId!==reqId);renderAdminBookings();}
+  catch(e){alert('삭제 실패: '+e.message);}
   showLoad(false);}
 
 async function toggleRequestEnabled(){
@@ -1085,7 +1094,7 @@ function openAdminBook(docId){
 function renderAdminSlots(){
   const docId=_('abid')?.value,dateId=_('abDate')?.value,date=S.schedule.dates.find(d=>d.id===dateId),cont=_('abSlots');if(!date||!cont)return;
   const booking=S.bookings.find(b=>b._docId===docId),taken=S.bookings.filter(b=>b.date===date.date&&b._docId!==docId).map(b=>b.slot);
-  cont.innerHTML=date.slots.map(slot=>{const isTaken=taken.includes(slot),isCur=booking?.date===date.date&&booking?.slot===slot,isSel=S.adminSel===dateId+'|'+slot;return `<button class="sb ${isTaken?'bk':isSel?'sl':isCur?'mn':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'adminPickSlot(\''+dateId+'\',\''+slot+'\',this)'}">${slot}${isCur?' ✓':''}</button>`;}).join('')||'<p style="font-size:13px;color:#9ca3af">슬롯 없음</p>';}
+  cont.innerHTML=date.slots.map(slot=>{const isTaken=taken.includes(slot),isCur=booking?.date===date.date&&booking?.slot===slot,isSel=S.adminSel===dateId+'|'+slot;return `<button class="sb ${isTaken?'bk':isSel?'sl':isCur?'mn':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'adminPickSlot(\''+dateId+'\',\''+slot+'\',this)'}">${slot}</button>`;}).join('')||'<p style="font-size:13px;color:#9ca3af">슬롯 없음</p>';}
 
 function adminPickSlot(dateId,slot,btn){S.adminSel=dateId+'|'+slot;btn.closest('.sg').querySelectorAll('.sb').forEach(b=>{if(!b.classList.contains('bk')&&!b.classList.contains('mn'))b.classList.remove('sl');});btn.classList.add('sl');}
 
