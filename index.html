@@ -188,7 +188,7 @@ const S = {
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[],
   tab:null, selDate:null, adminSel:null,
-  editingScore:false, lang2Open:false, stuSort:'seat'
+  editingScore:false, lang2Open:false, marchEditingScore:false, marchLang2Open:false, stuSort:'seat'
 };
 
 const _=id=>document.getElementById(id);
@@ -201,6 +201,7 @@ function showErr(id,msg){const el=_(id);if(el){el.textContent=msg;el.style.displ
 function hideErr(id){const el=_(id);if(el)el.style.display='none';}
 function fmtPhoneInput(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.length>7)el.value=v.slice(0,3)+'-'+v.slice(3,7)+'-'+v.slice(7);else if(v.length>3)el.value=v.slice(0,3)+'-'+v.slice(3);else el.value=v;}
 function isScoreOpen(){if(!S.config.scoreStart)return false;const t=new Date().toISOString().slice(0,10);if(S.config.scoreEnd)return t>=S.config.scoreStart&&t<=S.config.scoreEnd;return t>=S.config.scoreStart;}
+function isMarchScoreOpen(){if(!S.config.marchScoreStart)return false;const t=new Date().toISOString().slice(0,10);if(S.config.marchScoreEnd)return t>=S.config.marchScoreStart&&t<=S.config.marchScoreEnd;return t>=S.config.marchScoreStart;}
 function showLoad(v){_('vLoad').style.display=v?'flex':'none';}
 
 function showView(id){
@@ -270,7 +271,7 @@ async function doLogin(){
 }
 
 function doLogout(){
-  S.user=null;S.studentDocId=null;S.editingScore=false;S.lang2Open=false;
+  S.user=null;S.studentDocId=null;S.editingScore=false;S.lang2Open=false;S.marchEditingScore=false;S.marchLang2Open=false;
   _('lId').value='';_('lPw').value='';hideErr('lErr');showView('vLogin');
 }
 
@@ -303,7 +304,9 @@ async function createFirstAdmin(){
 /* ── STUDENT ── */
 function renderStu(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);
-  if(myB){_('stuC').innerHTML=bookCardHtml(myB)+scoreCardHtml(myB)+qCardHtml(myB);}
+  const myStu=S.students.find(s=>s._docId===S.studentDocId);
+  if(myB){_('stuC').innerHTML=bookCardHtml(myB)+marchScoreCardHtml(myStu)+scoreCardHtml(myStu)+qCardHtml(myB);}
+  else if(myStu){_('stuC').innerHTML=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`+marchScoreCardHtml(myStu)+scoreCardHtml(myStu);}
   else showBookForm(false);
 }
 
@@ -351,8 +354,8 @@ function scoreTblHtml(sc){if(!sc)return '';return `<div style="overflow-x:auto">
   <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.engRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td><td class="vl">${sc.lang2Raw||'—'}</td></tr>
 </table></div>`;}
 
-function scoreCardHtml(booking){
-  const open=isScoreOpen(),sc=booking.score,hasSc=sc&&Object.values(sc).some(v=>v),showForm=open&&(!hasSc||S.editingScore);
+function scoreCardHtml(stu){
+  const open=isScoreOpen(),sc=stu?.score,hasSc=sc&&Object.values(sc).some(v=>v),showForm=open&&(!hasSc||S.editingScore);
   const badge=hasSc?`<span class="bx bg">성적 입력 완료</span>`:open?`<span class="bx bb">입력 가능</span>`:`<span class="bx bgr">입력 기간 아님</span>`;
   const editBtn=hasSc&&open?`<button class="btn bs bsm" onclick="S.editingScore=${!S.editingScore};renderStu()">${S.editingScore?'취소':'수정'}</button>`:'';
   const pNote=S.config.scoreStart?`<p style="font-size:11px;color:#6b7280;margin-bottom:10px">입력 기간: ${S.config.scoreStart}${S.config.scoreEnd?' ~ '+S.config.scoreEnd:' ~ 무기한'}</p>`:'';
@@ -362,6 +365,34 @@ function scoreCardHtml(booking){
   else body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${S.config.scoreStart?`<br><span style="font-size:12px">기간: ${S.config.scoreStart} ~ ${S.config.scoreEnd}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
   return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">모의평가 성적</p></div>${editBtn}</div>${pNote}${body}</div>`;}
 
+function marchScoreFormHtml(s){s=s||{};return `
+  <div class="frow"><div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="mk-kr" type="number" min="0" max="100" value="${s.korRaw||''}" placeholder="0–100"></div>
+  <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="mk-mr" type="number" min="0" max="100" value="${s.matRaw||''}" placeholder="0–100"></div></div>
+  <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="mk-er" type="number" min="0" max="100" value="${s.engRaw||''}" placeholder="0–100"></div>
+  <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="mk-hr" type="number" min="0" max="50" value="${s.hisRaw||''}" placeholder="0–50"></div></div>
+  <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="mk-e1s">${expOpts(s.exp1Subj||'')}</select></div>
+  <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="mk-e1r" type="number" min="0" max="50" value="${s.exp1Raw||''}" placeholder="0–50"></div></div>
+  <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="mk-e2s">${expOpts(s.exp2Subj||'')}</select></div>
+  <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="mk-e2r" type="number" min="0" max="50" value="${s.exp2Raw||''}" placeholder="0–50"></div></div>
+  <button class="btn bp bfw" style="margin-top:14px" onclick="saveMarchScore()">성적 저장</button>`;}
+
+function marchScoreTblHtml(sc){if(!sc)return '';return `<div style="overflow-x:auto"><table class="sc-tbl">
+  <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td></tr>
+  <tr><td class="rh" style="font-size:10px">선택과목</td><td class="ec"></td><td class="ec"></td><td class="ec"></td><td class="ec"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td></tr>
+  <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.engRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td></tr>
+</table></div>`;}
+
+function marchScoreCardHtml(stu){
+  const open=isMarchScoreOpen(),sc=stu?.marchScore,hasSc=sc&&Object.values(sc).some(v=>v),showForm=open&&(!hasSc||S.marchEditingScore);
+  const badge=hasSc?`<span class="bx bg">성적 입력 완료</span>`:open?`<span class="bx bb">입력 가능</span>`:`<span class="bx bgr">입력 기간 아님</span>`;
+  const editBtn=hasSc&&open?`<button class="btn bs bsm" onclick="S.marchEditingScore=${!S.marchEditingScore};renderStu()">${S.marchEditingScore?'취소':'수정'}</button>`:'';
+  const pNote=S.config.marchScoreStart?`<p style="font-size:11px;color:#6b7280;margin-bottom:10px">입력 기간: ${S.config.marchScoreStart}${S.config.marchScoreEnd?' ~ '+S.config.marchScoreEnd:' ~ 무기한'}</p>`:'';
+  let body='';
+  if(showForm)body=marchScoreFormHtml(sc||{});
+  else if(hasSc)body=marchScoreTblHtml(sc);
+  else body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${S.config.marchScoreStart?`<br><span style="font-size:12px">기간: ${S.config.marchScoreStart} ~ ${S.config.marchScoreEnd}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
+  return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">3월 모의고사 성적</p></div>${editBtn}</div>${pNote}${body}</div>`;}
+
 function qCardHtml(booking){return `<div class="card" style="margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx ${booking.question?'bg':'bb'}">질문 & 고민</span><p style="font-size:15px;font-weight:700">상담 전 질문 & 고민</p></div>
   <div class="fg" style="margin-bottom:12px"><label class="fl">상담에서 다루고 싶은 내용을 자유롭게 적어주세요</label><textarea class="fi ta" id="sk-q" rows="5">${booking.question||''}</textarea></div>
@@ -369,10 +400,23 @@ function qCardHtml(booking){return `<div class="card" style="margin-bottom:12px"
 </div>`;}
 
 async function saveScore(){
-  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  if(!S.studentDocId)return;
   const score={korSubj:_('sk-ks')?.value||'',korRaw:_('sk-kr')?.value||'',matSubj:_('sk-ms')?.value||'',matRaw:_('sk-mr')?.value||'',engRaw:_('sk-er')?.value||'',hisRaw:_('sk-hr')?.value||'',exp1Subj:_('sk-e1s')?.value||'',exp1Raw:_('sk-e1r')?.value||'',exp2Subj:_('sk-e2s')?.value||'',exp2Raw:_('sk-e2r')?.value||'',lang2Subj:S.lang2Open?(_('sk-l2s')?.value||''):'',lang2Raw:S.lang2Open?(_('sk-l2r')?.value||''):''};
   showLoad(true);
-  try{await db.collection('bookings').doc(myB._docId).update({score});myB.score=score;S.editingScore=false;renderStu();}
+  try{await db.collection('students').doc(S.studentDocId).update({score});
+    const stu=S.students.find(x=>x._docId===S.studentDocId);if(stu)stu.score=score;
+    S.editingScore=false;renderStu();}
+  catch(e){alert('저장 실패: '+e.message);}
+  showLoad(false);
+}
+
+async function saveMarchScore(){
+  if(!S.studentDocId)return;
+  const marchScore={korRaw:_('mk-kr')?.value||'',matRaw:_('mk-mr')?.value||'',engRaw:_('mk-er')?.value||'',hisRaw:_('mk-hr')?.value||'',exp1Subj:_('mk-e1s')?.value||'',exp1Raw:_('mk-e1r')?.value||'',exp2Subj:_('mk-e2s')?.value||'',exp2Raw:_('mk-e2r')?.value||''};
+  showLoad(true);
+  try{await db.collection('students').doc(S.studentDocId).update({marchScore});
+    const stu=S.students.find(x=>x._docId===S.studentDocId);if(stu)stu.marchScore=marchScore;
+    S.marchEditingScore=false;renderStu();}
   catch(e){alert('저장 실패: '+e.message);}
   showLoad(false);
 }
@@ -431,9 +475,10 @@ async function cancelMyBook(){
 async function setTab(tab){
   S.tab=tab;
   const isAdmin=S.user.type==='admin';
-  const tabs=isAdmin?[['students','학생 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['accounts','계정 관리']]:[['bookings','예약 현황']];
+  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['schedule','일정 관리'],['bookings','예약 현황'],['accounts','계정 관리']]:[['bookings','예약 현황']];
   _('adminTabs').innerHTML=tabs.map(([id,label])=>`<button class="tab ${S.tab===id?'on':''}" onclick="setTab('${id}')">${label}</button>`).join('');
   if(tab==='students')renderAdminStudents();
+  else if(tab==='scores')renderAdminScores();
   else if(tab==='schedule')renderAdminSchedule();
   else if(tab==='bookings')renderAdminBookings();
   else if(tab==='accounts'){await loadAdmins();renderAdminAccounts();}
@@ -465,6 +510,66 @@ function renderAdminStudents(){
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>계정 ID</th><th>관리</th></tr></thead>
     <tbody>${rows||'<tr><td colspan="9" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
   </table></div></div>`;}
+
+/* ── ADMIN: 학생 성적 ── */
+function renderAdminScores(){
+  const gradeOrder={'고3':0,'고2':1,'고1':2};
+  const sorted=[...S.students].sort((a,b)=>{
+    if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='seat') return ((a.seat||999))-(b.seat||999);
+    if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
+    return 0;
+  });
+  const rows=sorted.map(s=>{
+    const hasMarch=s.marchScore&&Object.values(s.marchScore).some(v=>v);
+    const hasJune=s.score&&Object.values(s.score).some(v=>v);
+    return `<tr>
+      <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+      <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
+      <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
+      <td style="text-align:center">${hasMarch?'<span class="bx bg">입력 완료</span>':'<span style="color:#d1d5db">—</span>'}</td>
+      <td style="text-align:center">${hasJune?'<span class="bx bg">입력 완료</span>':'<span style="color:#d1d5db">—</span>'}</td>
+      <td style="white-space:nowrap"><div style="display:flex;gap:6px">
+        <button class="btn bs bsm" onclick="openScoreDetail('${s._docId}')">상세</button>
+        <button class="btn bp bsm" onclick="openAdminScoreEdit('${s._docId}','marchScore','scores')">3월</button>
+        <button class="btn bp bsm" onclick="openAdminScoreEdit('${s._docId}','score','scores')">6월</button>
+      </div></td>
+    </tr>`;}).join('');
+  const totalMarch=S.students.filter(s=>s.marchScore&&Object.values(s.marchScore).some(v=>v)).length;
+  const totalJune=S.students.filter(s=>s.score&&Object.values(s.score).some(v=>v)).length;
+  const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
+  const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminScores()">${l}</button>`).join('');
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 성적 관리 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.students.length}명)</span></span>
+    <button class="btn bs bsm" onclick="refreshStudents()">새로고침</button></div>
+  <div style="display:flex;gap:12px;margin-bottom:14px">
+    <div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1"><span style="font-size:11px;font-weight:600;color:#6b7280">3월 모의고사</span><p style="font-size:18px;font-weight:800;margin-top:2px">${totalMarch}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${S.students.length}명</span></p></div>
+    <div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1"><span style="font-size:11px;font-weight:600;color:#6b7280">6월 모의평가</span><p style="font-size:18px;font-weight:800;margin-top:2px">${totalJune}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${S.students.length}명</span></p></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
+  <div class="card" style="padding:0"><div class="tw"><table>
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>3월 모의고사</th><th>6월 모의평가</th><th>관리</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="7" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+  </table></div></div>`;}
+
+function openScoreDetail(stuDocId){
+  const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
+  const hasMarch=stu.marchScore&&Object.values(stu.marchScore).some(v=>v);
+  const hasJune=stu.score&&Object.values(stu.score).some(v=>v);
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">성적 상세 정보</p>
+    <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${stu.name}</p></div>
+      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:700;font-size:14px">${stu.school} ${stu.grade}</p></div>
+    </div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><p style="font-size:14px;font-weight:700">3월 모의고사 성적</p>
+      <div style="display:flex;gap:6px">${hasMarch?`<button class="btn bd bsm" onclick="adminDelMarchScore('${stuDocId}','scores')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','marchScore','scores')">${hasMarch?'수정':'입력'}</button></div></div>
+    ${hasMarch?marchScoreTblHtml(stu.marchScore):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px"><p style="font-size:14px;font-weight:700">6월 모의평가 성적</p>
+      <div style="display:flex;gap:6px">${hasJune?`<button class="btn bd bsm" onclick="adminDelScore('${stuDocId}','scores')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','score','scores')">${hasJune?'수정':'입력'}</button></div></div>
+    ${hasJune?scoreTblHtml(stu.score):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    <button class="btn bs bfw" style="margin-top:16px" onclick="closeModal()">닫기</button>`;openModal();}
+
+async function refreshStudents(){showLoad(true);try{const snap=await db.collection('students').get();S.students=snap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminScores();}catch(e){alert('새로고침 실패: '+e.message);}showLoad(false);}
 
 function openStuModal(docId){
   const s=docId?S.students.find(x=>x._docId===docId):null;
@@ -530,8 +635,14 @@ async function resetPw(docId){
 /* ── ADMIN: 일정 ── */
 function renderAdminSchedule(){
   const open=isScoreOpen();
+  const marchOpen=isMarchScoreOpen();
+  const marchCfgCard=`<div class="card" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📝 3월 모의고사 성적 입력 기간</p>${marchOpen?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
+    <div class="frow"><div class="fg"><label class="fl">시작일</label><input class="fi" id="cfgMS" type="date" value="${S.config.marchScoreStart||''}"></div><div class="fg"><label class="fl">종료일</label><input class="fi" id="cfgME" type="date" value="${S.config.marchScoreEnd||''}"></div></div>
+    <button class="btn bp bsm" onclick="saveCfgSettings()">저장</button>${S.config.marchScoreStart?`<span style="font-size:12px;color:#6b7280;margin-left:10px">${S.config.marchScoreStart} ~ ${S.config.marchScoreEnd||'무기한'}</span>`:''}
+  </div>`;
   const cfgCard=`<div class="card" style="margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📊 성적 입력 기간 설정</p>${open?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📝 6월 모의평가 성적 입력 기간</p>${open?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
     <div class="frow"><div class="fg"><label class="fl">시작일</label><input class="fi" id="cfgS" type="date" value="${S.config.scoreStart||''}"></div><div class="fg"><label class="fl">종료일</label><input class="fi" id="cfgE" type="date" value="${S.config.scoreEnd||''}"></div></div>
     <button class="btn bp bsm" onclick="saveCfgSettings()">저장</button>${S.config.scoreStart?`<span style="font-size:12px;color:#6b7280;margin-left:10px">${S.config.scoreStart} ~ ${S.config.scoreEnd||'무기한'}</span>`:''}
   </div>`;
@@ -549,10 +660,11 @@ function renderAdminSchedule(){
         <button class="btn bp bsm" style="height:36px" onclick="openBulk('${d.id}')">일괄 추가 (30분)</button>
       </div>
     </div>`;}).join('');
-  _('adminC').innerHTML=cfgCard+`<div class="sh"><span class="shtitle">예약 일정 관리</span><button class="btn bp bsm" onclick="openAddDate()">+ 날짜 추가</button></div>${datesHtml||'<div class="card empty">등록된 날짜가 없습니다.</div>'}`;}
+  _('adminC').innerHTML=marchCfgCard+cfgCard+`<div class="sh"><span class="shtitle">예약 일정 관리</span><button class="btn bp bsm" onclick="openAddDate()">+ 날짜 추가</button></div>${datesHtml||'<div class="card empty">등록된 날짜가 없습니다.</div>'}`;}
 
 async function saveCfgSettings(){
-  S.config.scoreStart=_('cfgS').value;S.config.scoreEnd=_('cfgE').value;
+  S.config.scoreStart=_('cfgS')?.value||S.config.scoreStart||'';S.config.scoreEnd=_('cfgE')?.value||S.config.scoreEnd||'';
+  S.config.marchScoreStart=_('cfgMS')?.value||S.config.marchScoreStart||'';S.config.marchScoreEnd=_('cfgME')?.value||S.config.marchScoreEnd||'';
   showLoad(true);try{await db.collection('config').doc('main').set(S.config);renderAdminSchedule();}catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
 
 function openAddDate(){_('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">날짜 추가</p>
@@ -619,9 +731,10 @@ function renderAdminBookings(){
   const bookedIds=new Set(S.bookings.map(b=>b.studentId));
   const unbooked=S.students.filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
   const rows=sorted.map(b=>{
-    const stu=S.students.find(s=>s._docId===b.studentId),hasSc=b.score&&Object.values(b.score).some(v=>v);
+    const stu=S.students.find(s=>s._docId===b.studentId),hasSc=stu?.score&&Object.values(stu.score).some(v=>v),hasMarchSc=stu?.marchScore&&Object.values(stu.marchScore).some(v=>v);
     return `<tr><td><span class="bx bb" style="font-size:11px">${b.dateLabel}</span></td><td style="font-weight:700;color:#1C64F2">${b.slot}</td><td style="font-weight:600">${b.studentName}</td><td>${stu?.school||'—'}</td>
     <td><span class="bx ${stu?.grade==='고3'?'br':stu?.grade==='고2'?'bb':'bg'}">${stu?.grade||'—'}</span></td><td style="text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td><td>${stu?.studentPhone||'—'}</td>
+    <td style="text-align:center">${hasMarchSc?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
     <td style="text-align:center">${hasSc?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
     <td style="text-align:center">${b.question?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
     <td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button>${!isViewer?`<button class="btn bs bsm np" onclick="openAdminBook('${b._docId}')">변경</button><button class="btn bd bsm np" onclick="adminDelBook('${b._docId}')">삭제</button>`:''}</div></td></tr>`;}).join('');
@@ -632,8 +745,8 @@ function renderAdminBookings(){
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
     <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${sorted.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
     <div class="card np" style="padding:0;margin-bottom:16px"><div class="tw"><table>
-      <thead><tr><th>날짜</th><th>시간</th><th>학생명</th><th>학교</th><th>학년</th><th>좌석</th><th>연락처</th><th>성적</th><th>질문</th><th>관리</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="9" class="empty">예약 내역이 없습니다.</td></tr>'}</tbody>
+      <thead><tr><th>날짜</th><th>시간</th><th>학생명</th><th>학교</th><th>학년</th><th>좌석</th><th>연락처</th><th>3월</th><th>6월</th><th>질문</th><th>관리</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="11" class="empty">예약 내역이 없습니다.</td></tr>'}</tbody>
     </table></div></div>
     <div class="sh np" style="margin-top:8px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx br">미예약</span>예약하지 않은 학생 <span style="font-size:13px;font-weight:400;color:#6b7280">(${unbooked.length}명)</span></span></div>
     <div class="card np" style="padding:0"><div class="tw"><table>
@@ -645,25 +758,34 @@ async function refreshBookings(){showLoad(true);try{const snap=await db.collecti
 
 function openBookDetail(docId){
   const b=S.bookings.find(x=>x._docId===docId);if(!b)return;
-  const stu=S.students.find(s=>s._docId===b.studentId),hasSc=b.score&&Object.values(b.score).some(v=>v);
+  const stu=S.students.find(s=>s._docId===b.studentId);
+  const hasSc=stu?.score&&Object.values(stu.score).some(v=>v);
+  const hasMarchSc=stu?.marchScore&&Object.values(stu.marchScore).some(v=>v);
+  const isAdmin=S.user.type==='admin';
+  const stuId=b.studentId;
+  const marchBtns=isAdmin?`<div style="display:flex;gap:6px">${hasMarchSc?`<button class="btn bd bsm" onclick="adminDelMarchScore('${stuId}','booking','${docId}')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuId}','marchScore','booking','${docId}')">${hasMarchSc?'수정':'입력'}</button></div>`:'';
+  const scoreBtns=isAdmin?`<div style="display:flex;gap:6px">${hasSc?`<button class="btn bd bsm" onclick="adminDelScore('${stuId}','booking','${docId}')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuId}','score','booking','${docId}')">${hasSc?'수정':'입력'}</button></div>`:'';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">예약 상세 정보</p>
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${b.studentName}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">예약 일시</p><p style="font-weight:700;font-size:14px">${b.dateLabel} ${b.slot}</p></div>
       ${stu?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div><div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.studentPhone}</p></div>${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}${stu.memo?`<div style="grid-column:1/-1"><p style="font-size:11px;color:#6b7280;margin-bottom:2px">메모</p><p style="font-size:13px">${stu.memo}</p></div>`:''}`:''}
     </div></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><p style="font-size:14px;font-weight:700">성적 정보</p>${S.user.type==='admin'&&hasSc?`<button class="btn bd bsm" onclick="adminDelScore('${docId}')">성적 삭제</button>`:''}</div>
-    ${hasSc?scoreTblHtml(b.score):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
-    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px"><p style="font-size:14px;font-weight:700">질문 & 고민</p>${S.user.type==='admin'&&b.question?`<button class="btn bd bsm" onclick="adminDelQuestion('${docId}')">고민 삭제</button>`:''}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><p style="font-size:14px;font-weight:700">3월 모의고사 성적</p>${marchBtns}</div>
+    ${hasMarchSc?marchScoreTblHtml(stu.marchScore):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px"><p style="font-size:14px;font-weight:700">6월 모의평가 성적</p>${scoreBtns}</div>
+    ${hasSc?scoreTblHtml(stu.score):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px"><p style="font-size:14px;font-weight:700">질문 & 고민</p>${isAdmin&&b.question?`<button class="btn bd bsm" onclick="adminDelQuestion('${docId}')">고민 삭제</button>`:''}</div>
     <div style="background:#f9fafb;border-radius:10px;padding:12px;min-height:60px"><p style="font-size:13px;color:${b.question?'#111827':'#9ca3af'};white-space:pre-wrap;line-height:1.6">${b.question||'입력된 내용이 없습니다.'}</p></div>
     <button class="btn bs bfw" style="margin-top:16px" onclick="closeModal()">닫기</button>`;openModal();}
 
-async function adminDelScore(docId){
-  if(!confirm('이 학생의 성적을 삭제하시겠습니까?'))return;
+async function adminDelScore(stuDocId, from, bookDocId){
+  if(!confirm('이 학생의 6월 모의평가 성적을 삭제하시겠습니까?'))return;
   showLoad(true);
-  try{await db.collection('bookings').doc(docId).update({score:{}});
-  const b=S.bookings.find(x=>x._docId===docId);if(b)b.score={};
-  closeModal();renderAdminBookings();}
+  try{await db.collection('students').doc(stuDocId).update({score:{}});
+  const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.score={};
+  if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
+  else{closeModal();renderAdminScores();}}
   catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
 
 async function adminDelQuestion(docId){
@@ -673,6 +795,73 @@ async function adminDelQuestion(docId){
   const b=S.bookings.find(x=>x._docId===docId);if(b)b.question='';
   closeModal();renderAdminBookings();}
   catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
+
+async function adminDelMarchScore(stuDocId, from, bookDocId){
+  if(!confirm('이 학생의 3월 모의고사 성적을 삭제하시겠습니까?'))return;
+  showLoad(true);
+  try{await db.collection('students').doc(stuDocId).update({marchScore:{}});
+  const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.marchScore={};
+  if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
+  else{closeModal();renderAdminScores();}}
+  catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
+
+function openAdminScoreEdit(stuDocId, type, from, bookDocId){
+  const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
+  const isMarch=type==='marchScore';
+  const sc=isMarch?(stu.marchScore||{}):(stu.score||{});
+  const title=isMarch?'3월 모의고사 성적 입력/수정':'6월 모의평가 성적 입력/수정';
+  const backAction=from==='booking'&&bookDocId?`openBookDetail('${bookDocId}')`:`closeModal();renderAdminScores()`;
+  let formHtml='';
+  if(isMarch){
+    formHtml=`
+    <div class="frow"><div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div>
+    <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="as-mr" type="number" min="0" max="100" value="${sc.matRaw||''}" placeholder="0–100"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="as-er" type="number" min="0" max="100" value="${sc.engRaw||''}" placeholder="0–100"></div>
+    <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="as-hr" type="number" min="0" max="50" value="${sc.hisRaw||''}" placeholder="0–50"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'')}</select></div>
+    <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="as-e1r" type="number" min="0" max="50" value="${sc.exp1Raw||''}" placeholder="0–50"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'')}</select></div>
+    <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="as-e2r" type="number" min="0" max="50" value="${sc.exp2Raw||''}" placeholder="0–50"></div></div>`;
+  }else{
+    formHtml=`
+    <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="as-ks"><option value="">선택</option><option ${sc.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${sc.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
+    <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="as-ms"><option value="">선택</option><option ${sc.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${sc.matSubj==='미적분'?'selected':''}>미적분</option><option ${sc.matSubj==='기하'?'selected':''}>기하</option></select></div>
+    <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="as-mr" type="number" min="0" max="100" value="${sc.matRaw||''}" placeholder="0–100"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="as-er" type="number" min="0" max="100" value="${sc.engRaw||''}" placeholder="0–100"></div>
+    <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="as-hr" type="number" min="0" max="50" value="${sc.hisRaw||''}" placeholder="0–50"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'')}</select></div>
+    <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="as-e1r" type="number" min="0" max="50" value="${sc.exp1Raw||''}" placeholder="0–50"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'')}</select></div>
+    <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="as-e2r" type="number" min="0" max="50" value="${sc.exp2Raw||''}" placeholder="0–50"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">제2외국어 과목</label><select class="fi fsel" id="as-l2s">${l2Opts(sc.lang2Subj||'')}</select></div>
+    <div class="fg"><label class="fl">제2외국어 원점수</label><input class="fi" id="as-l2r" type="number" min="0" max="50" value="${sc.lang2Raw||''}" placeholder="0–50"></div></div>`;
+  }
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${title}</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${stu.name} 학생</p>
+    ${formHtml}
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="${backAction}">← 돌아가기</button><button class="btn bp" style="flex:1" onclick="saveAdminScore('${stuDocId}','${type}','${from||''}','${bookDocId||''}')">저장</button></div>`;
+  if(!_('mOv').classList.contains('hidden'))return;openModal();
+}
+
+async function saveAdminScore(stuDocId, type, from, bookDocId){
+  const isMarch=type==='marchScore';
+  let scoreData;
+  if(isMarch){
+    scoreData={korRaw:_('as-kr')?.value||'',matRaw:_('as-mr')?.value||'',engRaw:_('as-er')?.value||'',hisRaw:_('as-hr')?.value||'',exp1Subj:_('as-e1s')?.value||'',exp1Raw:_('as-e1r')?.value||'',exp2Subj:_('as-e2s')?.value||'',exp2Raw:_('as-e2r')?.value||''};
+  }else{
+    scoreData={korSubj:_('as-ks')?.value||'',korRaw:_('as-kr')?.value||'',matSubj:_('as-ms')?.value||'',matRaw:_('as-mr')?.value||'',engRaw:_('as-er')?.value||'',hisRaw:_('as-hr')?.value||'',exp1Subj:_('as-e1s')?.value||'',exp1Raw:_('as-e1r')?.value||'',exp2Subj:_('as-e2s')?.value||'',exp2Raw:_('as-e2r')?.value||'',lang2Subj:_('as-l2s')?.value||'',lang2Raw:_('as-l2r')?.value||''};
+  }
+  showLoad(true);
+  try{
+    const update={};update[type]=scoreData;
+    await db.collection('students').doc(stuDocId).update(update);
+    const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu[type]=scoreData;
+    if(from==='booking'&&bookDocId)openBookDetail(bookDocId);
+    else{closeModal();renderAdminScores();}
+  }catch(e){alert('저장 실패: '+e.message);}
+  showLoad(false);
+}
 
 function openAdminBook(docId){
   S.adminSel=null;
