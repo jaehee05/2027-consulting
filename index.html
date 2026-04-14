@@ -340,21 +340,27 @@ function renderStu(){
 
 function bookCardHtml(b){
   const pendingReq=S.requests.find(r=>r.bookingId===b._docId&&r.status==='pending');
-  const rejectedReqs=S.requests.filter(r=>r.bookingId===b._docId&&r.status==='rejected');
-  const latestRejected=rejectedReqs.length?rejectedReqs.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))[0]:null;
+  const notifications=S.requests.filter(r=>r.bookingId===b._docId&&(r.status==='rejected'||r.status==='approved')&&!r.dismissed);
   let statusHtml='';
   if(pendingReq){
     const typeLabel=pendingReq.type==='cancel'?'취소':'변경';
     statusHtml=`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">⏳ 예약 ${typeLabel} 요청이 승인 대기 중입니다.</p><p style="font-size:11px;color:#92400e;margin-top:4px">사유: ${pendingReq.reason}</p>${pendingReq.type==='change'?`<p style="font-size:11px;color:#92400e;margin-top:2px">변경 희망: ${pendingReq.newDateLabel} ${pendingReq.newSlot}</p>`:''}</div>`;
   }
-  if(latestRejected){
-    const typeLabel=latestRejected.type==='cancel'?'취소':'변경';
-    statusHtml+=`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#dc2626;font-weight:600">예약 ${typeLabel} 요청이 거절되었습니다.</p><p style="font-size:11px;color:#dc2626;margin-top:4px">사유: ${latestRejected.reason}</p></div>`;
-  }
+  notifications.forEach(r=>{
+    const typeLabel=r.type==='cancel'?'취소':'변경';
+    if(r.status==='rejected'){
+      statusHtml+=`<div style="position:relative;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:12px 14px;margin-bottom:12px"><button onclick="dismissNotif('${r._docId}')" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#dc2626;line-height:1">&times;</button><p style="font-size:12px;color:#dc2626;font-weight:600">예약 ${typeLabel} 요청이 거절되었습니다.</p>${r.rejectReason?`<p style="font-size:11px;color:#dc2626;margin-top:4px">거절 사유: ${r.rejectReason}</p>`:''}</div>`;
+    }else{
+      statusHtml+=`<div style="position:relative;background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:12px 14px;margin-bottom:12px"><button onclick="dismissNotif('${r._docId}')" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#15803d;line-height:1">&times;</button><p style="font-size:12px;color:#15803d;font-weight:600">예약 ${typeLabel} 요청이 승인되었습니다.</p></div>`;
+    }
+  });
   const reqEnabled=S.config.requestEnabled!==false;
-  const btns=!reqEnabled?'':pendingReq?'':`<div style="display:flex;gap:8px">
+  const btns=reqEnabled?(pendingReq?'':`<div style="display:flex;gap:8px">
     <button class="btn bs" style="flex:1" onclick="requestCancelBook()">예약 취소 요청</button>
     <button class="btn bp" style="flex:1" onclick="showChangeRequestForm()">예약 변경 요청</button>
+  </div>`):`<div style="display:flex;gap:8px">
+    <button class="btn bs" style="flex:1" onclick="cancelMyBook()">예약 취소</button>
+    <button class="btn bp" style="flex:1" onclick="showBookForm(true)">예약 변경</button>
   </div>`;
   return `<div class="card" style="margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span class="bx bg">예약 완료</span><p style="font-size:15px;font-weight:700">상담 예약 현황</p></div>
@@ -513,6 +519,19 @@ async function bookSlot(dateId,slot){
   }catch(e){alert('예약 실패: '+e.message);}
   showLoad(false);
 }
+
+async function dismissNotif(reqId){
+  const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
+  try{await db.collection('requests').doc(reqId).update({dismissed:true});req.dismissed=true;renderStu();}
+  catch(e){alert('삭제 실패: '+e.message);}}
+
+async function cancelMyBook(){
+  if(!confirm('예약을 취소하시겠습니까?'))return;
+  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  showLoad(true);
+  try{await db.collection('bookings').doc(myB._docId).delete();S.bookings=S.bookings.filter(b=>b.studentId!==S.studentDocId);renderStu();}
+  catch(e){alert('취소 실패: '+e.message);}
+  showLoad(false);}
 
 function requestCancelBook(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
@@ -870,7 +889,7 @@ function renderRequestsSection(){
     return `<tr><td>${typeLabel}</td><td style="font-weight:600">${r.studentName}</td>
       <td style="font-size:12px">${r.currentDateLabel} ${r.currentSlot}</td>
       <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.reason||'').replace(/"/g,'&quot;')}">${r.reason||'—'}</td>
-      <td>${statusLabel}</td>
+      <td>${statusLabel}${r.status==='rejected'&&r.rejectReason?`<span style="font-size:10px;color:#6b7280;display:block;margin-top:2px" title="${r.rejectReason.replace(/"/g,'&quot;')}">${r.rejectReason.length>10?r.rejectReason.slice(0,10)+'…':r.rejectReason}</span>`:''}</td>
       <td style="font-size:11px;color:#6b7280">${r.createdAt?new Date(r.createdAt).toLocaleDateString('ko-KR'):'—'}</td></tr>`;}).join('');
   const reqEnabled=S.config.requestEnabled!==false;
   const toggleLabel=reqEnabled?'요청 기능 OFF':'요청 기능 ON';
@@ -907,15 +926,24 @@ async function approveRequest(reqId){
   }catch(e){alert('승인 실패: '+e.message);}
   showLoad(false);}
 
-async function rejectRequest(reqId){
+function rejectRequest(reqId){
   const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
   const typeLabel=req.type==='cancel'?'취소':'변경';
-  if(!confirm(`${req.studentName} 학생의 예약 ${typeLabel} 요청을 거절하시겠습니까?`))return;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 ${typeLabel} 요청 거절</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${req.studentName} 학생</p>
+    <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px">현재 예약: <b>${req.currentDateLabel} ${req.currentSlot}</b></p>${req.type==='change'?`<p style="font-size:13px;margin-top:4px">변경 희망: <b style="color:#1C64F2">${req.newDateLabel} ${req.newSlot}</b></p>`:''}<p style="font-size:12px;color:#6b7280;margin-top:4px">학생 사유: ${req.reason}</p></div>
+    <div class="fg"><label class="fl">거절 사유</label><textarea class="fi ta" id="rejectReason" rows="3" placeholder="거절 사유를 입력해주세요. (선택)"></textarea></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bd" style="flex:1" onclick="confirmReject('${reqId}')">거절</button></div>`;
+  openModal();}
+
+async function confirmReject(reqId){
+  const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
+  const rejectReason=_('rejectReason')?.value?.trim()||'';
   showLoad(true);
   try{
-    await db.collection('requests').doc(reqId).update({status:'rejected'});
-    req.status='rejected';
-    renderAdminBookings();
+    await db.collection('requests').doc(reqId).update({status:'rejected',rejectReason});
+    req.status='rejected';req.rejectReason=rejectReason;
+    closeModal();renderAdminBookings();
   }catch(e){alert('거절 실패: '+e.message);}
   showLoad(false);}
 
