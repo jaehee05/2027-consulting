@@ -250,7 +250,7 @@ async function doLogin(){
       S.user={type:a.role,id:a.id,name:a.name};
       await loadAll();
       _('adminUname').textContent=a.name;
-      _('adminRoleLabel').textContent=a.role==='admin'?'관리자':'뷰어';
+      _('adminRoleLabel').textContent=a.role==='admin'?'관리자':'OP';
       showView('vAdmin');
       setTab(a.role==='admin'?'students':'bookings');
       return;
@@ -736,7 +736,6 @@ async function doBulk(){
 
 /* ── ADMIN: 예약 현황 ── */
 function renderAdminBookings(){
-  const isViewer=S.user.type==='viewer';
   const sorted=[...S.bookings].sort((a,b)=>{const sA=S.students.find(s=>s._docId===a.studentId)?.seat||999;const sB=S.students.find(s=>s._docId===b.studentId)?.seat||999;if(sA!==sB)return sA-sB;return a.date!==b.date?a.date.localeCompare(b.date):a.slot.localeCompare(b.slot);});
   const bookedIds=new Set(S.bookings.map(b=>b.studentId));
   const unbooked=S.students.filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
@@ -747,8 +746,8 @@ function renderAdminBookings(){
     <td style="text-align:center">${hasMarchSc?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
     <td style="text-align:center">${hasSc?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
     <td style="text-align:center">${b.question?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
-    <td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button>${!isViewer?`<button class="btn bs bsm np" onclick="openAdminBook('${b._docId}')">변경</button><button class="btn bd bsm np" onclick="adminDelBook('${b._docId}')">삭제</button>`:''}</div></td></tr>`;}).join('');
-  const unbookedRows=unbooked.map(s=>`<tr><td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td><td style="font-weight:600">${s.name}</td><td>${s.school}</td><td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td><td>${s.studentPhone}</td><td>${s.guardianPhone}</td><td style="color:#9ca3af;font-size:12px">${s.memo||'—'}</td></tr>`).join('');
+    <td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button><button class="btn bs bsm np" onclick="openAdminBook('${b._docId}')">변경</button><button class="btn bd bsm np" onclick="adminDelBook('${b._docId}')">삭제</button></div></td></tr>`;}).join('');
+  const unbookedRows=unbooked.map(s=>`<tr><td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td><td style="font-weight:600">${s.name}</td><td>${s.school}</td><td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td><td>${s.studentPhone}</td><td>${s.guardianPhone}</td><td style="color:#9ca3af;font-size:12px">${s.memo||'—'}</td><td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openStuDetail('${s._docId}')">상세</button><button class="btn bp bsm" onclick="openNewBookForStu('${s._docId}')">예약</button></div></td></tr>`).join('');
   const byDate={};sorted.forEach(b=>{if(!byDate[b.date])byDate[b.date]={label:b.dateLabel,items:[]};byDate[b.date].items.push(b);});
   const printHtml=Object.values(byDate).map(g=>`<div style="margin-bottom:20px"><p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:8px">${g.label}</p>${g.items.map(b=>{const stu=S.students.find(s=>s._docId===b.studentId);return `<div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><b style="color:#1C64F2;min-width:48px">${b.slot}</b><b style="min-width:60px">${b.studentName}</b><span>${stu?.school||''}</span><span style="color:#6b7280">${stu?.grade||''}</span><span style="color:#6b7280">${stu?.studentPhone||''}</span></div>`;}).join('')}</div>`).join('');
   _('adminC').innerHTML=`<div class="sh np"><span class="shtitle">예약 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(예약 ${sorted.length}건 · 미예약 ${unbooked.length}명)</span></span>
@@ -760,8 +759,8 @@ function renderAdminBookings(){
     </table></div></div>
     <div class="sh np" style="margin-top:8px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx br">미예약</span>예약하지 않은 학생 <span style="font-size:13px;font-weight:400;color:#6b7280">(${unbooked.length}명)</span></span></div>
     <div class="card np" style="padding:0"><div class="tw"><table>
-      <thead><tr><th>좌석</th><th>이름</th><th>학교</th><th>학년</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th></tr></thead>
-      <tbody>${unbookedRows||'<tr><td colspan="6" class="empty">미예약 학생이 없습니다. 🎉</td></tr>'}</tbody>
+      <thead><tr><th>좌석</th><th>이름</th><th>학교</th><th>학년</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>관리</th></tr></thead>
+      <tbody>${unbookedRows||'<tr><td colspan="8" class="empty">미예약 학생이 없습니다. 🎉</td></tr>'}</tbody>
     </table></div></div>`;}
 
 async function refreshBookings(){showLoad(true);try{const snap=await db.collection('bookings').get();S.bookings=snap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminBookings();}catch(e){alert('새로고침 실패: '+e.message);}showLoad(false);}
@@ -795,6 +794,7 @@ async function adminDelScore(stuDocId, from, bookDocId){
   try{await db.collection('students').doc(stuDocId).update({score:{}});
   const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.score={};
   if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
+  else if(from==='stuDetail'){closeModal();openStuDetail(stuDocId);}
   else{closeModal();renderAdminScores();}}
   catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
 
@@ -812,6 +812,7 @@ async function adminDelMarchScore(stuDocId, from, bookDocId){
   try{await db.collection('students').doc(stuDocId).update({marchScore:{}});
   const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.marchScore={};
   if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
+  else if(from==='stuDetail'){closeModal();openStuDetail(stuDocId);}
   else{closeModal();renderAdminScores();}}
   catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
 
@@ -820,7 +821,7 @@ function openAdminScoreEdit(stuDocId, type, from, bookDocId){
   const isMarch=type==='marchScore';
   const sc=isMarch?(stu.marchScore||{}):(stu.score||{});
   const title=isMarch?'3월 모의고사 성적 입력/수정':'6월 모의평가 성적 입력/수정';
-  const backAction=from==='booking'&&bookDocId?`openBookDetail('${bookDocId}')`:`closeModal();renderAdminScores()`;
+  const backAction=from==='booking'&&bookDocId?`openBookDetail('${bookDocId}')`:from==='stuDetail'?`openStuDetail('${stuDocId}')`:`closeModal();renderAdminScores()`;
   let formHtml='';
   if(isMarch){
     formHtml=`
@@ -874,6 +875,7 @@ async function saveAdminScore(stuDocId, type, from, bookDocId){
     await db.collection('students').doc(stuDocId).update(update);
     const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu[type]=scoreData;
     if(from==='booking'&&bookDocId)openBookDetail(bookDocId);
+    else if(from==='stuDetail')openStuDetail(stuDocId);
     else{closeModal();renderAdminScores();}
   }catch(e){alert('저장 실패: '+e.message);}
   showLoad(false);
@@ -893,7 +895,7 @@ function renderAdminSlots(){
   const booking=S.bookings.find(b=>b._docId===docId),taken=S.bookings.filter(b=>b.date===date.date&&b._docId!==docId).map(b=>b.slot);
   cont.innerHTML=date.slots.map(slot=>{const isTaken=taken.includes(slot),isCur=booking?.date===date.date&&booking?.slot===slot,isSel=S.adminSel===dateId+'|'+slot;return `<button class="sb ${isTaken?'bk':isSel?'sl':isCur?'mn':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'adminPickSlot(\''+dateId+'\',\''+slot+'\',this)'}">${slot}${isCur?' ✓':''}</button>`;}).join('')||'<p style="font-size:13px;color:#9ca3af">슬롯 없음</p>';}
 
-function adminPickSlot(dateId,slot,btn){S.adminSel=dateId+'|'+slot;document.querySelectorAll('#abSlots .sb').forEach(b=>{if(!b.classList.contains('bk')&&!b.classList.contains('mn'))b.classList.remove('sl');});btn.classList.add('sl');}
+function adminPickSlot(dateId,slot,btn){S.adminSel=dateId+'|'+slot;btn.closest('.sg').querySelectorAll('.sb').forEach(b=>{if(!b.classList.contains('bk')&&!b.classList.contains('mn'))b.classList.remove('sl');});btn.classList.add('sl');}
 
 async function saveAdminBook(){
   if(!S.adminSel){alert('시간을 선택하세요.');return;}
@@ -906,24 +908,75 @@ async function adminDelBook(docId){
   const b=S.bookings.find(x=>x._docId===docId);if(!b||!confirm(`${b.studentName} 학생의 ${b.dateLabel} ${b.slot} 예약을 삭제하시겠습니까?`))return;
   showLoad(true);try{await db.collection('bookings').doc(docId).delete();S.bookings=S.bookings.filter(x=>x._docId!==docId);renderAdminBookings();}catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
 
+function openStuDetail(stuDocId){
+  const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
+  const hasSc=stu.score&&Object.values(stu.score).some(v=>v);
+  const hasMarchSc=stu.marchScore&&Object.values(stu.marchScore).some(v=>v);
+  const isAdmin=S.user.type==='admin';
+  const marchBtns=isAdmin?`<div style="display:flex;gap:6px">${hasMarchSc?`<button class="btn bd bsm" onclick="adminDelMarchScore('${stuDocId}','stuDetail','')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','marchScore','stuDetail','')">${hasMarchSc?'수정':'입력'}</button></div>`:'';
+  const scoreBtns=isAdmin?`<div style="display:flex;gap:6px">${hasSc?`<button class="btn bd bsm" onclick="adminDelScore('${stuDocId}','stuDetail','')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','score','stuDetail','')">${hasSc?'수정':'입력'}</button></div>`:'';
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">학생 상세 정보</p>
+    <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${stu.name}</p></div>
+      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">좌석</p><p style="font-weight:700;font-size:14px;color:#1C64F2">${stu.seat||'—'}</p></div>
+      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div>
+      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.studentPhone}</p></div>
+      ${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}
+      ${stu.memo?`<div style="grid-column:1/-1"><p style="font-size:11px;color:#6b7280;margin-bottom:2px">메모</p><p style="font-size:13px">${stu.memo}</p></div>`:''}
+    </div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><p style="font-size:14px;font-weight:700">3월 모의고사 성적</p>${marchBtns}</div>
+    ${hasMarchSc?marchScoreTblHtml(stu.marchScore):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px"><p style="font-size:14px;font-weight:700">6월 모의평가 성적</p>${scoreBtns}</div>
+    ${hasSc?scoreTblHtml(stu.score):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1" onclick="closeModal();openNewBookForStu('${stuDocId}')">예약 등록</button></div>`;openModal();}
+
+function openNewBookForStu(stuDocId){
+  const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
+  S.adminSel=null;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 등록</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${stu.name} 학생 (${stu.school} ${stu.grade})</p>
+    <input type="hidden" id="nbStuId" value="${stuDocId}">
+    <div class="fg"><label class="fl">날짜 선택</label><select class="fi fsel" id="nbDate" onchange="renderNewBookSlots()">${S.schedule.dates.map(d=>`<option value="${d.id}">${d.label}</option>`).join('')}</select></div>
+    <div class="fg"><label class="fl">시간 선택</label><div class="sg" id="nbSlots" style="margin-top:4px"></div></div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveNewBookForStu()">예약 등록</button></div>`;
+  openModal();renderNewBookSlots();}
+
+function renderNewBookSlots(){
+  const dateId=_('nbDate')?.value,date=S.schedule.dates.find(d=>d.id===dateId),cont=_('nbSlots');if(!date||!cont)return;
+  const taken=S.bookings.filter(b=>b.date===date.date).map(b=>b.slot);
+  cont.innerHTML=date.slots.map(slot=>{const isTaken=taken.includes(slot),isSel=S.adminSel===dateId+'|'+slot;return `<button class="sb ${isTaken?'bk':isSel?'sl':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'adminPickSlot(\''+dateId+'\',\''+slot+'\',this)'}">${slot}</button>`;}).join('')||'<p style="font-size:13px;color:#9ca3af">슬롯 없음</p>';}
+
+async function saveNewBookForStu(){
+  if(!S.adminSel){alert('시간을 선택하세요.');return;}
+  const stuDocId=_('nbStuId')?.value;const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
+  const [dateId,slot]=S.adminSel.split('|'),date=S.schedule.dates.find(d=>d.id===dateId);if(!date)return;
+  showLoad(true);
+  try{
+    const bookData={studentId:stuDocId,studentName:stu.name,date:date.date,dateLabel:date.label,slot,question:''};
+    const docRef=await db.collection('bookings').add(bookData);
+    bookData._docId=docRef.id;S.bookings.push(bookData);
+    S.adminSel=null;closeModal();renderAdminBookings();
+  }catch(e){alert('예약 등록 실패: '+e.message);}
+  showLoad(false);}
+
 /* ── ADMIN: 계정 관리 ── */
 function renderAdminAccounts(){
   const rows=S.admins.map(a=>`<tr>
     <td><code>${a.id}</code></td><td style="font-weight:600">${a.name}</td>
-    <td><span class="bx ${a.role==='admin'?'br':'bb'}">${a.role==='admin'?'관리자':'뷰어'}</span></td>
+    <td><span class="bx ${a.role==='admin'?'br':'bb'}">${a.role==='admin'?'관리자':'OP'}</span></td>
     <td style="white-space:nowrap"><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openAcctModal('${a.id}')">수정</button>${a.id!==S.user.id?`<button class="btn bd bsm" onclick="delAcct('${a.id}')">삭제</button>`:'<span style="font-size:11px;color:#9ca3af;padding:0 8px">본인</span>'}</div></td>
   </tr>`).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">관리자 / 뷰어 계정 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.admins.length}개)</span></span><button class="btn bp bsm" onclick="openAcctModal(null)">+ 계정 추가</button></div>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">관리자 / OP 계정 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.admins.length}개)</span></span><button class="btn bp bsm" onclick="openAcctModal(null)">+ 계정 추가</button></div>
   <div class="card" style="padding:0"><div class="tw"><table><thead><tr><th>ID</th><th>이름</th><th>권한</th><th>관리</th></tr></thead>
   <tbody>${rows||'<tr><td colspan="4" class="empty">계정이 없습니다.</td></tr>'}</tbody></table></div></div>
-  <div style="margin-top:14px;padding:14px;background:#fff8e1;border:1px solid #fde68a;border-radius:10px"><p style="font-size:12px;color:#92400e;font-weight:500">💡 뷰어 권한: 예약 현황 조회 및 상세보기만 가능. 학생 정보·일정·예약 수정·삭제 불가.</p></div>`;}
+  <div style="margin-top:14px;padding:14px;background:#fff8e1;border:1px solid #fde68a;border-radius:10px"><p style="font-size:12px;color:#92400e;font-weight:500">💡 OP 권한: 예약 현황 조회·상세보기 및 예약 등록·변경·취소 가능. 학생 정보·일정·계정 관리 불가.</p></div>`;}
 
 function openAcctModal(accId){
   const a=accId?S.admins.find(x=>x.id===accId):null;
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${a?'계정 수정':'계정 추가'}</p>
     ${a?`<div class="fg"><label class="fl">ID</label><input class="fi" value="${a.id}" disabled style="background:#f9fafb;color:#6b7280"></div>`:`<div class="fg"><label class="fl">ID</label><input class="fi" id="acid" placeholder="로그인 아이디"></div>`}
     <div class="fg"><label class="fl">이름</label><input class="fi" id="acname" value="${a?.name||''}" placeholder="김재희"></div>
-    <div class="fg"><label class="fl">권한</label><select class="fi fsel" id="acrole"><option value="admin" ${a?.role==='admin'?'selected':''}>관리자</option><option value="viewer" ${a?.role==='viewer'?'selected':''}>뷰어</option></select></div>
+    <div class="fg"><label class="fl">권한</label><select class="fi fsel" id="acrole"><option value="admin" ${a?.role==='admin'?'selected':''}>관리자</option><option value="viewer" ${a?.role==='viewer'?'selected':''}>OP</option></select></div>
     ${a?`<div class="fg"><label class="fl">비밀번호 변경 (변경 시에만 입력)</label><input class="fi" id="acpw" type="password" placeholder="새 비밀번호 (비워두면 유지)"></div>`:`<div class="fg"><label class="fl">비밀번호 (6자 이상)</label><input class="fi" id="acpw" type="password" placeholder="비밀번호"></div>`}
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveAcct('${accId||''}')">저장</button></div>`;
