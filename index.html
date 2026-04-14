@@ -837,6 +837,7 @@ function renderAdminBookings(){
   const printHtml=Object.values(byDate).map(g=>`<div style="margin-bottom:20px"><p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:8px">${g.label}</p>${g.items.map(b=>{const stu=S.students.find(s=>s._docId===b.studentId);return `<div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><b style="color:#1C64F2;min-width:48px">${b.slot}</b><b style="min-width:60px">${b.studentName}</b><span>${stu?.school||''}</span><span style="color:#6b7280">${stu?.grade||''}</span><span style="color:#6b7280">${stu?.studentPhone||''}</span></div>`;}).join('')}</div>`).join('');
   _('adminC').innerHTML=`<div class="sh np"><span class="shtitle">예약 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(예약 ${sorted.length}건 · 미예약 ${unbooked.length}명)</span></span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
+    ${renderRequestsSection()}
     <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${sorted.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
     <div class="card np" style="padding:0;margin-bottom:16px"><div class="tw"><table>
       <thead><tr><th>날짜</th><th>시간</th><th>학생명</th><th>학교</th><th>학년</th><th>좌석</th><th>연락처</th><th>3월</th><th>6월</th><th>질문</th><th>관리</th></tr></thead>
@@ -846,8 +847,7 @@ function renderAdminBookings(){
     <div class="card np" style="padding:0"><div class="tw"><table>
       <thead><tr><th>좌석</th><th>이름</th><th>학교</th><th>학년</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>관리</th></tr></thead>
       <tbody>${unbookedRows||'<tr><td colspan="8" class="empty">미예약 학생이 없습니다. 🎉</td></tr>'}</tbody>
-    </table></div></div>
-    ${renderRequestsSection()}`;}
+    </table></div></div>`;}
 
 function renderRequestsSection(){
   const pending=S.requests.filter(r=>r.status==='pending').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
