@@ -351,7 +351,8 @@ function bookCardHtml(b){
     const typeLabel=latestRejected.type==='cancel'?'취소':'변경';
     statusHtml+=`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#dc2626;font-weight:600">예약 ${typeLabel} 요청이 거절되었습니다.</p><p style="font-size:11px;color:#dc2626;margin-top:4px">사유: ${latestRejected.reason}</p></div>`;
   }
-  const btns=pendingReq?'':`<div style="display:flex;gap:8px">
+  const reqEnabled=S.config.requestEnabled!==false;
+  const btns=!reqEnabled?'':pendingReq?'':`<div style="display:flex;gap:8px">
     <button class="btn bs" style="flex:1" onclick="requestCancelBook()">예약 취소 요청</button>
     <button class="btn bp" style="flex:1" onclick="showChangeRequestForm()">예약 변경 요청</button>
   </div>`;
@@ -841,12 +842,12 @@ function renderAdminBookings(){
   _('adminC').innerHTML=`<div class="sh np"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bg">예약</span>예약 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(예약 ${sorted.length}건 · 미예약 ${unbooked.length}명)</span></span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
     <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${sorted.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
-    <div class="card np" style="padding:0;margin-bottom:16px"><div class="tw"><table>
+    <div class="card np" style="padding:0;margin-bottom:24px"><div class="tw"><table>
       <thead><tr><th>날짜</th><th>시간</th><th>학생명</th><th>학교</th><th>학년</th><th>좌석</th><th>연락처</th><th>3월</th><th>6월</th><th>질문</th><th>관리</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="11" class="empty">예약 내역이 없습니다.</td></tr>'}</tbody>
     </table></div></div>
     ${renderRequestsSection()}
-    <div class="sh np" style="margin-top:8px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx br">미예약</span>예약하지 않은 학생 <span style="font-size:13px;font-weight:400;color:#6b7280">(${unbooked.length}명)</span></span></div>
+    <div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx br">미예약</span>예약하지 않은 학생 <span style="font-size:13px;font-weight:400;color:#6b7280">(${unbooked.length}명)</span></span></div>
     <div class="card np" style="padding:0"><div class="tw"><table>
       <thead><tr><th>좌석</th><th>이름</th><th>학교</th><th>학년</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>관리</th></tr></thead>
       <tbody>${unbookedRows||'<tr><td colspan="8" class="empty">미예약 학생이 없습니다. 🎉</td></tr>'}</tbody>
@@ -871,12 +872,15 @@ function renderRequestsSection(){
       <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.reason||'').replace(/"/g,'&quot;')}">${r.reason||'—'}</td>
       <td>${statusLabel}</td>
       <td style="font-size:11px;color:#6b7280">${r.createdAt?new Date(r.createdAt).toLocaleDateString('ko-KR'):'—'}</td></tr>`;}).join('');
-  return `<div class="sh np" style="margin-top:8px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bb">요청</span>예약 변경/취소 요청 <span style="font-size:13px;font-weight:400;color:#6b7280">(대기 ${pending.length}건)</span></span></div>
-    <div class="card np" style="padding:0;margin-bottom:16px"><div class="tw"><table>
+  const reqEnabled=S.config.requestEnabled!==false;
+  const toggleLabel=reqEnabled?'요청 기능 OFF':'요청 기능 ON';
+  const toggleBtn=`<button class="btn ${reqEnabled?'bd':'bp'} bsm" onclick="toggleRequestEnabled()">${toggleLabel}</button>`;
+  return `<div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bb">요청</span>예약 변경/취소 요청 <span style="font-size:13px;font-weight:400;color:#6b7280">(대기 ${pending.length}건)</span></span>${toggleBtn}</div>
+    <div class="card np" style="padding:0;margin-bottom:24px"><div class="tw"><table>
       <thead><tr><th>유형</th><th>학생명</th><th>현재 예약</th><th>사유</th><th>요청일</th><th>관리</th></tr></thead>
       <tbody>${pendingRows||'<tr><td colspan="6" class="empty">대기 중인 요청이 없습니다.</td></tr>'}</tbody>
     </table></div></div>
-    ${resolved.length?`<div class="sh np" style="margin-top:8px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bgr">처리 완료</span>최근 처리된 요청</span></div>
+    ${resolved.length?`<div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bgr">처리 완료</span>최근 처리된 요청</span></div>
     <div class="card np" style="padding:0"><div class="tw"><table>
       <thead><tr><th>유형</th><th>학생명</th><th>예약</th><th>사유</th><th>결과</th><th>처리일</th></tr></thead>
       <tbody>${resolvedRows}</tbody>
@@ -913,6 +917,14 @@ async function rejectRequest(reqId){
     req.status='rejected';
     renderAdminBookings();
   }catch(e){alert('거절 실패: '+e.message);}
+  showLoad(false);}
+
+async function toggleRequestEnabled(){
+  const cur=S.config.requestEnabled!==false;
+  S.config.requestEnabled=!cur;
+  showLoad(true);
+  try{await db.collection('config').doc('main').set(S.config);renderAdminBookings();}
+  catch(e){alert('설정 저장 실패: '+e.message);S.config.requestEnabled=cur;}
   showLoad(false);}
 
 async function refreshBookings(){showLoad(true);try{const[bkSnap,reqSnap]=await Promise.all([db.collection('bookings').get(),db.collection('requests').get()]);S.bookings=bkSnap.docs.map(d=>({_docId:d.id,...d.data()}));S.requests=reqSnap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminBookings();}catch(e){alert('새로고침 실패: '+e.message);}showLoad(false);}
