@@ -351,8 +351,8 @@ function scoreFormHtml(s){s=s||{};return `
 
 function scoreTblHtml(sc){if(!sc)return '';const hasL2=sc.lang2Subj||sc.lang2Raw;return `<div style="overflow-x:auto"><table class="sc-tbl">
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어</td>':''}</tr>
-  <tr><td class="rh" style="font-size:10px">선택과목</td><td class="ec"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="ec"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
-  <tr><td class="rh" style="font-size:10px">원점수</td><td class="dl"></td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="dl"></td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
+  <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
+  <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px">등급</td><td class="vl">${sc.hisGrade||'—'}</td><td class="dl"></td><td class="dl"></td><td class="vl">${sc.engGrade||'—'}</td><td class="dl"></td><td class="dl"></td>${hasL2?'<td class="dl"></td>':''}</tr>
 </table></div>`;}
 
