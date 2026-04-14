@@ -188,7 +188,7 @@ const S = {
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[],
   tab:null, selDate:null, adminSel:null,
-  editingScore:false, lang2Open:false, marchEditingScore:false, marchLang2Open:false, stuSort:'seat'
+  editingScore:false, lang2Open:false, marchEditingScore:false, stuSort:'seat'
 };
 
 const _=id=>document.getElementById(id);
@@ -271,7 +271,7 @@ async function doLogin(){
 }
 
 function doLogout(){
-  S.user=null;S.studentDocId=null;S.editingScore=false;S.lang2Open=false;S.marchEditingScore=false;S.marchLang2Open=false;
+  S.user=null;S.studentDocId=null;S.editingScore=false;S.lang2Open=false;S.marchEditingScore=false;
   _('lId').value='';_('lPw').value='';hideErr('lErr');showView('vLogin');
 }
 
@@ -365,21 +365,29 @@ function scoreCardHtml(stu){
   else body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${S.config.scoreStart?`<br><span style="font-size:12px">기간: ${S.config.scoreStart} ~ ${S.config.scoreEnd}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
   return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">모의평가 성적</p></div>${editBtn}</div>${pNote}${body}</div>`;}
 
+function gradeOpts(sel){return [1,2,3,4,5,6,7,8,9].map(g=>`<option ${String(g)===String(sel)?'selected':''}>${g}</option>`).join('');}
 function marchScoreFormHtml(s){s=s||{};return `
-  <div class="frow"><div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="mk-kr" type="number" min="0" max="100" value="${s.korRaw||''}" placeholder="0–100"></div>
-  <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="mk-mr" type="number" min="0" max="100" value="${s.matRaw||''}" placeholder="0–100"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="mk-er" type="number" min="0" max="100" value="${s.engRaw||''}" placeholder="0–100"></div>
-  <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="mk-hr" type="number" min="0" max="50" value="${s.hisRaw||''}" placeholder="0–50"></div></div>
+  <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="mk-ks"><option value="">선택</option><option ${s.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${s.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
+  <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="mk-kr" type="number" min="0" max="100" value="${s.korRaw||''}" placeholder="0–100"></div>
+  <div class="fg"><label class="fl">국어 등급</label><select class="fi fsel" id="mk-kg"><option value="">등급</option>${gradeOpts(s.korGrade||'')}</select></div></div>
+  <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="mk-ms"><option value="">선택</option><option ${s.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${s.matSubj==='미적분'?'selected':''}>미적분</option><option ${s.matSubj==='기하'?'selected':''}>기하</option></select></div>
+  <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="mk-mr" type="number" min="0" max="100" value="${s.matRaw||''}" placeholder="0–100"></div>
+  <div class="fg"><label class="fl">수학 등급</label><select class="fi fsel" id="mk-mg"><option value="">등급</option>${gradeOpts(s.matGrade||'')}</select></div></div>
+  <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="mk-eg"><option value="">등급</option>${gradeOpts(s.engGrade||'')}</select></div>
+  <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="mk-hg"><option value="">등급</option>${gradeOpts(s.hisGrade||'')}</select></div></div>
   <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="mk-e1s">${expOpts(s.exp1Subj||'')}</select></div>
-  <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="mk-e1r" type="number" min="0" max="50" value="${s.exp1Raw||''}" placeholder="0–50"></div></div>
+  <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="mk-e1r" type="number" min="0" max="50" value="${s.exp1Raw||''}" placeholder="0–50"></div>
+  <div class="fg"><label class="fl">탐구 1 등급</label><select class="fi fsel" id="mk-e1g"><option value="">등급</option>${gradeOpts(s.exp1Grade||'')}</select></div></div>
   <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="mk-e2s">${expOpts(s.exp2Subj||'')}</select></div>
-  <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="mk-e2r" type="number" min="0" max="50" value="${s.exp2Raw||''}" placeholder="0–50"></div></div>
+  <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="mk-e2r" type="number" min="0" max="50" value="${s.exp2Raw||''}" placeholder="0–50"></div>
+  <div class="fg"><label class="fl">탐구 2 등급</label><select class="fi fsel" id="mk-e2g"><option value="">등급</option>${gradeOpts(s.exp2Grade||'')}</select></div></div>
   <button class="btn bp bfw" style="margin-top:14px" onclick="saveMarchScore()">성적 저장</button>`;}
 
 function marchScoreTblHtml(sc){if(!sc)return '';return `<div style="overflow-x:auto"><table class="sc-tbl">
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td></tr>
-  <tr><td class="rh" style="font-size:10px">선택과목</td><td class="ec"></td><td class="ec"></td><td class="ec"></td><td class="ec"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td></tr>
-  <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.engRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td></tr>
+  <tr><td class="rh" style="font-size:10px">선택과목</td><td class="ec"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="ec"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td></tr>
+  <tr><td class="rh" style="font-size:10px">원점수</td><td class="ec"></td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="ec"></td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td></tr>
+  <tr><td class="rh" style="font-size:10px">등급</td><td class="vl">${sc.hisGrade||'—'}</td><td class="vl">${sc.korGrade||'—'}</td><td class="vl">${sc.matGrade||'—'}</td><td class="vl">${sc.engGrade||'—'}</td><td class="vl">${sc.exp1Grade||'—'}</td><td class="vl">${sc.exp2Grade||'—'}</td></tr>
 </table></div>`;}
 
 function marchScoreCardHtml(stu){
@@ -412,7 +420,7 @@ async function saveScore(){
 
 async function saveMarchScore(){
   if(!S.studentDocId)return;
-  const marchScore={korRaw:_('mk-kr')?.value||'',matRaw:_('mk-mr')?.value||'',engRaw:_('mk-er')?.value||'',hisRaw:_('mk-hr')?.value||'',exp1Subj:_('mk-e1s')?.value||'',exp1Raw:_('mk-e1r')?.value||'',exp2Subj:_('mk-e2s')?.value||'',exp2Raw:_('mk-e2r')?.value||''};
+  const marchScore={korSubj:_('mk-ks')?.value||'',korRaw:_('mk-kr')?.value||'',korGrade:_('mk-kg')?.value||'',matSubj:_('mk-ms')?.value||'',matRaw:_('mk-mr')?.value||'',matGrade:_('mk-mg')?.value||'',engGrade:_('mk-eg')?.value||'',hisGrade:_('mk-hg')?.value||'',exp1Subj:_('mk-e1s')?.value||'',exp1Raw:_('mk-e1r')?.value||'',exp1Grade:_('mk-e1g')?.value||'',exp2Subj:_('mk-e2s')?.value||'',exp2Raw:_('mk-e2r')?.value||'',exp2Grade:_('mk-e2g')?.value||''};
   showLoad(true);
   try{await db.collection('students').doc(S.studentDocId).update({marchScore});
     const stu=S.students.find(x=>x._docId===S.studentDocId);if(stu)stu.marchScore=marchScore;
@@ -814,14 +822,20 @@ function openAdminScoreEdit(stuDocId, type, from, bookDocId){
   let formHtml='';
   if(isMarch){
     formHtml=`
-    <div class="frow"><div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div>
-    <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="as-mr" type="number" min="0" max="100" value="${sc.matRaw||''}" placeholder="0–100"></div></div>
-    <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="as-er" type="number" min="0" max="100" value="${sc.engRaw||''}" placeholder="0–100"></div>
-    <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="as-hr" type="number" min="0" max="50" value="${sc.hisRaw||''}" placeholder="0–50"></div></div>
+    <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="as-ks"><option value="">선택</option><option ${sc.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${sc.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
+    <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div>
+    <div class="fg"><label class="fl">국어 등급</label><select class="fi fsel" id="as-kg"><option value="">등급</option>${gradeOpts(sc.korGrade||'')}</select></div></div>
+    <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="as-ms"><option value="">선택</option><option ${sc.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${sc.matSubj==='미적분'?'selected':''}>미적분</option><option ${sc.matSubj==='기하'?'selected':''}>기하</option></select></div>
+    <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="as-mr" type="number" min="0" max="100" value="${sc.matRaw||''}" placeholder="0–100"></div>
+    <div class="fg"><label class="fl">수학 등급</label><select class="fi fsel" id="as-mg"><option value="">등급</option>${gradeOpts(sc.matGrade||'')}</select></div></div>
+    <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="as-eg"><option value="">등급</option>${gradeOpts(sc.engGrade||'')}</select></div>
+    <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="as-hg"><option value="">등급</option>${gradeOpts(sc.hisGrade||'')}</select></div></div>
     <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'')}</select></div>
-    <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="as-e1r" type="number" min="0" max="50" value="${sc.exp1Raw||''}" placeholder="0–50"></div></div>
+    <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="as-e1r" type="number" min="0" max="50" value="${sc.exp1Raw||''}" placeholder="0–50"></div>
+    <div class="fg"><label class="fl">탐구 1 등급</label><select class="fi fsel" id="as-e1g"><option value="">등급</option>${gradeOpts(sc.exp1Grade||'')}</select></div></div>
     <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'')}</select></div>
-    <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="as-e2r" type="number" min="0" max="50" value="${sc.exp2Raw||''}" placeholder="0–50"></div></div>`;
+    <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="as-e2r" type="number" min="0" max="50" value="${sc.exp2Raw||''}" placeholder="0–50"></div>
+    <div class="fg"><label class="fl">탐구 2 등급</label><select class="fi fsel" id="as-e2g"><option value="">등급</option>${gradeOpts(sc.exp2Grade||'')}</select></div></div>`;
   }else{
     formHtml=`
     <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="as-ks"><option value="">선택</option><option ${sc.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${sc.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
@@ -848,7 +862,7 @@ async function saveAdminScore(stuDocId, type, from, bookDocId){
   const isMarch=type==='marchScore';
   let scoreData;
   if(isMarch){
-    scoreData={korRaw:_('as-kr')?.value||'',matRaw:_('as-mr')?.value||'',engRaw:_('as-er')?.value||'',hisRaw:_('as-hr')?.value||'',exp1Subj:_('as-e1s')?.value||'',exp1Raw:_('as-e1r')?.value||'',exp2Subj:_('as-e2s')?.value||'',exp2Raw:_('as-e2r')?.value||''};
+    scoreData={korSubj:_('as-ks')?.value||'',korRaw:_('as-kr')?.value||'',korGrade:_('as-kg')?.value||'',matSubj:_('as-ms')?.value||'',matRaw:_('as-mr')?.value||'',matGrade:_('as-mg')?.value||'',engGrade:_('as-eg')?.value||'',hisGrade:_('as-hg')?.value||'',exp1Subj:_('as-e1s')?.value||'',exp1Raw:_('as-e1r')?.value||'',exp1Grade:_('as-e1g')?.value||'',exp2Subj:_('as-e2s')?.value||'',exp2Raw:_('as-e2r')?.value||'',exp2Grade:_('as-e2g')?.value||''};
   }else{
     scoreData={korSubj:_('as-ks')?.value||'',korRaw:_('as-kr')?.value||'',matSubj:_('as-ms')?.value||'',matRaw:_('as-mr')?.value||'',engRaw:_('as-er')?.value||'',hisRaw:_('as-hr')?.value||'',exp1Subj:_('as-e1s')?.value||'',exp1Raw:_('as-e1r')?.value||'',exp2Subj:_('as-e2s')?.value||'',exp2Raw:_('as-e2r')?.value||'',lang2Subj:_('as-l2s')?.value||'',lang2Raw:_('as-l2r')?.value||''};
   }
