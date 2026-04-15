@@ -652,7 +652,9 @@ function cutDiffChip(raw,cuts){
 }
 function rawWithDiff(raw,cuts){
   if(!raw&&raw!==0)return '—';
-  return `${raw}${cutDiffChip(raw,cuts)}`;
+  const chip=cutDiffChip(raw,cuts);
+  if(!chip)return raw;
+  return `<span style="position:relative;display:inline-block"><span>${raw}</span><span style="position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:3px">${chip}</span></span>`;
 }
 function examScoreTblFull(exam,sc){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
