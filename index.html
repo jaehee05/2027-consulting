@@ -476,16 +476,21 @@ function getExpSubjects(exam){
 }
 function getScoreSteps(exam){
   const steps=[
-    {id:'kor',title:'국어',type:'subjRaw',subjOpts:`<option value="">선택과목 입력</option><option>화법과 작문</option><option>언어와 매체</option>`,rawMax:100,subjKey:'korSubj',rawKey:'korRaw'},
-    {id:'mat',title:'수학',type:'subjRaw',subjOpts:`<option value="">선택과목 입력</option><option>확률과 통계</option><option>미적분</option><option>기하</option>`,rawMax:100,subjKey:'matSubj',rawKey:'matRaw'},
+    {id:'kors',title:'국어',type:'grid',subjKey:'korSubj',items:['화법과 작문','언어와 매체']},
+    {id:'korr',title:'국어',type:'subjRaw',rawMax:100,rawKey:'korRaw',showSubjKey:'korSubj'},
+    {id:'mats',title:'수학',type:'grid',subjKey:'matSubj',items:['확률과 통계','미적분','기하']},
+    {id:'matr',title:'수학',type:'subjRaw',rawMax:100,rawKey:'matRaw',showSubjKey:'matSubj'},
     {id:'eng',title:'영어',type:'rawOnly',rawMax:100,rawKey:'engRaw'},
     {id:'his',title:'한국사',type:'rawOnly',rawMax:50,rawKey:'hisRaw'},
     {id:'exp1s',title:'탐구 1',type:'expGrid',subjKey:'exp1Subj',excludeKey:null},
-    {id:'exp1r',title:'탐구 1',type:'expRaw',rawMax:50,rawKey:'exp1Raw',showSubjKey:'exp1Subj'},
+    {id:'exp1r',title:'탐구 1',type:'subjRaw',rawMax:50,rawKey:'exp1Raw',showSubjKey:'exp1Subj'},
     {id:'exp2s',title:'탐구 2',type:'expGrid',subjKey:'exp2Subj',excludeKey:'exp1Subj'},
-    {id:'exp2r',title:'탐구 2',type:'expRaw',rawMax:50,rawKey:'exp2Raw',showSubjKey:'exp2Subj'},
+    {id:'exp2r',title:'탐구 2',type:'subjRaw',rawMax:50,rawKey:'exp2Raw',showSubjKey:'exp2Subj'},
   ];
-  if(exam.hasLang2)steps.push({id:'lang2',title:'제2외국어',type:'subjRaw',subjOpts:l2Opts(''),rawMax:50,subjKey:'lang2Subj',rawKey:'lang2Raw'});
+  if(exam.hasLang2)steps.push(
+    {id:'lang2s',title:'제2외국어',type:'grid',subjKey:'lang2Subj',items:['독일어Ⅰ','프랑스어Ⅰ','스페인어Ⅰ','중국어Ⅰ','일본어Ⅰ','러시아어Ⅰ','아랍어Ⅰ','베트남어Ⅰ','한문Ⅰ']},
+    {id:'lang2r',title:'제2외국어',type:'subjRaw',rawMax:50,rawKey:'lang2Raw',showSubjKey:'lang2Subj'}
+  );
   return steps;
 }
 
@@ -512,34 +517,40 @@ function renderScoreWizard(){
   const prevBtn=step>0?`<a class="sw-prev" onclick="swSaveStep();S.scoreStep--;renderScoreWizard()">이전 페이지로 돌아가기</a>`:'';
   const isLast=step===steps.length-1;
 
-  if(st.type==='expGrid'){
-    const groups=getExpSubjects(exam);const exclude=st.excludeKey?w[st.excludeKey]:'';const cur=w[st.subjKey]||'';
+  if(st.type==='expGrid'||st.type==='grid'){
+    const isExp=st.type==='expGrid';
+    const exclude=st.excludeKey?w[st.excludeKey]:'';const cur=w[st.subjKey]||'';
     let grid='';
-    for(const g of groups){
-      grid+=`<p style="font-size:12px;font-weight:700;color:#6b7280;margin:12px 0 8px">${g.group}</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">`;
-      for(const item of g.items){
-        const disabled=item===exclude;const selected=item===cur;
-        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${selected?'#1C64F2':disabled?'#f3f4f6':'#e5e7eb'};background:${selected?'#1C64F2':disabled?'#f9fafb':'#f3f4f6'};color:${selected?'#fff':disabled?'#d1d5db':'#374151'};cursor:${disabled?'default':'pointer'};font-family:inherit;transition:.15s" ${disabled?'disabled':''}onclick="S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
+    if(isExp){
+      const groups=getExpSubjects(exam);
+      for(const g of groups){
+        grid+=`<p style="font-size:12px;font-weight:700;color:#6b7280;margin:12px 0 8px">${g.group}</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">`;
+        for(const item of g.items){
+          const dis=item===exclude;const sel=item===cur;
+          grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':dis?'#f3f4f6':'#e5e7eb'};background:${sel?'#1C64F2':dis?'#f9fafb':'#f3f4f6'};color:${sel?'#fff':dis?'#d1d5db':'#374151'};cursor:${dis?'default':'pointer'};font-family:inherit;transition:.15s" ${dis?'disabled':''}onclick="S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
+        }
+        grid+=`</div>`;
+      }
+    }else{
+      const cols=st.items.length<=3?st.items.length:3;
+      grid+=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-top:16px">`;
+      for(const item of st.items){
+        const sel=item===cur;
+        grid+=`<button style="padding:16px 8px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':'#e5e7eb'};background:${sel?'#1C64F2':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
       }
       grid+=`</div>`;
     }
     c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
-      <div><p class="sw-title">${st.title}</p><p style="color:#6b7280;font-size:14px;margin-bottom:4px">과목을 선택하세요.</p>${grid}</div>
+      <div><p class="sw-title">${st.title}</p><p style="color:#6b7280;font-size:14px;margin-bottom:4px">${isExp?'과목을 선택하세요.':'선택과목을 선택하세요.'}</p>${grid}</div>
       <div class="sw-bottom">${prevBtn}</div>
     </div></div>`;return;
   }
 
   let fields='';
   let subtitle='';
-  if(st.type==='subjRaw'){
-    const curSubj=w[st.subjKey]||'';
-    let selHtml=st.subjOpts;
-    if(curSubj){selHtml=st.subjOpts.replace(`>${curSubj}<`,` selected>${curSubj}<`);}
-    fields+=`<div class="sw-field"><label class="sw-label ${curSubj?'on':''}">선택과목 입력</label><select class="sw-select" id="sw-subj" onchange="this.previousElementSibling.classList.toggle('on',!!this.value)">${selHtml}</select></div>`;
-  }
-  if(st.type==='expRaw'&&st.showSubjKey){subtitle=`<p style="color:#1C64F2;font-size:14px;font-weight:600;margin-bottom:4px">${w[st.showSubjKey]||''}</p>`;}
+  if(st.showSubjKey){subtitle=`<p style="color:#1C64F2;font-size:14px;font-weight:600;margin-bottom:4px">${w[st.showSubjKey]||''}</p>`;}
   const rawKey=st.rawKey;const curRaw=w[rawKey]||'';
-  fields+=`<div class="sw-field"><label class="sw-label ${curRaw?'on':''}">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력" value="${curRaw}" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`;
+  fields+=`<div class="sw-field"><label class="sw-label ${curRaw?'on':''}">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="let v=Number(this.value);if(this.value!==''&&v>${st.rawMax})this.value=${st.rawMax};if(this.value!==''&&v<0)this.value=0" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`;
   c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
     <div><p class="sw-title">${st.title}</p>${subtitle}${fields}</div>
     <div class="sw-bottom">${prevBtn}<button class="sw-next" onclick="${isLast?`swSaveStep();finishScoreWizard()`:`swSaveStep();S.scoreStep++;renderScoreWizard()`}">${isLast?'저장':'다음'}</button></div>
@@ -549,9 +560,8 @@ function renderScoreWizard(){
 function swSaveStep(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
   const steps=getScoreSteps(exam);const st=steps[S.scoreStep];if(!st)return;
-  if(st.type==='expGrid')return;
-  if(st.type==='subjRaw'&&st.subjKey){S.scoreWizard[st.subjKey]=_('sw-subj')?.value||'';}
-  if(st.rawKey)S.scoreWizard[st.rawKey]=_('sw-raw')?.value||'';
+  if(st.type==='expGrid'||st.type==='grid')return;
+  if(st.rawKey){let v=_('sw-raw')?.value||'';if(v!==''&&Number(v)>st.rawMax)v=String(st.rawMax);if(v!==''&&Number(v)<0)v='0';S.scoreWizard[st.rawKey]=v;}
 }
 
 async function finishScoreWizard(){
