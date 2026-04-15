@@ -911,7 +911,7 @@ function drawGradeGraph(exams,stu,subjInfo){
     dots+=`<text x="${p.x}" y="${p.y-10}" text-anchor="middle" font-size="10" fill="#1C64F2" font-weight="700">${p.g}등급</text>`;
   });
   if(!pts.length)return `<div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px">입력된 성적이 없습니다.</div>`;
-  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${gridLines}${xLabels}${path}${dots}</svg></div>`;
+  return `<div style="overflow-x:auto;display:flex;justify-content:center"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${gridLines}${xLabels}${path}${dots}</svg></div>`;
 }
 
 function renderConsultDetail(){
@@ -938,6 +938,7 @@ function renderConsultDetail(){
       <button class="btn bs bsm" onclick="S.consultStuId=null;renderAdminConsult()">← 목록</button>
       <div><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p></div>
     </div>
+    ${qInfo}
     <div class="card" style="margin-bottom:12px">
       <p style="font-size:13px;font-weight:700;margin-bottom:10px">성적표</p>
       ${examsWithScore.length>1?'<div class="dtabs" style="margin-bottom:10px">'+scoreTabs+'</div>':''}
@@ -948,7 +949,6 @@ function renderConsultDetail(){
       <div class="dtabs" style="margin-bottom:10px">${graphTabs}</div>
       ${graphBody}
     </div>
-    ${qInfo}
     <div class="card">
       <p style="font-size:13px;font-weight:700;margin-bottom:8px">컨설팅 내용</p>
       <textarea class="fi ta" id="consultInput" rows="8" placeholder="컨설팅 내용을 기록하세요...">${stu.consultNote||''}</textarea>
