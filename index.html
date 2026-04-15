@@ -497,7 +497,8 @@ function getScoreSteps(exam){
     {id:'exp2r',title:'탐구 2',type:'subjRaw',rawMax:50,rawKey:'exp2Raw',showSubjKey:'exp2Subj'},
   ];
   if(exam.hasLang2)steps.push(
-    {id:'lang2',title:'제2외국어',type:'gridRaw',subjKey:'lang2Subj',rawKey:'lang2Raw',rawMax:50,items:['독일어Ⅰ','프랑스어Ⅰ','스페인어Ⅰ','중국어Ⅰ','일본어Ⅰ','러시아어Ⅰ','아랍어Ⅰ','베트남어Ⅰ','한문Ⅰ']}
+    {id:'lang2c',title:'제2외국어/한문',type:'lang2Choice'},
+    {id:'lang2',title:'제2외국어/한문',type:'gridRaw',subjKey:'lang2Subj',rawKey:'lang2Raw',rawMax:50,items:['독일어Ⅰ','프랑스어Ⅰ','스페인어Ⅰ','중국어Ⅰ','일본어Ⅰ','러시아어Ⅰ','아랍어Ⅰ','베트남어Ⅰ','한문Ⅰ']}
   );
   return steps;
 }
@@ -507,7 +508,7 @@ function startScoreWizard(examId){
   const stu=S.students.find(x=>x._docId===S.studentDocId);
   const sc=getStuExamScore(stu,examId)||{};
   S.scoreWizardExamId=examId;S.scoreStep=0;
-  S.scoreWizard={korSubj:sc.korSubj||'',korRaw:sc.korRaw||'',matSubj:sc.matSubj||'',matRaw:sc.matRaw||'',engRaw:sc.engRaw||'',hisRaw:sc.hisRaw||'',exp1Subj:sc.exp1Subj||'',exp1Raw:sc.exp1Raw||'',exp2Subj:sc.exp2Subj||'',exp2Raw:sc.exp2Raw||'',lang2Subj:sc.lang2Subj||'',lang2Raw:sc.lang2Raw||''};
+  S.scoreWizard={korSubj:sc.korSubj||'',korRaw:sc.korRaw||'',matSubj:sc.matSubj||'',matRaw:sc.matRaw||'',engRaw:sc.engRaw||'',hisRaw:sc.hisRaw||'',exp1Subj:sc.exp1Subj||'',exp1Raw:sc.exp1Raw||'',exp2Subj:sc.exp2Subj||'',exp2Raw:sc.exp2Raw||'',lang2Subj:sc.lang2Subj||'',lang2Raw:sc.lang2Raw||'',lang2Take:!!(sc.lang2Subj||sc.lang2Raw)};
   renderScoreWizard();
 }
 
@@ -543,8 +544,20 @@ function renderScoreWizard(){
     return;
   }
 
+  if(st.type==='lang2Choice'){
+    const rawKey=st.id==='lang2c'?'lang2Raw':'';
+    c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
+      <div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><p class="sw-title" style="margin:0">${st.title}</p>
+        <div style="display:flex;border:1.5px solid #e5e7eb;border-radius:8px;overflow:hidden">
+          <button style="padding:8px 16px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${w.lang2Take?'#1C64F2':'#fff'};color:${w.lang2Take?'#fff':'#374151'};transition:.15s" onclick="S.scoreWizard.lang2Take=true;S.scoreStep++;renderScoreWizard()">응시</button>
+          <button style="padding:8px 16px;font-size:13px;font-weight:600;border:none;border-left:1.5px solid #e5e7eb;cursor:pointer;font-family:inherit;background:${!w.lang2Take?'#f3f4f6':'#fff'};color:#374151;transition:.15s" onclick="S.scoreWizard.lang2Take=false;S.scoreWizard.lang2Subj='';S.scoreWizard.lang2Raw='';swSaveStep();finishScoreWizard()">미응시</button>
+        </div></div></div>
+      <div class="sw-bottom">${prevBtn}</div>
+    </div></div>`;return;
+  }
+
   if(st.type==='expGrid'){
-    const cur=w[st.subjKey]||'';
+    const cur=w[st.subjKey]||'';const rawKey=st.subjKey.replace('Subj','Raw');
     const groups=getExpSubjects(exam);
     const exp1Idx=st.excludeKey?expSubjIndex(exam,w[st.excludeKey]):-1;
     let grid='';
@@ -553,7 +566,7 @@ function renderScoreWizard(){
       for(const item of g.items){
         const idx=expSubjIndex(exam,item);
         const dis=st.excludeKey&&idx<=exp1Idx;const sel=item===cur;
-        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':dis?'#f3f4f6':'#e5e7eb'};background:${sel?'#1C64F2':dis?'#f9fafb':'#f3f4f6'};color:${sel?'#fff':dis?'#d1d5db':'#374151'};cursor:${dis?'default':'pointer'};font-family:inherit;transition:.15s" ${dis?'disabled':''}onclick="S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
+        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':dis?'#f3f4f6':'#e5e7eb'};background:${sel?'#1C64F2':dis?'#f9fafb':'#f3f4f6'};color:${sel?'#fff':dis?'#d1d5db':'#374151'};cursor:${dis?'default':'pointer'};font-family:inherit;transition:.15s" ${dis?'disabled':''}onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}')S.scoreWizard['${rawKey}']='';S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
       }
       grid+=`</div>`;
     }
@@ -583,7 +596,7 @@ function swValidateRaw(el,max){
 function swSaveStep(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
   const steps=getScoreSteps(exam);const st=steps[S.scoreStep];if(!st)return;
-  if(st.type==='expGrid')return;
+  if(st.type==='expGrid'||st.type==='lang2Choice')return;
   if(st.rawKey){S.scoreWizard[st.rawKey]=_('sw-raw')?.value||'';}
 }
 
