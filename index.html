@@ -65,6 +65,26 @@ tr:last-child td{border-bottom:none}
 .sc-tbl td{border:1px solid #d1d5db;text-align:center;vertical-align:middle;height:32px;padding:2px 4px}
 .sc-tbl .hd{background:#f3f4f6;font-size:11px;font-weight:600;color:#374151}
 .sc-tbl .rh{background:#f9fafb;font-size:11px;font-weight:600;color:#374151;width:13%}
+.sw-wrap{min-height:420px;display:flex;flex-direction:column;justify-content:space-between}
+.sw-title{font-size:22px;font-weight:800;margin-bottom:8px}
+.sw-field{margin-bottom:24px}
+.sw-label{font-size:12px;color:#1C64F2;font-weight:600;margin-bottom:4px;display:none}
+.sw-label.on{display:block}
+.sw-input{width:100%;border:none;border-bottom:1.5px solid #e5e7eb;padding:10px 0;font-size:18px;font-weight:600;font-family:inherit;outline:none;background:transparent;color:#111827;transition:.2s}
+.sw-input::placeholder{color:#d1d5db;font-weight:400}
+.sw-input:focus{border-bottom-color:#1C64F2}
+.sw-input:focus~.sw-label,.sw-input:not(:placeholder-shown)~.sw-label{display:block}
+.sw-select{width:100%;border:none;border-bottom:1.5px solid #e5e7eb;padding:10px 0;font-size:18px;font-weight:600;font-family:inherit;outline:none;background:transparent;color:#111827;appearance:none;-webkit-appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}
+.sw-select:focus{border-bottom-color:#1C64F2}
+.sw-select option{font-size:14px}
+.sw-bottom{margin-top:auto;padding-top:20px}
+.sw-prev{display:block;text-align:center;color:#9ca3af;font-size:13px;font-weight:500;margin-bottom:12px;cursor:pointer;text-decoration:none}
+.sw-prev:hover{color:#6b7280}
+.sw-next{width:100%;padding:16px;border-radius:14px;background:#1C64F2;color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:.15s}
+.sw-next:hover{background:#1a56d6}
+.sw-done{text-align:center;padding:40px 20px}
+.sw-check{width:80px;height:80px;border-radius:50%;border:3px solid #1C64F2;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.sw-check svg{width:40px;height:40px;stroke:#1C64F2;stroke-width:2.5;fill:none}
 .gc-in{width:100%;height:32px;border:1px solid #e5e7eb;border-radius:6px;text-align:center;font-size:12px;font-weight:600;font-family:inherit;outline:none;padding:0 2px;box-sizing:border-box}
 .gc-in:focus{border-color:#1C64F2;box-shadow:0 0 0 2px rgba(28,100,242,.1)}
 .gc-tbl{width:100%;border-collapse:collapse;font-size:12px}
@@ -224,7 +244,8 @@ const S = {
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[], requests:[],
   tab:null, selDate:null, adminSel:null,
-  editingExamId:null, lang2Open:false, stuSort:'seat'
+  editingExamId:null, lang2Open:false, stuSort:'seat',
+  scoreStep:0, scoreWizard:{}, scoreWizardExamId:null
 };
 
 const _=id=>document.getElementById(id);
@@ -362,7 +383,7 @@ async function doLogin(){
 }
 
 function doLogout(){
-  S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;
+  S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
   sessionStorage.removeItem('session');
   _('lId').value='';_('lPw').value='';hideErr('lErr');showView('vLogin');
 }
@@ -447,25 +468,84 @@ function l2Opts(sel){return `<option value="">선택</option>${['독일어Ⅰ','
 
 function gradeOpts(sel){return [1,2,3,4,5,6,7,8,9].map(g=>`<option ${String(g)===String(sel)?'selected':''}>${g}</option>`).join('');}
 
-function examScoreFormHtml(exam,s){s=s||{};const sci2=exam.hasScienceII;let html=`
-  <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="es-ks"><option value="">선택</option><option ${s.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${s.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
-  <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="es-kr" type="number" min="0" max="100" value="${s.korRaw||''}" placeholder="0–100"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="es-ms"><option value="">선택</option><option ${s.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${s.matSubj==='미적분'?'selected':''}>미적분</option><option ${s.matSubj==='기하'?'selected':''}>기하</option></select></div>
-  <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="es-mr" type="number" min="0" max="100" value="${s.matRaw||''}" placeholder="0–100"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="es-er" type="number" min="0" max="100" value="${s.engRaw||''}" placeholder="0–100"></div>
-  <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="es-hr" type="number" min="0" max="50" value="${s.hisRaw||''}" placeholder="0–50"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="es-e1s">${expOpts(s.exp1Subj||'',sci2)}</select></div>
-  <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="es-e1r" type="number" min="0" max="50" value="${s.exp1Raw||''}" placeholder="0–50"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="es-e2s">${expOpts(s.exp2Subj||'',sci2)}</select></div>
-  <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="es-e2r" type="number" min="0" max="50" value="${s.exp2Raw||''}" placeholder="0–50"></div></div>`;
-  if(exam.hasLang2){html+=`
-  <div style="cursor:pointer;display:flex;align-items:center;gap:7px;padding:8px 12px;border:1px dashed #e5e7eb;border-radius:10px;background:#fafafa;margin-bottom:${S.lang2Open?'10px':'0'}" onclick="S.lang2Open=!S.lang2Open;renderStu()">
-    <span style="width:20px;height:20px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:14px">${S.lang2Open?'−':'+'}</span>
-    <span style="font-size:13px;font-weight:500;color:#6b7280">제2외국어 / 한문 ${S.lang2Open?'닫기':'추가'}</span>
-  </div>
-  ${S.lang2Open?`<div class="frow" style="margin-top:10px"><div class="fg"><label class="fl">제2외국어 과목</label><select class="fi fsel" id="es-l2s">${l2Opts(s.lang2Subj||'')}</select></div><div class="fg"><label class="fl">원점수</label><input class="fi" id="es-l2r" type="number" min="0" max="50" value="${s.lang2Raw||''}" placeholder="0–50"></div></div>`:''}`;}
-  html+=`<button class="btn bp bfw" style="margin-top:14px" onclick="saveExamScore('${exam.id}')">성적 저장</button>`;
-  return html;}
+function getScoreSteps(exam){
+  const sci2=exam.hasScienceII;
+  const steps=[
+    {id:'kor',title:'국어',subjOpts:`<option value="">선택과목 입력</option><option>화법과 작문</option><option>언어와 매체</option>`,rawMax:100,subjKey:'korSubj',rawKey:'korRaw'},
+    {id:'mat',title:'수학',subjOpts:`<option value="">선택과목 입력</option><option>확률과 통계</option><option>미적분</option><option>기하</option>`,rawMax:100,subjKey:'matSubj',rawKey:'matRaw'},
+    {id:'eng',title:'영어',rawMax:100,rawKey:'engRaw'},
+    {id:'his',title:'한국사',rawMax:50,rawKey:'hisRaw'},
+    {id:'exp1',title:'탐구 1',subjOpts:expOpts('',sci2),rawMax:50,subjKey:'exp1Subj',rawKey:'exp1Raw'},
+    {id:'exp2',title:'탐구 2',subjOpts:expOpts('',sci2),rawMax:50,subjKey:'exp2Subj',rawKey:'exp2Raw'},
+  ];
+  if(exam.hasLang2)steps.push({id:'lang2',title:'제2외국어',subjOpts:l2Opts(''),rawMax:50,subjKey:'lang2Subj',rawKey:'lang2Raw'});
+  return steps;
+}
+
+function startScoreWizard(examId){
+  const exam=getExam(examId);if(!exam)return;
+  const stu=S.students.find(x=>x._docId===S.studentDocId);
+  const sc=getStuExamScore(stu,examId)||{};
+  S.scoreWizardExamId=examId;S.scoreStep=0;
+  S.scoreWizard={korSubj:sc.korSubj||'',korRaw:sc.korRaw||'',matSubj:sc.matSubj||'',matRaw:sc.matRaw||'',engRaw:sc.engRaw||'',hisRaw:sc.hisRaw||'',exp1Subj:sc.exp1Subj||'',exp1Raw:sc.exp1Raw||'',exp2Subj:sc.exp2Subj||'',exp2Raw:sc.exp2Raw||'',lang2Subj:sc.lang2Subj||'',lang2Raw:sc.lang2Raw||''};
+  renderScoreWizard();
+}
+
+function renderScoreWizard(){
+  const exam=getExam(S.scoreWizardExamId);if(!exam)return;
+  const steps=getScoreSteps(exam);const step=S.scoreStep;const c=_('stuC');
+  if(step>=steps.length){
+    c.innerHTML=`<div class="card sw-done">
+      <div class="sw-check"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <p style="font-size:18px;font-weight:800;margin-bottom:12px">성적이 저장되었습니다!</p>
+      <button class="btn bs" onclick="S.scoreWizardExamId=null;renderStu()">돌아가기</button>
+    </div>`;return;
+  }
+  const st=steps[step];const w=S.scoreWizard;
+  let fields='';
+  if(st.subjOpts){
+    const curSubj=w[st.subjKey]||'';
+    const opts=st.subjOpts.replace(new RegExp(`(<option[^>]*>)(${curSubj.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})(</option>)`),'$1$2$3'.replace('$1','<option selected>').replace(/<option>/,''));
+    let selHtml=st.subjOpts;
+    if(curSubj){selHtml=st.subjOpts.replace(`>${curSubj}<`,` selected>${curSubj}<`);}
+    fields+=`<div class="sw-field"><label class="sw-label ${curSubj?'on':''}">선택과목 입력</label><select class="sw-select" id="sw-subj" onchange="this.previousElementSibling.classList.toggle('on',!!this.value)">${selHtml}</select></div>`;
+  }
+  const curRaw=w[st.rawKey]||'';
+  fields+=`<div class="sw-field"><label class="sw-label ${curRaw?'on':''}">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력" value="${curRaw}" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`;
+  const prevBtn=step>0?`<a class="sw-prev" onclick="swSaveStep();S.scoreStep--;renderScoreWizard()">이전 페이지로 돌아가기</a>`:'';
+  const isLast=step===steps.length-1;
+  c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
+    <div><p class="sw-title">${st.title}</p>${fields}</div>
+    <div class="sw-bottom">${prevBtn}<button class="sw-next" onclick="${isLast?`swSaveStep();finishScoreWizard()`:`swSaveStep();S.scoreStep++;renderScoreWizard()`}">${isLast?'저장':'다음'}</button></div>
+  </div></div>`;
+}
+
+function swSaveStep(){
+  const exam=getExam(S.scoreWizardExamId);if(!exam)return;
+  const steps=getScoreSteps(exam);const st=steps[S.scoreStep];if(!st)return;
+  if(st.subjKey){S.scoreWizard[st.subjKey]=_('sw-subj')?.value||'';}
+  S.scoreWizard[st.rawKey]=_('sw-raw')?.value||'';
+}
+
+async function finishScoreWizard(){
+  const examId=S.scoreWizardExamId;const exam=getExam(examId);if(!exam||!S.studentDocId)return;
+  const w=S.scoreWizard;
+  const scoreData={korSubj:w.korSubj,korRaw:w.korRaw,korGrade:getExamGrade(exam,w.korSubj,w.korRaw),matSubj:w.matSubj,matRaw:w.matRaw,matGrade:getExamGrade(exam,w.matSubj,w.matRaw),engRaw:w.engRaw,engGrade:getAbsGrade('eng',w.engRaw),hisRaw:w.hisRaw,hisGrade:getAbsGrade('his',w.hisRaw),exp1Subj:w.exp1Subj,exp1Raw:w.exp1Raw,exp1Grade:getExamGrade(exam,w.exp1Subj,w.exp1Raw),exp2Subj:w.exp2Subj,exp2Raw:w.exp2Raw,exp2Grade:getExamGrade(exam,w.exp2Subj,w.exp2Raw)};
+  if(exam.hasLang2){scoreData.lang2Subj=w.lang2Subj;scoreData.lang2Raw=w.lang2Raw;scoreData.lang2Grade=getAbsGrade('lang2',w.lang2Raw);}
+  showLoad(true);
+  try{
+    const stu=S.students.find(x=>x._docId===S.studentDocId);
+    if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;
+    await db.collection('students').doc(S.studentDocId).update({['scores.'+examId]:scoreData});
+    S.editingExamId=null;S.scoreStep=getScoreSteps(exam).length;renderScoreWizard();
+  }catch(e){alert('저장 실패: '+e.message);}
+  showLoad(false);
+}
+
+function examScoreFormHtml(exam,s){
+  setTimeout(()=>startScoreWizard(exam.id),0);
+  return `<div style="text-align:center;padding:20px;color:#9ca3af"><p>로딩 중...</p></div>`;
+}
 
 function examScoreTblHtml(exam,sc){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
@@ -481,17 +561,17 @@ function examScoreTblHtml(exam,sc){if(!sc)return '';
 </table></div>`;}
 
 function examScoreCardHtml(exam,stu){
+  if(S.scoreWizardExamId===exam.id)return '';
   const open=isExamOpen(exam),sc=getStuExamScore(stu,exam.id),hasSc=sc&&Object.values(sc).some(v=>v);
   const isEditing=S.editingExamId===exam.id;
-  const showForm=open&&(!hasSc||isEditing);
   const badge=hasSc?`<span class="bx bg">성적 입력 완료</span>`:open?`<span class="bx bb">입력 가능</span>`:`<span class="bx bgr">입력 기간 아님</span>`;
-  const editBtn=hasSc&&open?`<button class="btn bs bsm" onclick="S.editingExamId=${isEditing?'null':`'${exam.id}'`};renderStu()">${isEditing?'취소':'수정'}</button>`:'';
+  const editBtn=hasSc&&open?`<button class="btn bs bsm" onclick="startScoreWizard('${exam.id}')">${isEditing?'취소':'수정'}</button>`:'';
+  const startBtn=!hasSc&&open?`<button class="btn bp bsm" onclick="startScoreWizard('${exam.id}')">성적 입력</button>`:'';
   const pNote=exam.scoreStart?`<p style="font-size:11px;color:#6b7280;margin-bottom:10px">입력 기간: ${exam.scoreStart}${exam.scoreEnd?' ~ '+exam.scoreEnd:' ~ 무기한'}</p>`:'';
   let body='';
-  if(showForm)body=examScoreFormHtml(exam,sc||{});
-  else if(hasSc)body=examScoreTblHtml(exam,sc);
-  else body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${exam.scoreStart?`<br><span style="font-size:12px">기간: ${exam.scoreStart} ~ ${exam.scoreEnd||'무기한'}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
-  return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">${exam.name} 성적</p></div>${editBtn}</div>${pNote}${body}</div>`;}
+  if(hasSc)body=examScoreTblHtml(exam,sc);
+  else if(!open)body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${exam.scoreStart?`<br><span style="font-size:12px">기간: ${exam.scoreStart} ~ ${exam.scoreEnd||'무기한'}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
+  return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">${exam.name} 성적</p></div>${editBtn||startBtn}</div>${pNote}${body}</div>`;}
 
 function qCardHtml(booking){return `<div class="card" style="margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx ${booking.question?'bg':'bb'}">질문 & 고민</span><p style="font-size:15px;font-weight:700">상담 전 질문 & 고민</p></div>
