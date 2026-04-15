@@ -847,14 +847,17 @@ function renderAdminConsult(){
   </table></div></div>`;
 }
 
-function getGradeSubjects(){
+function getGradeSubjects(stu){
+  const exams=getExams();
+  let exp1Name='탐구 1',exp2Name='탐구 2';
+  for(const ex of exams){const sc=getStuExamScore(stu,ex.id);if(sc){if(sc.exp1Subj&&exp1Name==='탐구 1')exp1Name=sc.exp1Subj;if(sc.exp2Subj&&exp2Name==='탐구 2')exp2Name=sc.exp2Subj;}}
   return [
     {key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw)},
     {key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw)},
     {key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGrade||getAbsGrade('eng',sc?.engRaw)},
     {key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGrade||getAbsGrade('his',sc?.hisRaw)},
-    {key:'exp1',label:'탐구 1',getGrade:(ex,sc)=>sc?.exp1Grade||getExamGrade(ex,sc?.exp1Subj,sc?.exp1Raw)},
-    {key:'exp2',label:'탐구 2',getGrade:(ex,sc)=>sc?.exp2Grade||getExamGrade(ex,sc?.exp2Subj,sc?.exp2Raw)},
+    {key:'exp1',label:exp1Name,getGrade:(ex,sc)=>sc?.exp1Grade||getExamGrade(ex,sc?.exp1Subj,sc?.exp1Raw)},
+    {key:'exp2',label:exp2Name,getGrade:(ex,sc)=>sc?.exp2Grade||getExamGrade(ex,sc?.exp2Subj,sc?.exp2Raw)},
   ];
 }
 
@@ -915,7 +918,7 @@ function renderConsultDetail(){
     const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
     scoreBody=examScoreTblHtml(selEx,getStuExamScore(stu,selEx.id));
   }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
-  const subjects=getGradeSubjects();
+  const subjects=getGradeSubjects(stu);
   const graphTabIdx=S.consultGraphTab||0;
   const graphTabs=subjects.map((s,i)=>`<button class="dt ${i===graphTabIdx?'on':''}" onclick="S.consultGraphTab=${i};renderConsultDetail()">${s.label}</button>`).join('');
   const selSubj=subjects[graphTabIdx]||subjects[0];
