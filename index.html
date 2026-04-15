@@ -85,10 +85,10 @@ tr:last-child td{border-bottom:none}
 .sw-done{text-align:left;padding:40px 20px}
 .sw-check-wrap{width:120px;height:120px;margin:0 0 24px;position:relative}
 .sw-check-wrap svg{width:120px;height:120px}
-.sw-circle-outer{fill:none;stroke:#4B83F0;stroke-width:5;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:swCircle .6s .4s ease-out forwards}
-.sw-circle-inner{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:swCircle .6s .4s ease-out forwards}
-.sw-mark-outer{fill:none;stroke:#4B83F0;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:swCheck .4s .1s ease-out forwards}
-.sw-mark-inner{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:swCheck .4s .1s ease-out forwards}
+.sw-circle-outer{fill:none;stroke:#4B83F0;stroke-width:7;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:swCircle .6s .4s ease-out forwards}
+.sw-circle-inner{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:swCircle .6s .4s ease-out forwards}
+.sw-mark-outer{fill:none;stroke:#4B83F0;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:swCheck .4s .1s ease-out forwards}
+.sw-mark-inner{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:swCheck .4s .1s ease-out forwards}
 @keyframes swCircle{to{stroke-dashoffset:0}}
 @keyframes swCheck{to{stroke-dashoffset:0}}
 .gc-in{width:100%;height:32px;border:1px solid #e5e7eb;border-radius:6px;text-align:center;font-size:12px;font-weight:600;font-family:inherit;outline:none;padding:0 2px;box-sizing:border-box}
@@ -487,10 +487,8 @@ function expSubjIndex(exam,subj){
 }
 function getScoreSteps(exam){
   const steps=[
-    {id:'kors',title:'국어',type:'grid',subjKey:'korSubj',items:['화법과 작문','언어와 매체']},
-    {id:'korr',title:'국어',type:'subjRaw',rawMax:100,rawKey:'korRaw',showSubjKey:'korSubj'},
-    {id:'mats',title:'수학',type:'grid',subjKey:'matSubj',items:['확률과 통계','미적분','기하']},
-    {id:'matr',title:'수학',type:'subjRaw',rawMax:100,rawKey:'matRaw',showSubjKey:'matSubj'},
+    {id:'kor',title:'국어',type:'gridRaw',subjKey:'korSubj',rawKey:'korRaw',rawMax:100,items:['화법과 작문','언어와 매체']},
+    {id:'mat',title:'수학',type:'gridRaw',subjKey:'matSubj',rawKey:'matRaw',rawMax:100,items:['확률과 통계','미적분','기하']},
     {id:'eng',title:'영어',type:'rawOnly',rawMax:100,rawKey:'engRaw'},
     {id:'his',title:'한국사',type:'rawOnly',rawMax:50,rawKey:'hisRaw'},
     {id:'exp1s',title:'탐구 1',type:'expGrid',subjKey:'exp1Subj',excludeKey:null},
@@ -499,8 +497,7 @@ function getScoreSteps(exam){
     {id:'exp2r',title:'탐구 2',type:'subjRaw',rawMax:50,rawKey:'exp2Raw',showSubjKey:'exp2Subj'},
   ];
   if(exam.hasLang2)steps.push(
-    {id:'lang2s',title:'제2외국어',type:'grid',subjKey:'lang2Subj',items:['독일어Ⅰ','프랑스어Ⅰ','스페인어Ⅰ','중국어Ⅰ','일본어Ⅰ','러시아어Ⅰ','아랍어Ⅰ','베트남어Ⅰ','한문Ⅰ']},
-    {id:'lang2r',title:'제2외국어',type:'subjRaw',rawMax:50,rawKey:'lang2Raw',showSubjKey:'lang2Subj'}
+    {id:'lang2',title:'제2외국어',type:'gridRaw',subjKey:'lang2Subj',rawKey:'lang2Raw',rawMax:50,items:['독일어Ⅰ','프랑스어Ⅰ','스페인어Ⅰ','중국어Ⅰ','일본어Ⅰ','러시아어Ⅰ','아랍어Ⅰ','베트남어Ⅰ','한문Ⅰ']}
   );
   return steps;
 }
@@ -528,33 +525,40 @@ function renderScoreWizard(){
   const prevBtn=step>0?`<a class="sw-prev" onclick="swSaveStep();S.scoreStep--;renderScoreWizard()">이전 페이지로 돌아가기</a>`:'';
   const isLast=step===steps.length-1;
 
-  if(st.type==='expGrid'||st.type==='grid'){
-    const isExp=st.type==='expGrid';
-    const exclude=st.excludeKey?w[st.excludeKey]:'';const cur=w[st.subjKey]||'';
+  if(st.type==='gridRaw'){
+    const cur=w[st.subjKey]||'';const curRaw=w[st.rawKey]||'';
+    const cols=st.items.length<=3?st.items.length:3;
+    let grid=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-top:8px">`;
+    for(const item of st.items){
+      const sel=item===cur;
+      grid+=`<button style="padding:16px 8px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':'#e5e7eb'};background:${sel?'#1C64F2':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="S.scoreWizard['${st.subjKey}']='${item}';renderScoreWizard()">${item}</button>`;
+    }
+    grid+=`</div>`;
+    const rawField=cur?`<div class="sw-field" style="margin-top:24px"><label class="sw-label on">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="let v=Number(this.value);if(this.value!==''&&v>${st.rawMax})this.value=${st.rawMax};if(this.value!==''&&v<0)this.value=0" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`:'';
+    c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
+      <div><p class="sw-title">${st.title}</p><p style="color:#6b7280;font-size:14px;margin-bottom:4px">선택과목을 선택하세요.</p>${grid}${rawField}</div>
+      <div class="sw-bottom">${prevBtn}${cur?`<button class="sw-next" onclick="swSaveStep();S.scoreStep++;renderScoreWizard()">다음</button>`:''}</div>
+    </div></div>`;
+    if(cur)setTimeout(()=>{const el=_('sw-raw');if(el)el.focus();},50);
+    return;
+  }
+
+  if(st.type==='expGrid'){
+    const cur=w[st.subjKey]||'';
+    const groups=getExpSubjects(exam);
+    const exp1Idx=st.excludeKey?expSubjIndex(exam,w[st.excludeKey]):-1;
     let grid='';
-    if(isExp){
-      const groups=getExpSubjects(exam);
-      const exp1Idx=st.excludeKey?expSubjIndex(exam,w[st.excludeKey]):-1;
-      for(const g of groups){
-        grid+=`<p style="font-size:12px;font-weight:700;color:#6b7280;margin:12px 0 8px">${g.group}</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">`;
-        for(const item of g.items){
-          const idx=expSubjIndex(exam,item);
-          const dis=st.excludeKey&&idx<=exp1Idx;const sel=item===cur;
-          grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':dis?'#f3f4f6':'#e5e7eb'};background:${sel?'#1C64F2':dis?'#f9fafb':'#f3f4f6'};color:${sel?'#fff':dis?'#d1d5db':'#374151'};cursor:${dis?'default':'pointer'};font-family:inherit;transition:.15s" ${dis?'disabled':''}onclick="S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
-        }
-        grid+=`</div>`;
-      }
-    }else{
-      const cols=st.items.length<=3?st.items.length:3;
-      grid+=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-top:16px">`;
-      for(const item of st.items){
-        const sel=item===cur;
-        grid+=`<button style="padding:16px 8px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':'#e5e7eb'};background:${sel?'#1C64F2':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
+    for(const g of groups){
+      grid+=`<p style="font-size:12px;font-weight:700;color:#6b7280;margin:12px 0 8px">${g.group}</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">`;
+      for(const item of g.items){
+        const idx=expSubjIndex(exam,item);
+        const dis=st.excludeKey&&idx<=exp1Idx;const sel=item===cur;
+        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':dis?'#f3f4f6':'#e5e7eb'};background:${sel?'#1C64F2':dis?'#f9fafb':'#f3f4f6'};color:${sel?'#fff':dis?'#d1d5db':'#374151'};cursor:${dis?'default':'pointer'};font-family:inherit;transition:.15s" ${dis?'disabled':''}onclick="S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
       }
       grid+=`</div>`;
     }
     c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
-      <div><p class="sw-title">${st.title}</p><p style="color:#6b7280;font-size:14px;margin-bottom:4px">${isExp?'과목을 선택하세요.':'선택과목을 선택하세요.'}</p>${grid}</div>
+      <div><p class="sw-title">${st.title}</p><p style="color:#6b7280;font-size:14px;margin-bottom:4px">과목을 선택하세요.</p>${grid}</div>
       <div class="sw-bottom">${prevBtn}</div>
     </div></div>`;return;
   }
@@ -573,7 +577,7 @@ function renderScoreWizard(){
 function swSaveStep(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
   const steps=getScoreSteps(exam);const st=steps[S.scoreStep];if(!st)return;
-  if(st.type==='expGrid'||st.type==='grid')return;
+  if(st.type==='expGrid')return;
   if(st.rawKey){let v=_('sw-raw')?.value||'';if(v!==''&&Number(v)>st.rawMax)v=String(st.rawMax);if(v!==''&&Number(v)<0)v='0';S.scoreWizard[st.rawKey]=v;}
 }
 
