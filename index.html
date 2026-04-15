@@ -468,17 +468,24 @@ function l2Opts(sel){return `<option value="">선택</option>${['독일어Ⅰ','
 
 function gradeOpts(sel){return [1,2,3,4,5,6,7,8,9].map(g=>`<option ${String(g)===String(sel)?'selected':''}>${g}</option>`).join('');}
 
+function getExpSubjects(exam){
+  const social=['생활과 윤리','윤리와 사상','한국지리','세계지리','동아시아사','세계사','경제','정치와 법','사회·문화'];
+  const science=['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ'];
+  if(exam.hasScienceII)science.push('물리학Ⅱ','화학Ⅱ','생명과학Ⅱ','지구과학Ⅱ');
+  return [{group:'사회탐구',items:social},{group:'과학탐구',items:science}];
+}
 function getScoreSteps(exam){
-  const sci2=exam.hasScienceII;
   const steps=[
-    {id:'kor',title:'국어',subjOpts:`<option value="">선택과목 입력</option><option>화법과 작문</option><option>언어와 매체</option>`,rawMax:100,subjKey:'korSubj',rawKey:'korRaw'},
-    {id:'mat',title:'수학',subjOpts:`<option value="">선택과목 입력</option><option>확률과 통계</option><option>미적분</option><option>기하</option>`,rawMax:100,subjKey:'matSubj',rawKey:'matRaw'},
-    {id:'eng',title:'영어',rawMax:100,rawKey:'engRaw'},
-    {id:'his',title:'한국사',rawMax:50,rawKey:'hisRaw'},
-    {id:'exp1',title:'탐구 1',subjOpts:expOpts('',sci2),rawMax:50,subjKey:'exp1Subj',rawKey:'exp1Raw'},
-    {id:'exp2',title:'탐구 2',subjOpts:expOpts('',sci2),rawMax:50,subjKey:'exp2Subj',rawKey:'exp2Raw'},
+    {id:'kor',title:'국어',type:'subjRaw',subjOpts:`<option value="">선택과목 입력</option><option>화법과 작문</option><option>언어와 매체</option>`,rawMax:100,subjKey:'korSubj',rawKey:'korRaw'},
+    {id:'mat',title:'수학',type:'subjRaw',subjOpts:`<option value="">선택과목 입력</option><option>확률과 통계</option><option>미적분</option><option>기하</option>`,rawMax:100,subjKey:'matSubj',rawKey:'matRaw'},
+    {id:'eng',title:'영어',type:'rawOnly',rawMax:100,rawKey:'engRaw'},
+    {id:'his',title:'한국사',type:'rawOnly',rawMax:50,rawKey:'hisRaw'},
+    {id:'exp1s',title:'탐구 1',type:'expGrid',subjKey:'exp1Subj',excludeKey:null},
+    {id:'exp1r',title:'탐구 1',type:'expRaw',rawMax:50,rawKey:'exp1Raw',showSubjKey:'exp1Subj'},
+    {id:'exp2s',title:'탐구 2',type:'expGrid',subjKey:'exp2Subj',excludeKey:'exp1Subj'},
+    {id:'exp2r',title:'탐구 2',type:'expRaw',rawMax:50,rawKey:'exp2Raw',showSubjKey:'exp2Subj'},
   ];
-  if(exam.hasLang2)steps.push({id:'lang2',title:'제2외국어',subjOpts:l2Opts(''),rawMax:50,subjKey:'lang2Subj',rawKey:'lang2Raw'});
+  if(exam.hasLang2)steps.push({id:'lang2',title:'제2외국어',type:'subjRaw',subjOpts:l2Opts(''),rawMax:50,subjKey:'lang2Subj',rawKey:'lang2Raw'});
   return steps;
 }
 
@@ -502,20 +509,39 @@ function renderScoreWizard(){
     </div>`;return;
   }
   const st=steps[step];const w=S.scoreWizard;
+  const prevBtn=step>0?`<a class="sw-prev" onclick="swSaveStep();S.scoreStep--;renderScoreWizard()">이전 페이지로 돌아가기</a>`:'';
+  const isLast=step===steps.length-1;
+
+  if(st.type==='expGrid'){
+    const groups=getExpSubjects(exam);const exclude=st.excludeKey?w[st.excludeKey]:'';const cur=w[st.subjKey]||'';
+    let grid='';
+    for(const g of groups){
+      grid+=`<p style="font-size:12px;font-weight:700;color:#6b7280;margin:12px 0 8px">${g.group}</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">`;
+      for(const item of g.items){
+        const disabled=item===exclude;const selected=item===cur;
+        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${selected?'#1C64F2':disabled?'#f3f4f6':'#e5e7eb'};background:${selected?'#1C64F2':disabled?'#f9fafb':'#f3f4f6'};color:${selected?'#fff':disabled?'#d1d5db':'#374151'};cursor:${disabled?'default':'pointer'};font-family:inherit;transition:.15s" ${disabled?'disabled':''}onclick="S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
+      }
+      grid+=`</div>`;
+    }
+    c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
+      <div><p class="sw-title">${st.title}</p><p style="color:#6b7280;font-size:14px;margin-bottom:4px">과목을 선택하세요.</p>${grid}</div>
+      <div class="sw-bottom">${prevBtn}</div>
+    </div></div>`;return;
+  }
+
   let fields='';
-  if(st.subjOpts){
+  let subtitle='';
+  if(st.type==='subjRaw'){
     const curSubj=w[st.subjKey]||'';
-    const opts=st.subjOpts.replace(new RegExp(`(<option[^>]*>)(${curSubj.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})(</option>)`),'$1$2$3'.replace('$1','<option selected>').replace(/<option>/,''));
     let selHtml=st.subjOpts;
     if(curSubj){selHtml=st.subjOpts.replace(`>${curSubj}<`,` selected>${curSubj}<`);}
     fields+=`<div class="sw-field"><label class="sw-label ${curSubj?'on':''}">선택과목 입력</label><select class="sw-select" id="sw-subj" onchange="this.previousElementSibling.classList.toggle('on',!!this.value)">${selHtml}</select></div>`;
   }
-  const curRaw=w[st.rawKey]||'';
+  if(st.type==='expRaw'&&st.showSubjKey){subtitle=`<p style="color:#1C64F2;font-size:14px;font-weight:600;margin-bottom:4px">${w[st.showSubjKey]||''}</p>`;}
+  const rawKey=st.rawKey;const curRaw=w[rawKey]||'';
   fields+=`<div class="sw-field"><label class="sw-label ${curRaw?'on':''}">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력" value="${curRaw}" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`;
-  const prevBtn=step>0?`<a class="sw-prev" onclick="swSaveStep();S.scoreStep--;renderScoreWizard()">이전 페이지로 돌아가기</a>`:'';
-  const isLast=step===steps.length-1;
   c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
-    <div><p class="sw-title">${st.title}</p>${fields}</div>
+    <div><p class="sw-title">${st.title}</p>${subtitle}${fields}</div>
     <div class="sw-bottom">${prevBtn}<button class="sw-next" onclick="${isLast?`swSaveStep();finishScoreWizard()`:`swSaveStep();S.scoreStep++;renderScoreWizard()`}">${isLast?'저장':'다음'}</button></div>
   </div></div>`;
 }
@@ -523,8 +549,9 @@ function renderScoreWizard(){
 function swSaveStep(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
   const steps=getScoreSteps(exam);const st=steps[S.scoreStep];if(!st)return;
-  if(st.subjKey){S.scoreWizard[st.subjKey]=_('sw-subj')?.value||'';}
-  S.scoreWizard[st.rawKey]=_('sw-raw')?.value||'';
+  if(st.type==='expGrid')return;
+  if(st.type==='subjRaw'&&st.subjKey){S.scoreWizard[st.subjKey]=_('sw-subj')?.value||'';}
+  if(st.rawKey)S.scoreWizard[st.rawKey]=_('sw-raw')?.value||'';
 }
 
 async function finishScoreWizard(){
