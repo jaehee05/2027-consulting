@@ -848,17 +848,26 @@ function renderAdminConsult(){
 }
 
 function getGradeSubjects(stu){
-  const exams=getExams();
-  let exp1Name='탐구 1',exp2Name='탐구 2';
-  for(const ex of exams){const sc=getStuExamScore(stu,ex.id);if(sc){if(sc.exp1Subj&&exp1Name==='탐구 1')exp1Name=sc.exp1Subj;if(sc.exp2Subj&&exp2Name==='탐구 2')exp2Name=sc.exp2Subj;}}
-  return [
-    {key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw)},
-    {key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw)},
-    {key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGrade||getAbsGrade('eng',sc?.engRaw)},
-    {key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGrade||getAbsGrade('his',sc?.hisRaw)},
-    {key:'exp1',label:exp1Name,getGrade:(ex,sc)=>sc?.exp1Grade||getExamGrade(ex,sc?.exp1Subj,sc?.exp1Raw)},
-    {key:'exp2',label:exp2Name,getGrade:(ex,sc)=>sc?.exp2Grade||getExamGrade(ex,sc?.exp2Subj,sc?.exp2Raw)},
-  ];
+  const exams=getExams();const subjects=[];
+  const korSet=new Set(),matSet=new Set(),expSet=new Set();
+  for(const ex of exams){
+    const sc=getStuExamScore(stu,ex.id);if(!sc)continue;
+    if(sc.korSubj)korSet.add(sc.korSubj);
+    if(sc.matSubj)matSet.add(sc.matSubj);
+    if(sc.exp1Subj)expSet.add(sc.exp1Subj);
+    if(sc.exp2Subj)expSet.add(sc.exp2Subj);
+  }
+  if(korSet.size>1){for(const subj of korSet)subjects.push({key:'kor_'+subj,label:subj,getGrade:(ex,sc)=>sc?.korSubj===subj?(sc.korGrade||getExamGrade(ex,sc.korSubj,sc.korRaw)):''});}
+  else subjects.push({key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw)});
+  if(matSet.size>1){for(const subj of matSet)subjects.push({key:'mat_'+subj,label:subj,getGrade:(ex,sc)=>sc?.matSubj===subj?(sc.matGrade||getExamGrade(ex,sc.matSubj,sc.matRaw)):''});}
+  else subjects.push({key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw)});
+  subjects.push({key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGrade||getAbsGrade('eng',sc?.engRaw)});
+  subjects.push({key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGrade||getAbsGrade('his',sc?.hisRaw)});
+  if(expSet.size){for(const subj of expSet)subjects.push({key:'exp_'+subj,label:subj,getGrade:(ex,sc)=>{
+    if(sc?.exp1Subj===subj)return sc.exp1Grade||getExamGrade(ex,sc.exp1Subj,sc.exp1Raw);
+    if(sc?.exp2Subj===subj)return sc.exp2Grade||getExamGrade(ex,sc.exp2Subj,sc.exp2Raw);return '';
+  }});}else{subjects.push({key:'exp1',label:'탐구 1',getGrade:()=>''});subjects.push({key:'exp2',label:'탐구 2',getGrade:()=>''});}
+  return subjects;
 }
 
 function drawGradeGraph(exams,stu,subjInfo){
