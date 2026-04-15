@@ -85,8 +85,10 @@ tr:last-child td{border-bottom:none}
 .sw-done{text-align:left;padding:40px 20px}
 .sw-check-wrap{width:120px;height:120px;margin:0 0 24px;position:relative}
 .sw-check-wrap svg{width:120px;height:120px}
-.sw-check-circle{fill:none;stroke:#4B83F0;stroke-width:2.5;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:swCircle .6s .4s ease-out forwards}
-.sw-check-mark{fill:none;stroke:#4B83F0;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:swCheck .4s .1s ease-out forwards}
+.sw-circle-outer{fill:none;stroke:#4B83F0;stroke-width:5;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:swCircle .6s .4s ease-out forwards}
+.sw-circle-inner{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:swCircle .6s .4s ease-out forwards}
+.sw-mark-outer{fill:none;stroke:#4B83F0;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:swCheck .4s .1s ease-out forwards}
+.sw-mark-inner{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:swCheck .4s .1s ease-out forwards}
 @keyframes swCircle{to{stroke-dashoffset:0}}
 @keyframes swCheck{to{stroke-dashoffset:0}}
 .gc-in{width:100%;height:32px;border:1px solid #e5e7eb;border-radius:6px;text-align:center;font-size:12px;font-weight:600;font-family:inherit;outline:none;padding:0 2px;box-sizing:border-box}
@@ -517,7 +519,7 @@ function renderScoreWizard(){
   const steps=getScoreSteps(exam);const step=S.scoreStep;const c=_('stuC');
   if(step>=steps.length){
     c.innerHTML=`<div class="card sw-done">
-      <div class="sw-check-wrap"><svg viewBox="0 0 120 120"><circle class="sw-check-circle" cx="60" cy="60" r="50"/><path class="sw-check-mark" d="M40 62l14 14 26-30"/></svg></div>
+      <div class="sw-check-wrap"><svg viewBox="0 0 120 120"><circle class="sw-circle-outer" cx="60" cy="60" r="50"/><circle class="sw-circle-inner" cx="60" cy="60" r="50"/><path class="sw-mark-outer" d="M40 62l14 14 26-30"/><path class="sw-mark-inner" d="M40 62l14 14 26-30"/></svg></div>
       <p style="font-size:18px;font-weight:800;margin-bottom:12px">성적이 저장되었습니다!</p>
       <button class="btn bs" onclick="S.scoreWizardExamId=null;renderStu()">돌아가기</button>
     </div>`;return;
