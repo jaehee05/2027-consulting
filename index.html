@@ -531,10 +531,10 @@ function renderScoreWizard(){
     let grid=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-top:8px">`;
     for(const item of st.items){
       const sel=item===cur;
-      grid+=`<button style="padding:16px 8px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':'#e5e7eb'};background:${sel?'#1C64F2':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="S.scoreWizard['${st.subjKey}']='${item}';renderScoreWizard()">${item}</button>`;
+      grid+=`<button style="padding:16px 8px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':'#e5e7eb'};background:${sel?'#1C64F2':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}'){S.scoreWizard['${st.rawKey}']='';};S.scoreWizard['${st.subjKey}']='${item}';renderScoreWizard()">${item}</button>`;
     }
     grid+=`</div>`;
-    const rawField=cur?`<div class="sw-field" style="margin-top:24px"><label class="sw-label on">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="let v=Number(this.value);if(this.value!==''&&v>${st.rawMax})this.value=${st.rawMax};if(this.value!==''&&v<0)this.value=0" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`:'';
+    const rawField=cur?`<div class="sw-field" style="margin-top:24px"><label class="sw-label on">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="swValidateRaw(this,${st.rawMax})" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`:'';
     c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
       <div><p class="sw-title">${st.title}</p><p style="color:#6b7280;font-size:14px;margin-bottom:4px">선택과목을 선택하세요.</p>${grid}${rawField}</div>
       <div class="sw-bottom">${prevBtn}${cur?`<button class="sw-next" onclick="swSaveStep();S.scoreStep++;renderScoreWizard()">다음</button>`:''}</div>
@@ -567,18 +567,24 @@ function renderScoreWizard(){
   let subtitle='';
   if(st.showSubjKey){subtitle=`<p style="color:#1C64F2;font-size:14px;font-weight:600;margin-bottom:4px">${w[st.showSubjKey]||''}</p>`;}
   const rawKey=st.rawKey;const curRaw=w[rawKey]||'';
-  fields+=`<div class="sw-field"><label class="sw-label ${curRaw?'on':''}">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="let v=Number(this.value);if(this.value!==''&&v>${st.rawMax})this.value=${st.rawMax};if(this.value!==''&&v<0)this.value=0" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`;
+  fields+=`<div class="sw-field"><label class="sw-label ${curRaw?'on':''}">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="swValidateRaw(this,${st.rawMax})" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`;
   c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
     <div><p class="sw-title">${st.title}</p>${subtitle}${fields}</div>
     <div class="sw-bottom">${prevBtn}<button class="sw-next" onclick="${isLast?`swSaveStep();finishScoreWizard()`:`swSaveStep();S.scoreStep++;renderScoreWizard()`}">${isLast?'저장':'다음'}</button></div>
   </div></div>`;
 }
 
+function swValidateRaw(el,max){
+  if(el.value==='')return;
+  const v=Number(el.value);
+  if(v<0){alert('원점수는 0 이상이어야 합니다.');el.value='';return;}
+  if(v>max){alert('원점수는 '+max+' 이하여야 합니다.');el.value='';return;}
+}
 function swSaveStep(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
   const steps=getScoreSteps(exam);const st=steps[S.scoreStep];if(!st)return;
   if(st.type==='expGrid')return;
-  if(st.rawKey){let v=_('sw-raw')?.value||'';if(v!==''&&Number(v)>st.rawMax)v=String(st.rawMax);if(v!==''&&Number(v)<0)v='0';S.scoreWizard[st.rawKey]=v;}
+  if(st.rawKey){S.scoreWizard[st.rawKey]=_('sw-raw')?.value||'';}
 }
 
 async function finishScoreWizard(){
