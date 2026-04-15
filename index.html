@@ -639,6 +639,19 @@ function examScoreFormHtml(exam,s){
   return `<div style="text-align:center;padding:20px;color:#9ca3af"><p>로딩 중...</p></div>`;
 }
 
+function examScoreTblFull(exam,sc){if(!sc)return '';
+  const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
+  const kg=examGradeCell(exam,sc.korSubj,sc.korRaw),mg=examGradeCell(exam,sc.matSubj,sc.matRaw);
+  const e1g=examGradeCell(exam,sc.exp1Subj,sc.exp1Raw),e2g=examGradeCell(exam,sc.exp2Subj,sc.exp2Raw);
+  const eg=absGradeCell('eng',sc.engRaw),hg=absGradeCell('his',sc.hisRaw);
+  const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw):'';
+  return `<div style="overflow-x:auto"><table class="sc-tbl">
+  <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
+  <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
+  <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.engRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
+  <tr><td class="rh" style="font-size:10px">등급</td>${hg}${kg}${mg}${eg}${e1g}${e2g}${l2g}</tr>
+</table></div>`;}
+
 function examScoreTblHtml(exam,sc){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
   const kg=examGradeCell(exam,sc.korSubj,sc.korRaw),mg=examGradeCell(exam,sc.matSubj,sc.matRaw);
@@ -925,7 +938,7 @@ function renderConsultDetail(){
   if(examsWithScore.length){
     scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.consultScoreTab=${i};renderConsultDetail()">${ex.name}</button>`).join('');
     const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
-    scoreBody=examScoreTblHtml(selEx,getStuExamScore(stu,selEx.id));
+    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
   }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
   const subjects=getGradeSubjects(stu);
   const graphTabIdx=S.consultGraphTab||0;
