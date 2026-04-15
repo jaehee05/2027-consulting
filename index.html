@@ -251,7 +251,8 @@ const S = {
   admins:[], requests:[],
   tab:null, selDate:null, adminSel:null,
   editingExamId:null, lang2Open:false, stuSort:'seat',
-  scoreStep:0, scoreWizard:{}, scoreWizardExamId:null
+  scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
+  consultStuId:null, consultScoreTab:0, consultGraphTab:0
 };
 
 const _=id=>document.getElementById(id);
@@ -819,51 +820,128 @@ async function setTab(tab){
 
 /* ── ADMIN: 컨설팅 ── */
 function renderAdminConsult(){
+  if(S.consultStuId){renderConsultDetail();return;}
   const sorted=[...S.students].sort((a,b)=>{
     if(S.stuSort==='grade'){const go={'고3':0,'고2':1,'고1':2};return (go[a.grade]??3)-(go[b.grade]??3)||a.name.localeCompare(b.name,'ko');}
     if(S.stuSort==='name')return a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='seat')return (a.seat||999)-(b.seat||999);
     return 0;
   });
-  const hasBooking=id=>S.bookings.some(b=>b.studentId===id);
   const rows=sorted.map(s=>{
-    const booked=hasBooking(s._docId);
+    const booked=S.bookings.some(b=>b.studentId===s._docId);
     const hasNote=s.consultNote&&s.consultNote.trim();
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="S.consultStuId='${s._docId}';S.consultScoreTab=0;S.consultGraphTab=0;renderAdminConsult()">
       <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
       <td style="text-align:center">${booked?'<span class="bx bg">예약</span>':'<span style="color:#d1d5db">—</span>'}</td>
       <td style="text-align:center">${hasNote?'<span class="bx bg">작성</span>':'<span style="color:#d1d5db">—</span>'}</td>
-      <td style="white-space:nowrap"><button class="btn bp bsm" onclick="openConsultNote('${s._docId}')">기록</button></td>
     </tr>`;}).join('');
   const sortOpts=[['seat','좌석순'],['grade','학년순'],['name','이름순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminConsult()">${l}</button>`).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">컨설팅 내용 기록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.students.length}명)</span></span></div>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">컨설팅 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.students.length}명)</span></span></div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table>
-    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>기록</th><th>관리</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="7" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>기록</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="6" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
   </table></div></div>`;
 }
 
-function openConsultNote(stuDocId){
-  const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
-  const booking=S.bookings.find(b=>b.studentId===stuDocId);
-  const exams=getExams();
-  const scoreInfo=exams.map(ex=>{
+function getGradeSubjects(){
+  return [
+    {key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw)},
+    {key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw)},
+    {key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGrade||getAbsGrade('eng',sc?.engRaw)},
+    {key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGrade||getAbsGrade('his',sc?.hisRaw)},
+    {key:'exp1',label:'탐구 1',getGrade:(ex,sc)=>sc?.exp1Grade||getExamGrade(ex,sc?.exp1Subj,sc?.exp1Raw)},
+    {key:'exp2',label:'탐구 2',getGrade:(ex,sc)=>sc?.exp2Grade||getExamGrade(ex,sc?.exp2Subj,sc?.exp2Raw)},
+  ];
+}
+
+function drawGradeGraph(exams,stu,subjInfo){
+  const W=560,H=200,PL=36,PR=16,PT=16,PB=28;
+  const cw=W-PL-PR,ch=H-PT-PB;
+  const pts=[];
+  exams.forEach((ex,i)=>{
     const sc=getStuExamScore(stu,ex.id);
-    if(!sc||!Object.values(sc).some(v=>v))return '';
-    return examScoreTblHtml(ex,sc);
-  }).join('');
-  const qInfo=booking&&booking.question?`<div style="margin-bottom:14px"><p style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px">학생 질문 & 고민</p><div style="background:#f9fafb;border-radius:8px;padding:10px"><p style="font-size:13px;white-space:pre-wrap;line-height:1.6">${booking.question}</p></div></div>`:'';
-  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">컨설팅 기록</p>
-    <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${stu.name} (${stu.school} ${stu.grade})${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p>
-    ${scoreInfo?'<div style="margin-bottom:14px">'+scoreInfo+'</div>':''}
+    const g=sc?subjInfo.getGrade(ex,sc):'';
+    if(g&&Number(g)>=1&&Number(g)<=9){
+      const x=PL+(exams.length>1?i*(cw/(exams.length-1)):cw/2);
+      const y=PT+(Number(g)-1)*(ch/8);
+      pts.push({x,y,g:Number(g),exam:ex.name});
+    }
+  });
+  let gridLines='';
+  for(let g=1;g<=9;g++){
+    const y=PT+(g-1)*(ch/8);
+    gridLines+=`<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="#f0f0f0" stroke-width="1"/>`;
+    gridLines+=`<text x="${PL-8}" y="${y+4}" text-anchor="end" font-size="10" fill="#9ca3af" font-weight="600">${g}</text>`;
+  }
+  let xLabels='';
+  exams.forEach((ex,i)=>{
+    const x=PL+(exams.length>1?i*(cw/(exams.length-1)):cw/2);
+    xLabels+=`<text x="${x}" y="${H-6}" text-anchor="middle" font-size="10" fill="#9ca3af" font-weight="600">${ex.name.replace(/\s*모의.*$/,'')}</text>`;
+    gridLines+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${H-PB}" stroke="#f0f0f0" stroke-width="1"/>`;
+  });
+  let path='',dots='';
+  if(pts.length>1){
+    let d=`M${pts[0].x},${pts[0].y}`;
+    for(let i=1;i<pts.length;i++){
+      const cp=(pts[i].x-pts[i-1].x)*0.3;
+      d+=` C${pts[i-1].x+cp},${pts[i-1].y} ${pts[i].x-cp},${pts[i].y} ${pts[i].x},${pts[i].y}`;
+    }
+    path=`<path d="${d}" fill="none" stroke="#1C64F2" stroke-width="2.5" stroke-linecap="round"/>`;
+  }else if(pts.length===1){
+    path='';
+  }
+  pts.forEach(p=>{
+    dots+=`<circle cx="${p.x}" cy="${p.y}" r="4.5" fill="#fff" stroke="#1C64F2" stroke-width="2.5"/>`;
+    dots+=`<text x="${p.x}" y="${p.y-10}" text-anchor="middle" font-size="10" fill="#1C64F2" font-weight="700">${p.g}등급</text>`;
+  });
+  if(!pts.length)return `<div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px">입력된 성적이 없습니다.</div>`;
+  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${gridLines}${xLabels}${path}${dots}</svg></div>`;
+}
+
+function renderConsultDetail(){
+  const stu=S.students.find(x=>x._docId===S.consultStuId);
+  if(!stu){S.consultStuId=null;renderAdminConsult();return;}
+  const booking=S.bookings.find(b=>b.studentId===S.consultStuId);
+  const exams=getExams();
+  const examsWithScore=exams.filter(ex=>hasStuExamScore(stu,ex.id));
+  const scoreTabIdx=S.consultScoreTab||0;
+  let scoreTabs='',scoreBody='';
+  if(examsWithScore.length){
+    scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.consultScoreTab=${i};renderConsultDetail()">${ex.name}</button>`).join('');
+    const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
+    scoreBody=examScoreTblHtml(selEx,getStuExamScore(stu,selEx.id));
+  }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
+  const subjects=getGradeSubjects();
+  const graphTabIdx=S.consultGraphTab||0;
+  const graphTabs=subjects.map((s,i)=>`<button class="dt ${i===graphTabIdx?'on':''}" onclick="S.consultGraphTab=${i};renderConsultDetail()">${s.label}</button>`).join('');
+  const selSubj=subjects[graphTabIdx]||subjects[0];
+  const graphBody=drawGradeGraph(exams,stu,selSubj);
+  const qInfo=booking&&booking.question?`<div class="card" style="margin-bottom:12px"><p style="font-size:13px;font-weight:700;margin-bottom:8px">학생 질문 & 고민</p><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;color:#374151;background:#f9fafb;border-radius:8px;padding:10px">${booking.question}</p></div>`:'';
+  _('adminC').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn bs bsm" onclick="S.consultStuId=null;renderAdminConsult()">← 목록</button>
+      <div><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <p style="font-size:13px;font-weight:700;margin-bottom:10px">성적표</p>
+      ${examsWithScore.length>1?'<div class="dtabs" style="margin-bottom:10px">'+scoreTabs+'</div>':''}
+      ${scoreBody}
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <p style="font-size:13px;font-weight:700;margin-bottom:10px">등급 추이</p>
+      <div class="dtabs" style="margin-bottom:10px">${graphTabs}</div>
+      ${graphBody}
+    </div>
     ${qInfo}
-    <div class="fg"><label class="fl">컨설팅 내용</label><textarea class="fi ta" id="consultInput" rows="10" placeholder="컨설팅 내용을 기록하세요...">${stu.consultNote||''}</textarea></div>
-    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1" onclick="saveConsultNote('${stuDocId}')">저장</button></div>`;
-  openModal();
+    <div class="card">
+      <p style="font-size:13px;font-weight:700;margin-bottom:8px">컨설팅 내용</p>
+      <textarea class="fi ta" id="consultInput" rows="8" placeholder="컨설팅 내용을 기록하세요...">${stu.consultNote||''}</textarea>
+      <button class="btn bp bsm" style="margin-top:10px" onclick="saveConsultNote('${S.consultStuId}')">저장</button>
+    </div>`;
 }
 
 async function saveConsultNote(stuDocId){
@@ -872,7 +950,7 @@ async function saveConsultNote(stuDocId){
   try{
     await db.collection('students').doc(stuDocId).update({consultNote:note});
     const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.consultNote=note;
-    closeModal();renderAdminConsult();
+    renderConsultDetail();
   }catch(e){alert('저장 실패: '+e.message);}
   showLoad(false);
 }
