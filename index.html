@@ -39,8 +39,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:#f3f4f6;padding:10px 12px;text-align:center;font-weight:600;color:#6b7280;border-bottom:1px solid #e5e7eb;white-space:nowrap}
 td{padding:10px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle;text-align:center}
 tr:last-child td{border-bottom:none}
-.sg{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.sb{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid #e5e7eb;background:#fff;color:#111827;transition:.15s;font-family:inherit}
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:8px}
+.sb{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid #e5e7eb;background:#fff;color:#111827;transition:.15s;font-family:inherit;text-align:center}
 .sb:hover:not(:disabled){border-color:#1C64F2;color:#1C64F2;background:#eff6ff}
 .sb.bk{background:#f3f4f6;color:#d1d5db;cursor:default;border-color:#f3f4f6;text-decoration:line-through}
 .sb.sl{background:#1C64F2;color:#fff;border-color:#1C64F2}
@@ -89,8 +89,11 @@ tr:last-child td{border-bottom:none}
   th,td{padding:8px 6px}
   .stgrid{grid-template-columns:1fr}
   .sb{padding:6px 10px;font-size:12px}
+  .sg{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}
   .dtabs{gap:6px}
   .dt{padding:6px 10px;font-size:12px}
+  .cfg-hdr{flex-wrap:wrap}
+  .cfg-save{flex-wrap:wrap}
   .info p{font-size:11px}
 }
 @media print{.np{display:none!important}.po{display:block!important}.topbar,.tabs{display:none!important}body{background:white}}
@@ -755,14 +758,14 @@ function renderAdminSchedule(){
   const open=isScoreOpen();
   const marchOpen=isMarchScoreOpen();
   const marchCfgCard=`<div class="card" style="margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📝 3월 모의고사 성적 입력 기간</p>${marchOpen?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
+    <div class="cfg-hdr" style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📝 3월 모의고사 성적 입력 기간</p>${marchOpen?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
     <div class="frow"><div class="fg"><label class="fl">시작일</label><input class="fi" id="cfgMS" type="date" value="${S.config.marchScoreStart||''}"></div><div class="fg"><label class="fl">종료일</label><input class="fi" id="cfgME" type="date" value="${S.config.marchScoreEnd||''}"></div></div>
-    <button class="btn bp bsm" onclick="saveCfgSettings()">저장</button>${S.config.marchScoreStart?`<span style="font-size:12px;color:#6b7280;margin-left:10px">${S.config.marchScoreStart} ~ ${S.config.marchScoreEnd||'무기한'}</span>`:''}
+    <div class="cfg-save" style="display:flex;align-items:center;gap:10px"><button class="btn bp bsm" onclick="saveCfgSettings()">저장</button>${S.config.marchScoreStart?`<span style="font-size:12px;color:#6b7280">${S.config.marchScoreStart} ~ ${S.config.marchScoreEnd||'무기한'}</span>`:''}</div>
   </div>`;
   const cfgCard=`<div class="card" style="margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📝 6월 모의평가 성적 입력 기간</p>${open?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
+    <div class="cfg-hdr" style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📝 6월 모의평가 성적 입력 기간</p>${open?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
     <div class="frow"><div class="fg"><label class="fl">시작일</label><input class="fi" id="cfgS" type="date" value="${S.config.scoreStart||''}"></div><div class="fg"><label class="fl">종료일</label><input class="fi" id="cfgE" type="date" value="${S.config.scoreEnd||''}"></div></div>
-    <button class="btn bp bsm" onclick="saveCfgSettings()">저장</button>${S.config.scoreStart?`<span style="font-size:12px;color:#6b7280;margin-left:10px">${S.config.scoreStart} ~ ${S.config.scoreEnd||'무기한'}</span>`:''}
+    <div class="cfg-save" style="display:flex;align-items:center;gap:10px"><button class="btn bp bsm" onclick="saveCfgSettings()">저장</button>${S.config.scoreStart?`<span style="font-size:12px;color:#6b7280">${S.config.scoreStart} ~ ${S.config.scoreEnd||'무기한'}</span>`:''}</div>
   </div>`;
   const datesHtml=S.schedule.dates.map(d=>{
     const slotHtml=d.slots.map(sl=>`<span style="display:inline-flex;align-items:center;gap:3px;background:#f3f4f6;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;margin:2px">${sl}<button onclick="rmSlot('${d.id}','${sl}')" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0;margin-left:2px">×</button></span>`).join('');
