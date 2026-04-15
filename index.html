@@ -639,22 +639,22 @@ function examScoreFormHtml(exam,s){
   return `<div style="text-align:center;padding:20px;color:#9ca3af"><p>로딩 중...</p></div>`;
 }
 
-function cutDiffChip(raw,cuts){
-  if(!cuts||!cuts.length||raw===''||raw===undefined||raw===null)return '';
-  const r=Number(raw);if(isNaN(r))return '';
+function cutDiffChips(raw,cuts){
+  if(!cuts||!cuts.length||raw===''||raw===undefined||raw===null)return {cur:'',upper:''};
+  const r=Number(raw);if(isNaN(r))return {cur:'',upper:''};
   let grade=9;
   for(let i=0;i<cuts.length;i++){if(r>=Number(cuts[i])){grade=i+1;break;}}
-  const cutVal=Number(cuts[grade-1]||0);
-  const diff=r-cutVal;
-  if(grade<=8){const nextCut=Number(cuts[grade-1]);const gap=r-nextCut;
-    return `<span style="display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;margin-left:2px;vertical-align:middle;white-space:nowrap">${diff>=0?'+':''}${diff}</span>`;}
-  return '';
+  let cur='';
+  if(grade<=8){const diff=r-Number(cuts[grade-1]);cur=`<span style="display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;vertical-align:middle;white-space:nowrap">${diff>=0?'+':''}${diff}</span>`;}
+  let upper='';
+  if(grade>=2){const upperCut=Number(cuts[grade-2]);const gap=r-upperCut;upper=`<span style="display:inline-block;background:#fee2e2;color:#dc2626;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;vertical-align:middle;white-space:nowrap">${gap}</span>`;}
+  return {cur,upper};
 }
 function rawWithDiff(raw,cuts){
   if(!raw&&raw!==0)return '—';
-  const chip=cutDiffChip(raw,cuts);
-  if(!chip)return raw;
-  return `<span style="position:relative;display:inline-block"><span>${raw}</span><span style="position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:3px">${chip}</span></span>`;
+  const {cur,upper}=cutDiffChips(raw,cuts);
+  if(!cur&&!upper)return raw;
+  return `<span style="position:relative;display:inline-block">${upper?`<span style="position:absolute;right:100%;top:50%;transform:translateY(-50%);margin-right:3px">${upper}</span>`:''}<span>${raw}</span>${cur?`<span style="position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:3px">${cur}</span>`:''}</span>`;
 }
 function examScoreTblFull(exam,sc){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
