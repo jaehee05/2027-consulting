@@ -270,7 +270,7 @@ function isExamOpen(exam){if(!exam||!exam.scoreStart)return false;const t=new Da
 function getStuExamScore(stu,examId){return stu?.scores?.[examId]||null;}
 function hasStuExamScore(stu,examId){const sc=getStuExamScore(stu,examId);return sc&&Object.values(sc).some(v=>v);}
 
-const GC_ABS_SUBJS=[['eng','영어',100],['his','한국사',50],['lang2','제2외국어',50]];
+const GC_ABS_SUBJS=[['eng','영어',100],['his','한국사',50],['lang2','제2외국어/한문',50]];
 function gcRelGroups(exam){
   const sci2=exam&&exam.hasScienceII;
   return [
@@ -646,7 +646,7 @@ function examScoreTblHtml(exam,sc){if(!sc)return '';
   const eg=absGradeCell('eng',sc.engRaw),hg=absGradeCell('his',sc.hisRaw);
   const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw):'';
   return `<div style="overflow-x:auto"><table class="sc-tbl">
-  <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어</td>':''}</tr>
+  <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
   <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px">등급</td>${hg}${kg}${mg}${eg}${e1g}${e2g}${l2g}</tr>
@@ -1126,7 +1126,7 @@ function renderAdminExams(){
       <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#6b7280">
         <span>${ex.scoreStart?'기간: '+ex.scoreStart+' ~ '+(ex.scoreEnd||'무기한'):'기간: 미설정'}</span>
         <span>|</span><span>등급컷: ${gcCount?gcCount+'개 과목 설정':'미설정'}</span>
-        <span>|</span><span>제2외국어: ${ex.hasLang2?'O':'X'}</span>
+        <span>|</span><span>제2외국어/한문: ${ex.hasLang2?'O':'X'}</span>
         <span>|</span><span>과탐II: ${ex.hasScienceII?'O':'X'}</span>
       </div>
       <div style="margin-top:10px"><button class="btn bs bsm" onclick="openExamGradeCuts('${ex.id}')">등급컷 설정</button></div>
@@ -1135,7 +1135,7 @@ function renderAdminExams(){
     ${examCards||'<div class="card empty">등록된 시험이 없습니다.</div>'}
     <div class="card" style="margin-top:16px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">절대평가 과목 등급컷</p><span class="bx bb" style="font-size:10px">모든 시험 공통</span></div>
-      <p style="font-size:11px;color:#6b7280;margin-bottom:10px">영어, 한국사, 제2외국어는 절대평가이므로 모든 시험에 동일하게 적용됩니다.</p>
+      <p style="font-size:11px;color:#6b7280;margin-bottom:10px">영어, 한국사, 제2외국어/한문는 절대평가이므로 모든 시험에 동일하게 적용됩니다.</p>
       <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${absRows}</table></div>
       <button class="btn bp bsm" style="margin-top:12px" onclick="saveAbsGradeCuts()">절대평가 등급컷 저장</button>
     </div>`;
@@ -1147,7 +1147,7 @@ function openAddExam(){
     <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date"></div>
     <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date"></div></div>
     <div style="display:flex;gap:16px;margin-bottom:14px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2"> 제2외국어 포함</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2"> 제2외국어/한문 포함</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2"> 과학탐구 II 포함</label>
     </div>
     <div class="ferr" id="mErr"></div>
@@ -1161,7 +1161,7 @@ function openEditExam(examId){
     <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date" value="${ex.scoreStart||''}"></div>
     <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date" value="${ex.scoreEnd||''}"></div></div>
     <div style="display:flex;gap:16px;margin-bottom:14px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2" ${ex.hasLang2?'checked':''}> 제2외국어 포함</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2" ${ex.hasLang2?'checked':''}> 제2외국어/한문 포함</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2" ${ex.hasScienceII?'checked':''}> 과학탐구 II 포함</label>
     </div>
     <div class="ferr" id="mErr"></div>
@@ -1484,8 +1484,8 @@ function openAdminScoreEdit(stuDocId, examId, from, bookDocId){
     <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'',exam.hasScienceII)}</select></div>
     <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="as-e2r" type="number" min="0" max="50" value="${sc.exp2Raw||''}" placeholder="0–50"></div></div>`;
   if(exam.hasLang2){formHtml+=`
-    <div class="frow"><div class="fg"><label class="fl">제2외국어 과목</label><select class="fi fsel" id="as-l2s">${l2Opts(sc.lang2Subj||'')}</select></div>
-    <div class="fg"><label class="fl">제2외국어 원점수</label><input class="fi" id="as-l2r" type="number" min="0" max="50" value="${sc.lang2Raw||''}" placeholder="0–50"></div></div>`;}
+    <div class="frow"><div class="fg"><label class="fl">제2외국어/한문 과목</label><select class="fi fsel" id="as-l2s">${l2Opts(sc.lang2Subj||'')}</select></div>
+    <div class="fg"><label class="fl">제2외국어/한문 원점수</label><input class="fi" id="as-l2r" type="number" min="0" max="50" value="${sc.lang2Raw||''}" placeholder="0–50"></div></div>`;}
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${exam.name} 성적 입력/수정</p>
     <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${stu.name} 학생</p>
     ${formHtml}
