@@ -972,7 +972,7 @@ function renderConsultDetail(){
   const qInfo=booking&&booking.question?`<div class="card" style="margin-bottom:12px"><p style="font-size:13px;font-weight:700;margin-bottom:8px">학생 질문 & 고민</p><p style="font-size:13px;white-space:pre-wrap;line-height:1.6;color:#374151;background:#f9fafb;border-radius:8px;padding:10px">${booking.question}</p></div>`:'';
   _('adminC').innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <button class="btn bs bsm" onclick="S.consultStuId=null;renderAdminConsult()">← 목록</button>
+      <button class="btn bs bsm" onclick="autoSaveConsultNote()">← 목록</button>
       <div><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p></div>
     </div>
     ${qInfo}
@@ -1002,6 +1002,15 @@ async function saveConsultNote(stuDocId){
     renderConsultDetail();
   }catch(e){alert('저장 실패: '+e.message);}
   showLoad(false);
+}
+async function autoSaveConsultNote(){
+  const stuDocId=S.consultStuId;if(!stuDocId)return;
+  const note=_('consultInput')?.value||'';
+  const stu=S.students.find(x=>x._docId===stuDocId);
+  if(stu&&note!==( stu.consultNote||'')){
+    try{await db.collection('students').doc(stuDocId).update({consultNote:note});stu.consultNote=note;}catch(e){}
+  }
+  S.consultStuId=null;renderAdminConsult();
 }
 
 /* ── ADMIN: 학생 ── */
