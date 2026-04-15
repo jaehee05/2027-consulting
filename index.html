@@ -452,8 +452,8 @@ function examScoreFormHtml(exam,s){s=s||{};const sci2=exam.hasScienceII;let html
   <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="es-kr" type="number" min="0" max="100" value="${s.korRaw||''}" placeholder="0–100"></div></div>
   <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="es-ms"><option value="">선택</option><option ${s.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${s.matSubj==='미적분'?'selected':''}>미적분</option><option ${s.matSubj==='기하'?'selected':''}>기하</option></select></div>
   <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="es-mr" type="number" min="0" max="100" value="${s.matRaw||''}" placeholder="0–100"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="es-eg"><option value="">등급</option>${gradeOpts(s.engGrade||'')}</select></div>
-  <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="es-hg"><option value="">등급</option>${gradeOpts(s.hisGrade||'')}</select></div></div>
+  <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="es-er" type="number" min="0" max="100" value="${s.engRaw||''}" placeholder="0–100"></div>
+  <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="es-hr" type="number" min="0" max="50" value="${s.hisRaw||''}" placeholder="0–50"></div></div>
   <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="es-e1s">${expOpts(s.exp1Subj||'',sci2)}</select></div>
   <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="es-e1r" type="number" min="0" max="50" value="${s.exp1Raw||''}" placeholder="0–50"></div></div>
   <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="es-e2s">${expOpts(s.exp2Subj||'',sci2)}</select></div>
@@ -471,12 +471,13 @@ function examScoreTblHtml(exam,sc){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
   const kg=examGradeCell(exam,sc.korSubj,sc.korRaw),mg=examGradeCell(exam,sc.matSubj,sc.matRaw);
   const e1g=examGradeCell(exam,sc.exp1Subj,sc.exp1Raw),e2g=examGradeCell(exam,sc.exp2Subj,sc.exp2Raw);
+  const eg=absGradeCell('eng',sc.engRaw),hg=absGradeCell('his',sc.hisRaw);
   const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw):'';
   return `<div style="overflow-x:auto"><table class="sc-tbl">
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어</td>':''}</tr>
   <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
-  <tr><td class="rh" style="font-size:10px">등급</td><td class="vl">${sc.hisGrade||'—'}</td>${kg}${mg}<td class="vl">${sc.engGrade||'—'}</td>${e1g}${e2g}${l2g}</tr>
+  <tr><td class="rh" style="font-size:10px">등급</td>${hg}${kg}${mg}${eg}${e1g}${e2g}${l2g}</tr>
 </table></div>`;}
 
 function examScoreCardHtml(exam,stu){
@@ -503,7 +504,8 @@ async function saveExamScore(examId){
   const exam=getExam(examId);if(!exam)return;
   const korSubj=_('es-ks')?.value||'',korRaw=_('es-kr')?.value||'',matSubj=_('es-ms')?.value||'',matRaw=_('es-mr')?.value||'';
   const exp1Subj=_('es-e1s')?.value||'',exp1Raw=_('es-e1r')?.value||'',exp2Subj=_('es-e2s')?.value||'',exp2Raw=_('es-e2r')?.value||'';
-  const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engGrade:_('es-eg')?.value||'',hisGrade:_('es-hg')?.value||'',exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
+  const engRaw=_('es-er')?.value||'',hisRaw=_('es-hr')?.value||'';
+  const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engRaw,engGrade:getAbsGrade('eng',engRaw),hisRaw,hisGrade:getAbsGrade('his',hisRaw),exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
   if(exam.hasLang2){const lang2Subj=S.lang2Open?(_('es-l2s')?.value||''):'',lang2Raw=S.lang2Open?(_('es-l2r')?.value||''):'';scoreData.lang2Subj=lang2Subj;scoreData.lang2Raw=lang2Raw;scoreData.lang2Grade=getAbsGrade('lang2',lang2Raw);}
   showLoad(true);
   try{
@@ -1153,8 +1155,8 @@ function openAdminScoreEdit(stuDocId, examId, from, bookDocId){
     <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div></div>
     <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="as-ms"><option value="">선택</option><option ${sc.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${sc.matSubj==='미적분'?'selected':''}>미적분</option><option ${sc.matSubj==='기하'?'selected':''}>기하</option></select></div>
     <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="as-mr" type="number" min="0" max="100" value="${sc.matRaw||''}" placeholder="0–100"></div></div>
-    <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="as-eg"><option value="">등급</option>${gradeOpts(sc.engGrade||'')}</select></div>
-    <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="as-hg"><option value="">등급</option>${gradeOpts(sc.hisGrade||'')}</select></div></div>
+    <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="as-er" type="number" min="0" max="100" value="${sc.engRaw||''}" placeholder="0–100"></div>
+    <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="as-hr" type="number" min="0" max="50" value="${sc.hisRaw||''}" placeholder="0–50"></div></div>
     <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'',exam.hasScienceII)}</select></div>
     <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="as-e1r" type="number" min="0" max="50" value="${sc.exp1Raw||''}" placeholder="0–50"></div></div>
     <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'',exam.hasScienceII)}</select></div>
@@ -1173,7 +1175,8 @@ async function saveAdminScore(stuDocId, examId, from, bookDocId){
   const exam=getExam(examId);if(!exam)return;
   const korSubj=_('as-ks')?.value||'',korRaw=_('as-kr')?.value||'',matSubj=_('as-ms')?.value||'',matRaw=_('as-mr')?.value||'';
   const exp1Subj=_('as-e1s')?.value||'',exp1Raw=_('as-e1r')?.value||'',exp2Subj=_('as-e2s')?.value||'',exp2Raw=_('as-e2r')?.value||'';
-  const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engGrade:_('as-eg')?.value||'',hisGrade:_('as-hg')?.value||'',exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
+  const engRaw=_('as-er')?.value||'',hisRaw=_('as-hr')?.value||'';
+  const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engRaw,engGrade:getAbsGrade('eng',engRaw),hisRaw,hisGrade:getAbsGrade('his',hisRaw),exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
   if(exam.hasLang2){scoreData.lang2Subj=_('as-l2s')?.value||'';scoreData.lang2Raw=_('as-l2r')?.value||'';scoreData.lang2Grade=getAbsGrade('lang2',scoreData.lang2Raw);}
   showLoad(true);
   try{
