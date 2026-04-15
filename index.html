@@ -860,23 +860,27 @@ function renderAdminConsult(){
     if(S.stuSort==='seat')return (a.seat||999)-(b.seat||999);
     return 0;
   });
+  const cExams=getExams();
   const rows=sorted.map(s=>{
     const booked=S.bookings.some(b=>b.studentId===s._docId);
     const hasNote=s.consultNote&&s.consultNote.trim();
+    const scoreCells=cExams.map(ex=>`<td style="text-align:center">${hasStuExamScore(s,ex.id)?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>`).join('');
     return `<tr style="cursor:pointer" onclick="S.consultStuId='${s._docId}';S.consultScoreTab=0;S.consultGraphTab=0;renderAdminConsult()">
       <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
       <td style="text-align:center">${booked?'<span class="bx bg">예약</span>':'<span style="color:#d1d5db">—</span>'}</td>
+      ${scoreCells}
       <td style="text-align:center">${hasNote?'<span class="bx bg">작성</span>':'<span style="color:#d1d5db">—</span>'}</td>
     </tr>`;}).join('');
   const sortOpts=[['seat','좌석순'],['grade','학년순'],['name','이름순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminConsult()">${l}</button>`).join('');
+  const examHeaders=cExams.map(ex=>`<th>${ex.name.replace(/\s*모의.*$/,'')}</th>`).join('');
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">컨설팅 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.students.length}명)</span></span></div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table>
-    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>기록</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="6" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th>${examHeaders}<th>기록</th></tr></thead>
+    <tbody>${rows||`<tr><td colspan="${6+cExams.length}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
   </table></div></div>`;
 }
 
