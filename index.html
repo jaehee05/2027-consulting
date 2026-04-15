@@ -224,7 +224,7 @@ const S = {
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[], requests:[],
   tab:null, selDate:null, adminSel:null,
-  editingScore:false, lang2Open:false, marchEditingScore:false, stuSort:'seat'
+  editingExamId:null, lang2Open:false, stuSort:'seat'
 };
 
 const _=id=>document.getElementById(id);
@@ -236,17 +236,23 @@ function initPw(phone){return phone.replace(/\D/g,'');}
 function showErr(id,msg){const el=_(id);if(el){el.textContent=msg;el.style.display='block';}}
 function hideErr(id){const el=_(id);if(el)el.style.display='none';}
 function fmtPhoneInput(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.length>7)el.value=v.slice(0,3)+'-'+v.slice(3,7)+'-'+v.slice(7);else if(v.length>3)el.value=v.slice(0,3)+'-'+v.slice(3);else el.value=v;}
-function isScoreOpen(){if(!S.config.scoreStart)return false;const t=new Date().toISOString().slice(0,10);if(S.config.scoreEnd)return t>=S.config.scoreStart&&t<=S.config.scoreEnd;return t>=S.config.scoreStart;}
-function isMarchScoreOpen(){if(!S.config.marchScoreStart)return false;const t=new Date().toISOString().slice(0,10);if(S.config.marchScoreEnd)return t>=S.config.marchScoreStart&&t<=S.config.marchScoreEnd;return t>=S.config.marchScoreStart;}
+function getExams(){return S.config.exams||[];}
+function getExam(id){return getExams().find(e=>e.id===id);}
+function isExamOpen(exam){if(!exam||!exam.scoreStart)return false;const t=new Date().toISOString().slice(0,10);if(exam.scoreEnd)return t>=exam.scoreStart&&t<=exam.scoreEnd;return t>=exam.scoreStart;}
+function getStuExamScore(stu,examId){return stu?.scores?.[examId]||null;}
+function hasStuExamScore(stu,examId){const sc=getStuExamScore(stu,examId);return sc&&Object.values(sc).some(v=>v);}
 
 const GC_ABS_SUBJS=[['eng','영어',100],['his','한국사',50],['lang2','제2외국어',50]];
-const GC_REL_GROUPS=[
-  ['국어',['화법과 작문','언어와 매체'],100],
-  ['수학',['확률과 통계','미적분','기하'],100],
-  ['사회탐구',['생활과 윤리','윤리와 사상','한국지리','세계지리','동아시아사','세계사','경제','정치와 법','사회·문화'],50],
-  ['과학탐구',['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ','물리학Ⅱ','화학Ⅱ','생명과학Ⅱ','지구과학Ⅱ'],50]
-];
-const GC_ALL_REL=GC_REL_GROUPS.flatMap(([,s])=>s);
+function gcRelGroups(exam){
+  const sci2=exam&&exam.hasScienceII;
+  return [
+    ['국어',['화법과 작문','언어와 매체'],100],
+    ['수학',['확률과 통계','미적분','기하'],100],
+    ['사회탐구',['생활과 윤리','윤리와 사상','한국지리','세계지리','동아시아사','세계사','경제','정치와 법','사회·문화'],50],
+    ['과학탐구',sci2?['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ','물리학Ⅱ','화학Ⅱ','생명과학Ⅱ','지구과학Ⅱ']:['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ'],50]
+  ];
+}
+function gcAllRel(exam){return gcRelGroups(exam).flatMap(([,s])=>s);}
 
 function calcGrade(raw,cuts){
   if(!cuts||!cuts.length||raw===''||raw===undefined||raw===null)return '';
@@ -254,16 +260,16 @@ function calcGrade(raw,cuts){
   for(let i=0;i<cuts.length;i++){if(r>=Number(cuts[i]))return String(i+1);}
   return '9';
 }
-function getRelGrade(exam,subj,raw){
-  const gc=S.config.gradeCuts;if(!gc||!subj||raw===''||raw===undefined)return '';
-  const cuts=gc[exam]&&gc[exam][subj];return cuts?calcGrade(raw,cuts):'';
+function getExamGrade(exam,subj,raw){
+  if(!exam||!exam.gradeCuts||!subj||raw===''||raw===undefined)return '';
+  const cuts=exam.gradeCuts[subj];return cuts?calcGrade(raw,cuts):'';
 }
 function getAbsGrade(type,raw){
   const gc=S.config.gradeCuts;if(!gc||!gc.abs||raw===''||raw===undefined)return '';
   const cuts=gc.abs[type];return cuts?calcGrade(raw,cuts):'';
 }
-function relGradeCell(exam,subj,raw){
-  const g=getRelGrade(exam,subj,raw);
+function examGradeCell(exam,subj,raw){
+  const g=getExamGrade(exam,subj,raw);
   return g?`<td class="vl">${g}</td>`:'<td class="dl"></td>';
 }
 function absGradeCell(type,raw){
@@ -294,7 +300,19 @@ async function loadAll(){
     S.students=stuSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.schedule=scSnap.exists?scSnap.data():{dates:JSON.parse(JSON.stringify(DFLT_DATES))};
     if(!S.schedule.dates)S.schedule.dates=JSON.parse(JSON.stringify(DFLT_DATES));
-    S.config=cfgSnap.exists?cfgSnap.data():{scoreStart:'',scoreEnd:''};
+    S.config=cfgSnap.exists?cfgSnap.data():{};
+    if(!S.config.exams){
+      S.config.exams=[];
+      if(S.config.marchScoreStart||S.config.marchScoreEnd){S.config.exams.push({id:'exam_march',name:'3월 모의고사',scoreStart:S.config.marchScoreStart||'',scoreEnd:S.config.marchScoreEnd||'',hasLang2:false,hasScienceII:false,gradeCuts:S.config.gradeCuts?.march||{}});}
+      if(S.config.scoreStart||S.config.scoreEnd){S.config.exams.push({id:'exam_june',name:'6월 모의평가',scoreStart:S.config.scoreStart||'',scoreEnd:S.config.scoreEnd||'',hasLang2:true,hasScienceII:true,gradeCuts:S.config.gradeCuts?.june||{}});}
+    }
+    if(!S.config.gradeCuts)S.config.gradeCuts={};
+    if(!S.config.gradeCuts.abs)S.config.gradeCuts.abs={};
+    S.students.forEach(stu=>{
+      if(!stu.scores)stu.scores={};
+      if(stu.marchScore&&Object.values(stu.marchScore).some(v=>v)&&!stu.scores.exam_march)stu.scores.exam_march=stu.marchScore;
+      if(stu.score&&Object.values(stu.score).some(v=>v)&&!stu.scores.exam_june)stu.scores.exam_june=stu.score;
+    });
     S.bookings=bkSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.requests=reqSnap.docs.map(d=>({_docId:d.id,...d.data()}));
   }catch(e){alert('데이터 로딩 실패: '+e.message);}
@@ -344,7 +362,7 @@ async function doLogin(){
 }
 
 function doLogout(){
-  S.user=null;S.studentDocId=null;S.editingScore=false;S.lang2Open=false;S.marchEditingScore=false;
+  S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;
   sessionStorage.removeItem('session');
   _('lId').value='';_('lPw').value='';hideErr('lErr');showView('vLogin');
 }
@@ -379,8 +397,9 @@ async function createFirstAdmin(){
 function renderStu(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
-  if(myB){_('stuC').innerHTML=bookCardHtml(myB)+marchScoreCardHtml(myStu)+scoreCardHtml(myStu)+qCardHtml(myB);}
-  else if(myStu){_('stuC').innerHTML=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`+marchScoreCardHtml(myStu)+scoreCardHtml(myStu);}
+  const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
+  if(myB){_('stuC').innerHTML=bookCardHtml(myB)+examCards+qCardHtml(myB);}
+  else if(myStu){_('stuC').innerHTML=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`+examCards;}
   else showBookForm(false);
 }
 
@@ -418,34 +437,40 @@ function bookCardHtml(b){
   ${statusHtml}${btns}
 </div>`;}
 
-function expOpts(sel){
+function expOpts(sel,hasScienceII){
   const social=['생활과 윤리','윤리와 사상','한국지리','세계지리','동아시아사','세계사','경제','정치와 법','사회·문화'];
-  const science=['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ','물리학Ⅱ','화학Ⅱ','생명과학Ⅱ','지구과학Ⅱ'];
+  const science=['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ'];
+  if(hasScienceII!==false)science.push('물리학Ⅱ','화학Ⅱ','생명과학Ⅱ','지구과학Ⅱ');
   return `<option value="">과목 선택</option><optgroup label="사회탐구">${social.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('')}</optgroup><optgroup label="과학탐구">${science.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('')}</optgroup>`;
 }
 function l2Opts(sel){return `<option value="">선택</option>${['독일어Ⅰ','프랑스어Ⅰ','스페인어Ⅰ','중국어Ⅰ','일본어Ⅰ','러시아어Ⅰ','아랍어Ⅰ','베트남어Ⅰ','한문Ⅰ'].map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('')}`;}
 
-function scoreFormHtml(s){s=s||{};return `
-  <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="sk-ks"><option value="">선택</option><option ${s.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${s.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
-  <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="sk-kr" type="number" min="0" max="100" value="${s.korRaw||''}" placeholder="0–100"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="sk-ms"><option value="">선택</option><option ${s.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${s.matSubj==='미적분'?'selected':''}>미적분</option><option ${s.matSubj==='기하'?'selected':''}>기하</option></select></div>
-  <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="sk-mr" type="number" min="0" max="100" value="${s.matRaw||''}" placeholder="0–100"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="sk-eg"><option value="">등급</option>${gradeOpts(s.engGrade||'')}</select></div>
-  <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="sk-hg"><option value="">등급</option>${gradeOpts(s.hisGrade||'')}</select></div></div>
-  <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="sk-e1s">${expOpts(s.exp1Subj||'')}</select></div>
-  <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="sk-e1r" type="number" min="0" max="50" value="${s.exp1Raw||''}" placeholder="0–50"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="sk-e2s">${expOpts(s.exp2Subj||'')}</select></div>
-  <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="sk-e2r" type="number" min="0" max="50" value="${s.exp2Raw||''}" placeholder="0–50"></div></div>
+function gradeOpts(sel){return [1,2,3,4,5,6,7,8,9].map(g=>`<option ${String(g)===String(sel)?'selected':''}>${g}</option>`).join('');}
+
+function examScoreFormHtml(exam,s){s=s||{};const sci2=exam.hasScienceII;let html=`
+  <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="es-ks"><option value="">선택</option><option ${s.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${s.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
+  <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="es-kr" type="number" min="0" max="100" value="${s.korRaw||''}" placeholder="0–100"></div></div>
+  <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="es-ms"><option value="">선택</option><option ${s.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${s.matSubj==='미적분'?'selected':''}>미적분</option><option ${s.matSubj==='기하'?'selected':''}>기하</option></select></div>
+  <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="es-mr" type="number" min="0" max="100" value="${s.matRaw||''}" placeholder="0–100"></div></div>
+  <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="es-eg"><option value="">등급</option>${gradeOpts(s.engGrade||'')}</select></div>
+  <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="es-hg"><option value="">등급</option>${gradeOpts(s.hisGrade||'')}</select></div></div>
+  <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="es-e1s">${expOpts(s.exp1Subj||'',sci2)}</select></div>
+  <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="es-e1r" type="number" min="0" max="50" value="${s.exp1Raw||''}" placeholder="0–50"></div></div>
+  <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="es-e2s">${expOpts(s.exp2Subj||'',sci2)}</select></div>
+  <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="es-e2r" type="number" min="0" max="50" value="${s.exp2Raw||''}" placeholder="0–50"></div></div>`;
+  if(exam.hasLang2){html+=`
   <div style="cursor:pointer;display:flex;align-items:center;gap:7px;padding:8px 12px;border:1px dashed #e5e7eb;border-radius:10px;background:#fafafa;margin-bottom:${S.lang2Open?'10px':'0'}" onclick="S.lang2Open=!S.lang2Open;renderStu()">
     <span style="width:20px;height:20px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:14px">${S.lang2Open?'−':'+'}</span>
     <span style="font-size:13px;font-weight:500;color:#6b7280">제2외국어 / 한문 ${S.lang2Open?'닫기':'추가'}</span>
   </div>
-  ${S.lang2Open?`<div class="frow" style="margin-top:10px"><div class="fg"><label class="fl">제2외국어 과목</label><select class="fi fsel" id="sk-l2s">${l2Opts(s.lang2Subj||'')}</select></div><div class="fg"><label class="fl">원점수</label><input class="fi" id="sk-l2r" type="number" min="0" max="50" value="${s.lang2Raw||''}" placeholder="0–50"></div></div>`:''}
-  <button class="btn bp bfw" style="margin-top:14px" onclick="saveScore()">성적 저장</button>`;}
+  ${S.lang2Open?`<div class="frow" style="margin-top:10px"><div class="fg"><label class="fl">제2외국어 과목</label><select class="fi fsel" id="es-l2s">${l2Opts(s.lang2Subj||'')}</select></div><div class="fg"><label class="fl">원점수</label><input class="fi" id="es-l2r" type="number" min="0" max="50" value="${s.lang2Raw||''}" placeholder="0–50"></div></div>`:''}`;}
+  html+=`<button class="btn bp bfw" style="margin-top:14px" onclick="saveExamScore('${exam.id}')">성적 저장</button>`;
+  return html;}
 
-function scoreTblHtml(sc){if(!sc)return '';const hasL2=sc.lang2Subj||sc.lang2Raw;
-  const kg=relGradeCell('june',sc.korSubj,sc.korRaw),mg=relGradeCell('june',sc.matSubj,sc.matRaw);
-  const e1g=relGradeCell('june',sc.exp1Subj,sc.exp1Raw),e2g=relGradeCell('june',sc.exp2Subj,sc.exp2Raw);
+function examScoreTblHtml(exam,sc){if(!sc)return '';
+  const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
+  const kg=examGradeCell(exam,sc.korSubj,sc.korRaw),mg=examGradeCell(exam,sc.matSubj,sc.matRaw);
+  const e1g=examGradeCell(exam,sc.exp1Subj,sc.exp1Raw),e2g=examGradeCell(exam,sc.exp2Subj,sc.exp2Raw);
   const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw):'';
   return `<div style="overflow-x:auto"><table class="sc-tbl">
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어</td>':''}</tr>
@@ -454,51 +479,18 @@ function scoreTblHtml(sc){if(!sc)return '';const hasL2=sc.lang2Subj||sc.lang2Raw
   <tr><td class="rh" style="font-size:10px">등급</td><td class="vl">${sc.hisGrade||'—'}</td>${kg}${mg}<td class="vl">${sc.engGrade||'—'}</td>${e1g}${e2g}${l2g}</tr>
 </table></div>`;}
 
-function scoreCardHtml(stu){
-  const open=isScoreOpen(),sc=stu?.score,hasSc=sc&&Object.values(sc).some(v=>v),showForm=open&&(!hasSc||S.editingScore);
+function examScoreCardHtml(exam,stu){
+  const open=isExamOpen(exam),sc=getStuExamScore(stu,exam.id),hasSc=sc&&Object.values(sc).some(v=>v);
+  const isEditing=S.editingExamId===exam.id;
+  const showForm=open&&(!hasSc||isEditing);
   const badge=hasSc?`<span class="bx bg">성적 입력 완료</span>`:open?`<span class="bx bb">입력 가능</span>`:`<span class="bx bgr">입력 기간 아님</span>`;
-  const editBtn=hasSc&&open?`<button class="btn bs bsm" onclick="S.editingScore=${!S.editingScore};renderStu()">${S.editingScore?'취소':'수정'}</button>`:'';
-  const pNote=S.config.scoreStart?`<p style="font-size:11px;color:#6b7280;margin-bottom:10px">입력 기간: ${S.config.scoreStart}${S.config.scoreEnd?' ~ '+S.config.scoreEnd:' ~ 무기한'}</p>`:'';
+  const editBtn=hasSc&&open?`<button class="btn bs bsm" onclick="S.editingExamId=${isEditing?'null':`'${exam.id}'`};renderStu()">${isEditing?'취소':'수정'}</button>`:'';
+  const pNote=exam.scoreStart?`<p style="font-size:11px;color:#6b7280;margin-bottom:10px">입력 기간: ${exam.scoreStart}${exam.scoreEnd?' ~ '+exam.scoreEnd:' ~ 무기한'}</p>`:'';
   let body='';
-  if(showForm)body=scoreFormHtml(sc||{});
-  else if(hasSc)body=scoreTblHtml(sc);
-  else body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${S.config.scoreStart?`<br><span style="font-size:12px">기간: ${S.config.scoreStart} ~ ${S.config.scoreEnd}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
-  return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">모의평가 성적</p></div>${editBtn}</div>${pNote}${body}</div>`;}
-
-function gradeOpts(sel){return [1,2,3,4,5,6,7,8,9].map(g=>`<option ${String(g)===String(sel)?'selected':''}>${g}</option>`).join('');}
-function marchScoreFormHtml(s){s=s||{};return `
-  <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="mk-ks"><option value="">선택</option><option ${s.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${s.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
-  <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="mk-kr" type="number" min="0" max="100" value="${s.korRaw||''}" placeholder="0–100"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="mk-ms"><option value="">선택</option><option ${s.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${s.matSubj==='미적분'?'selected':''}>미적분</option><option ${s.matSubj==='기하'?'selected':''}>기하</option></select></div>
-  <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="mk-mr" type="number" min="0" max="100" value="${s.matRaw||''}" placeholder="0–100"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="mk-eg"><option value="">등급</option>${gradeOpts(s.engGrade||'')}</select></div>
-  <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="mk-hg"><option value="">등급</option>${gradeOpts(s.hisGrade||'')}</select></div></div>
-  <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="mk-e1s">${expOpts(s.exp1Subj||'')}</select></div>
-  <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="mk-e1r" type="number" min="0" max="50" value="${s.exp1Raw||''}" placeholder="0–50"></div></div>
-  <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="mk-e2s">${expOpts(s.exp2Subj||'')}</select></div>
-  <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="mk-e2r" type="number" min="0" max="50" value="${s.exp2Raw||''}" placeholder="0–50"></div></div>
-  <button class="btn bp bfw" style="margin-top:14px" onclick="saveMarchScore()">성적 저장</button>`;}
-
-function marchScoreTblHtml(sc){if(!sc)return '';
-  const kg=relGradeCell('march',sc.korSubj,sc.korRaw),mg=relGradeCell('march',sc.matSubj,sc.matRaw);
-  const e1g=relGradeCell('march',sc.exp1Subj,sc.exp1Raw),e2g=relGradeCell('march',sc.exp2Subj,sc.exp2Raw);
-  return `<div style="overflow-x:auto"><table class="sc-tbl">
-  <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td></tr>
-  <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td></tr>
-  <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td></tr>
-  <tr><td class="rh" style="font-size:10px">등급</td><td class="vl">${sc.hisGrade||'—'}</td>${kg}${mg}<td class="vl">${sc.engGrade||'—'}</td>${e1g}${e2g}</tr>
-</table></div>`;}
-
-function marchScoreCardHtml(stu){
-  const open=isMarchScoreOpen(),sc=stu?.marchScore,hasSc=sc&&Object.values(sc).some(v=>v),showForm=open&&(!hasSc||S.marchEditingScore);
-  const badge=hasSc?`<span class="bx bg">성적 입력 완료</span>`:open?`<span class="bx bb">입력 가능</span>`:`<span class="bx bgr">입력 기간 아님</span>`;
-  const editBtn=hasSc&&open?`<button class="btn bs bsm" onclick="S.marchEditingScore=${!S.marchEditingScore};renderStu()">${S.marchEditingScore?'취소':'수정'}</button>`:'';
-  const pNote=S.config.marchScoreStart?`<p style="font-size:11px;color:#6b7280;margin-bottom:10px">입력 기간: ${S.config.marchScoreStart}${S.config.marchScoreEnd?' ~ '+S.config.marchScoreEnd:' ~ 무기한'}</p>`:'';
-  let body='';
-  if(showForm)body=marchScoreFormHtml(sc||{});
-  else if(hasSc)body=marchScoreTblHtml(sc);
-  else body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${S.config.marchScoreStart?`<br><span style="font-size:12px">기간: ${S.config.marchScoreStart} ~ ${S.config.marchScoreEnd}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
-  return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">3월 모의고사 성적</p></div>${editBtn}</div>${pNote}${body}</div>`;}
+  if(showForm)body=examScoreFormHtml(exam,sc||{});
+  else if(hasSc)body=examScoreTblHtml(exam,sc);
+  else body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${exam.scoreStart?`<br><span style="font-size:12px">기간: ${exam.scoreStart} ~ ${exam.scoreEnd||'무기한'}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
+  return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">${exam.name} 성적</p></div>${editBtn}</div>${pNote}${body}</div>`;}
 
 function qCardHtml(booking){return `<div class="card" style="margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx ${booking.question?'bg':'bb'}">질문 & 고민</span><p style="font-size:15px;font-weight:700">상담 전 질문 & 고민</p></div>
@@ -506,29 +498,19 @@ function qCardHtml(booking){return `<div class="card" style="margin-bottom:12px"
   <button class="btn bp bsm" id="qSaveBtn" onclick="saveQuestion()">저장</button>
 </div>`;}
 
-async function saveScore(){
+async function saveExamScore(examId){
   if(!S.studentDocId)return;
-  const korSubj=_('sk-ks')?.value||'',korRaw=_('sk-kr')?.value||'',matSubj=_('sk-ms')?.value||'',matRaw=_('sk-mr')?.value||'';
-  const exp1Subj=_('sk-e1s')?.value||'',exp1Raw=_('sk-e1r')?.value||'',exp2Subj=_('sk-e2s')?.value||'',exp2Raw=_('sk-e2r')?.value||'';
-  const lang2Subj=S.lang2Open?(_('sk-l2s')?.value||''):'',lang2Raw=S.lang2Open?(_('sk-l2r')?.value||''):'';
-  const score={korSubj,korRaw,korGrade:getRelGrade('june',korSubj,korRaw),matSubj,matRaw,matGrade:getRelGrade('june',matSubj,matRaw),engGrade:_('sk-eg')?.value||'',hisGrade:_('sk-hg')?.value||'',exp1Subj,exp1Raw,exp1Grade:getRelGrade('june',exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getRelGrade('june',exp2Subj,exp2Raw),lang2Subj,lang2Raw,lang2Grade:getAbsGrade('lang2',lang2Raw)};
+  const exam=getExam(examId);if(!exam)return;
+  const korSubj=_('es-ks')?.value||'',korRaw=_('es-kr')?.value||'',matSubj=_('es-ms')?.value||'',matRaw=_('es-mr')?.value||'';
+  const exp1Subj=_('es-e1s')?.value||'',exp1Raw=_('es-e1r')?.value||'',exp2Subj=_('es-e2s')?.value||'',exp2Raw=_('es-e2r')?.value||'';
+  const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engGrade:_('es-eg')?.value||'',hisGrade:_('es-hg')?.value||'',exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
+  if(exam.hasLang2){const lang2Subj=S.lang2Open?(_('es-l2s')?.value||''):'',lang2Raw=S.lang2Open?(_('es-l2r')?.value||''):'';scoreData.lang2Subj=lang2Subj;scoreData.lang2Raw=lang2Raw;scoreData.lang2Grade=getAbsGrade('lang2',lang2Raw);}
   showLoad(true);
-  try{await db.collection('students').doc(S.studentDocId).update({score});
-    const stu=S.students.find(x=>x._docId===S.studentDocId);if(stu)stu.score=score;
-    S.editingScore=false;renderStu();}
-  catch(e){alert('저장 실패: '+e.message);}
-  showLoad(false);
-}
-
-async function saveMarchScore(){
-  if(!S.studentDocId)return;
-  const korSubj=_('mk-ks')?.value||'',korRaw=_('mk-kr')?.value||'',matSubj=_('mk-ms')?.value||'',matRaw=_('mk-mr')?.value||'';
-  const exp1Subj=_('mk-e1s')?.value||'',exp1Raw=_('mk-e1r')?.value||'',exp2Subj=_('mk-e2s')?.value||'',exp2Raw=_('mk-e2r')?.value||'';
-  const marchScore={korSubj,korRaw,korGrade:getRelGrade('march',korSubj,korRaw),matSubj,matRaw,matGrade:getRelGrade('march',matSubj,matRaw),engGrade:_('mk-eg')?.value||'',hisGrade:_('mk-hg')?.value||'',exp1Subj,exp1Raw,exp1Grade:getRelGrade('march',exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getRelGrade('march',exp2Subj,exp2Raw)};
-  showLoad(true);
-  try{await db.collection('students').doc(S.studentDocId).update({marchScore});
-    const stu=S.students.find(x=>x._docId===S.studentDocId);if(stu)stu.marchScore=marchScore;
-    S.marchEditingScore=false;renderStu();}
+  try{
+    const stu=S.students.find(x=>x._docId===S.studentDocId);
+    if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;
+    await db.collection('students').doc(S.studentDocId).update({['scores.'+examId]:scoreData});
+    S.editingExamId=null;renderStu();}
   catch(e){alert('저장 실패: '+e.message);}
   showLoad(false);
 }
@@ -651,11 +633,11 @@ async function submitChangeRequest(){
 async function setTab(tab){
   S.tab=tab;
   const isAdmin=S.user.type==='admin';
-  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['gradeCuts','등급컷'],['schedule','일정 관리'],['bookings','예약 현황'],['accounts','계정 관리']]:[['bookings','예약 현황']];
+  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['accounts','계정 관리']]:[['bookings','예약 현황']];
   _('adminTabs').innerHTML=tabs.map(([id,label])=>`<button class="tab ${S.tab===id?'on':''}" onclick="setTab('${id}')">${label}</button>`).join('');
   if(tab==='students')renderAdminStudents();
   else if(tab==='scores')renderAdminScores();
-  else if(tab==='gradeCuts')renderAdminGradeCuts();
+  else if(tab==='exams')renderAdminExams();
   else if(tab==='schedule')renderAdminSchedule();
   else if(tab==='bookings')renderAdminBookings();
   else if(tab==='accounts'){await loadAdmins();renderAdminAccounts();}
@@ -698,48 +680,46 @@ function renderAdminScores(){
     if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
     return 0;
   });
+  const examsForRows=getExams();
   const rows=sorted.map(s=>{
-    const hasMarch=s.marchScore&&Object.values(s.marchScore).some(v=>v);
-    const hasJune=s.score&&Object.values(s.score).some(v=>v);
+    const examCells=examsForRows.map(ex=>`<td style="text-align:center">${hasStuExamScore(s,ex.id)?'<span class="bx bg">입력 완료</span>':'<span style="color:#d1d5db">—</span>'}</td>`).join('');
     return `<tr>
       <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
-      <td style="text-align:center">${hasMarch?'<span class="bx bg">입력 완료</span>':'<span style="color:#d1d5db">—</span>'}</td>
-      <td style="text-align:center">${hasJune?'<span class="bx bg">입력 완료</span>':'<span style="color:#d1d5db">—</span>'}</td>
+      ${examCells}
       <td style="white-space:nowrap"><button class="btn bs bsm" onclick="openScoreDetail('${s._docId}')">상세</button></td>
     </tr>`;}).join('');
-  const totalMarch=S.students.filter(s=>s.marchScore&&Object.values(s.marchScore).some(v=>v)).length;
-  const totalJune=S.students.filter(s=>s.score&&Object.values(s.score).some(v=>v)).length;
+  const exams=getExams();
+  const examTotals=exams.map(ex=>({ex,total:S.students.filter(s=>hasStuExamScore(s,ex.id)).length}));
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminScores()">${l}</button>`).join('');
+  const examHeaders=exams.map(ex=>`<th>${ex.name}</th>`).join('');
+  const colCount=5+exams.length;
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 성적 관리 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.students.length}명)</span></span>
     <button class="btn bs bsm" onclick="refreshStudents()">새로고침</button></div>
-  <div style="display:flex;gap:12px;margin-bottom:14px">
-    <div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1"><span style="font-size:11px;font-weight:600;color:#6b7280">3월 모의고사</span><p style="font-size:18px;font-weight:800;margin-top:2px">${totalMarch}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${S.students.length}명</span></p></div>
-    <div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1"><span style="font-size:11px;font-weight:600;color:#6b7280">6월 모의평가</span><p style="font-size:18px;font-weight:800;margin-top:2px">${totalJune}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${S.students.length}명</span></p></div>
-  </div>
+  <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">${examTotals.map(({ex,total})=>`<div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1;min-width:120px"><span style="font-size:11px;font-weight:600;color:#6b7280">${ex.name}</span><p style="font-size:18px;font-weight:800;margin-top:2px">${total}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${S.students.length}명</span></p></div>`).join('')}</div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table>
-    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>3월 모의고사</th><th>6월 모의평가</th><th>관리</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="7" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th>${examHeaders}<th>관리</th></tr></thead>
+    <tbody>${rows||`<tr><td colspan="${colCount}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
   </table></div></div>`;}
 
 function openScoreDetail(stuDocId){
   const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
-  const hasMarch=stu.marchScore&&Object.values(stu.marchScore).some(v=>v);
-  const hasJune=stu.score&&Object.values(stu.score).some(v=>v);
+  const exams=getExams();
+  const examSections=exams.map(ex=>{
+    const hasSc=hasStuExamScore(stu,ex.id);const sc=getStuExamScore(stu,ex.id);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px"><p style="font-size:14px;font-weight:700">${ex.name} 성적</p>
+      <div style="display:flex;gap:6px">${hasSc?`<button class="btn bd bsm" onclick="adminDelExamScore('${stuDocId}','${ex.id}','scores')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','${ex.id}','scores')">${hasSc?'수정':'입력'}</button></div></div>
+    ${hasSc?examScoreTblHtml(ex,sc):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}`;
+  }).join('');
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">성적 상세 정보</p>
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${stu.name}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:700;font-size:14px">${stu.school} ${stu.grade}</p></div>
     </div></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><p style="font-size:14px;font-weight:700">3월 모의고사 성적</p>
-      <div style="display:flex;gap:6px">${hasMarch?`<button class="btn bd bsm" onclick="adminDelMarchScore('${stuDocId}','scores')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','marchScore','scores')">${hasMarch?'수정':'입력'}</button></div></div>
-    ${hasMarch?marchScoreTblHtml(stu.marchScore):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
-    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px"><p style="font-size:14px;font-weight:700">6월 모의평가 성적</p>
-      <div style="display:flex;gap:6px">${hasJune?`<button class="btn bd bsm" onclick="adminDelScore('${stuDocId}','scores')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','score','scores')">${hasJune?'수정':'입력'}</button></div></div>
-    ${hasJune?scoreTblHtml(stu.score):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    ${examSections}
     <button class="btn bs bfw" style="margin-top:16px" onclick="closeModal()">닫기</button>`;openModal();}
 
 async function refreshStudents(){showLoad(true);try{const snap=await db.collection('students').get();S.students=snap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminScores();}catch(e){alert('새로고침 실패: '+e.message);}showLoad(false);}
@@ -805,92 +785,126 @@ async function resetPw(docId){
   catch(e){alert('초기화 실패: '+e.message);}
   showLoad(false);}
 
-/* ── ADMIN: 등급컷 ── */
-function gcCutRow(prefix,name,cuts,max){
-  cuts=cuts||[];
-  return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>`<td><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}" value="${cuts[i]!=null?cuts[i]:''}"></td>`).join('')}</tr>`;
-}
+/* ── ADMIN: 시험 관리 ── */
+function gcCutRow(prefix,name,cuts,max){cuts=cuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>`<td><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}" value="${cuts[i]!=null?cuts[i]:''}"></td>`).join('')}</tr>`;}
 function gcTblHeader(){return `<tr><th style="min-width:80px">과목</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th><th>6등급</th><th>7등급</th><th>8등급</th></tr>`;}
 
-function renderAdminGradeCuts(){
-  const gc=S.config.gradeCuts||{abs:{},march:{},june:{}};
-  let absRows=GC_ABS_SUBJS.map(([key,name,max])=>gcCutRow('gca-'+key,name,gc.abs?.[key],max)).join('');
-  function examSection(examKey){
-    let html='';
-    for(const [group,subjs,max] of GC_REL_GROUPS){
-      html+=`<tr><td class="gc-grp" colspan="9">${group}</td></tr>`;
-      for(let i=0;i<subjs.length;i++){
-        const subj=subjs[i];
-        html+=gcCutRow('gc-'+examKey+'-'+GC_ALL_REL.indexOf(subj),subj,gc[examKey]?.[subj],max);
-      }
-    }
-    return html;
-  }
-  _('adminC').innerHTML=`
-    <div class="sh"><span class="shtitle">등급컷 관리</span></div>
-    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">각 등급의 최저 원점수를 입력하세요. (예: 1등급 컷이 92이면, 92점 이상 = 1등급)</p>
-    <div class="card" style="margin-bottom:16px">
+function renderAdminExams(){
+  const exams=getExams();const gc=S.config.gradeCuts||{};
+  const absRows=GC_ABS_SUBJS.map(([key,name,max])=>gcCutRow('gca-'+key,name,gc.abs?.[key],max)).join('');
+  const examCards=exams.map(ex=>{
+    const open=isExamOpen(ex);const gcCount=ex.gradeCuts?Object.keys(ex.gradeCuts).length:0;
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px"><p style="font-size:15px;font-weight:700">${ex.name}</p>${open?'<span class="bx bg">입력 가능</span>':'<span class="bx bgr">마감</span>'}</div>
+        <div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openEditExam('${ex.id}')">수정</button><button class="btn bd bsm" onclick="deleteExam('${ex.id}')">삭제</button></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#6b7280">
+        <span>${ex.scoreStart?'기간: '+ex.scoreStart+' ~ '+(ex.scoreEnd||'무기한'):'기간: 미설정'}</span>
+        <span>|</span><span>등급컷: ${gcCount?gcCount+'개 과목 설정':'미설정'}</span>
+        <span>|</span><span>제2외국어: ${ex.hasLang2?'O':'X'}</span>
+        <span>|</span><span>과탐II: ${ex.hasScienceII?'O':'X'}</span>
+      </div>
+      <div style="margin-top:10px"><button class="btn bs bsm" onclick="openExamGradeCuts('${ex.id}')">등급컷 설정</button></div>
+    </div>`;}).join('');
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">시험 관리</span><button class="btn bp bsm" onclick="openAddExam()">+ 시험 추가</button></div>
+    ${examCards||'<div class="card empty">등록된 시험이 없습니다.</div>'}
+    <div class="card" style="margin-top:16px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">절대평가 과목 등급컷</p><span class="bx bb" style="font-size:10px">모든 시험 공통</span></div>
       <p style="font-size:11px;color:#6b7280;margin-bottom:10px">영어, 한국사, 제2외국어는 절대평가이므로 모든 시험에 동일하게 적용됩니다.</p>
       <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${absRows}</table></div>
       <button class="btn bp bsm" style="margin-top:12px" onclick="saveAbsGradeCuts()">절대평가 등급컷 저장</button>
-    </div>
-    <div class="card" style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">3월 모의고사 등급컷</p></div>
-      <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${examSection('march')}</table></div>
-      <button class="btn bp bsm" style="margin-top:12px" onclick="saveExamGradeCuts('march')">3월 등급컷 저장</button>
-    </div>
-    <div class="card" style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">6월 모의평가 등급컷</p></div>
-      <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${examSection('june')}</table></div>
-      <button class="btn bp bsm" style="margin-top:12px" onclick="saveExamGradeCuts('june')">6월 등급컷 저장</button>
     </div>`;
 }
 
+function openAddExam(){
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">시험 추가</p>
+    <div class="fg"><label class="fl">시험명</label><input class="fi" id="exName" placeholder="예: 3월 모의고사"></div>
+    <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date"></div>
+    <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date"></div></div>
+    <div style="display:flex;gap:16px;margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2"> 제2외국어 포함</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2"> 과학탐구 II 포함</label>
+    </div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveExamForm()">추가</button></div>`;openModal();}
+
+function openEditExam(examId){
+  const ex=getExam(examId);if(!ex)return;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">시험 수정</p>
+    <input type="hidden" id="exId" value="${examId}">
+    <div class="fg"><label class="fl">시험명</label><input class="fi" id="exName" value="${ex.name}"></div>
+    <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date" value="${ex.scoreStart||''}"></div>
+    <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date" value="${ex.scoreEnd||''}"></div></div>
+    <div style="display:flex;gap:16px;margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2" ${ex.hasLang2?'checked':''}> 제2외국어 포함</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2" ${ex.hasScienceII?'checked':''}> 과학탐구 II 포함</label>
+    </div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveExamForm()">저장</button></div>`;openModal();}
+
+async function saveExamForm(){
+  const name=_('exName')?.value.trim();if(!name){showErr('mErr','시험명을 입력하세요.');return;}
+  const examId=_('exId')?.value||('exam_'+uid());
+  const examData={id:examId,name,scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',hasLang2:_('exLang2')?.checked||false,hasScienceII:_('exSci2')?.checked||false};
+  if(!S.config.exams)S.config.exams=[];
+  const idx=S.config.exams.findIndex(e=>e.id===examId);
+  if(idx>=0){examData.gradeCuts=S.config.exams[idx].gradeCuts||{};S.config.exams[idx]=examData;}
+  else{examData.gradeCuts={};S.config.exams.push(examData);}
+  showLoad(true);
+  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();}
+  catch(e){showErr('mErr','저장 실패: '+e.message);}
+  showLoad(false);}
+
+async function deleteExam(examId){
+  const ex=getExam(examId);if(!ex||!confirm(`'${ex.name}' 시험을 삭제하시겠습니까? 해당 시험의 학생 성적 데이터는 유지됩니다.`))return;
+  S.config.exams=S.config.exams.filter(e=>e.id!==examId);
+  showLoad(true);
+  try{await db.collection('config').doc('main').set(S.config);renderAdminExams();}
+  catch(e){alert('삭제 실패: '+e.message);}
+  showLoad(false);}
+
+function openExamGradeCuts(examId){
+  const ex=getExam(examId);if(!ex)return;
+  const gc=ex.gradeCuts||{};const allRel=gcAllRel(ex);const groups=gcRelGroups(ex);
+  let rows='';
+  for(const [group,subjs,max] of groups){
+    rows+=`<tr><td class="gc-grp" colspan="9">${group}</td></tr>`;
+    for(const subj of subjs){rows+=gcCutRow('gc-'+allRel.indexOf(subj),subj,gc[subj],max);}
+  }
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${ex.name} 등급컷</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">각 등급의 최저 원점수를 입력하세요.</p>
+    <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${rows}</table></div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal();renderAdminExams()">취소</button><button class="btn bp" style="flex:1" onclick="saveExamGradeCutsFromModal('${examId}')">저장</button></div>`;openModal();}
+
+async function saveExamGradeCutsFromModal(examId){
+  const ex=getExam(examId);if(!ex)return;
+  const allRel=gcAllRel(ex);ex.gradeCuts={};
+  for(let si=0;si<allRel.length;si++){
+    const subj=allRel[si],vals=[];let hasVal=false;
+    for(let i=0;i<8;i++){const v=_('gc-'+si+'-'+i)?.value;vals.push(v!==''?Number(v):'');if(v!=='')hasVal=true;}
+    if(hasVal)ex.gradeCuts[subj]=vals;
+  }
+  showLoad(true);
+  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();alert('등급컷이 저장되었습니다.');}
+  catch(e){alert('저장 실패: '+e.message);}
+  showLoad(false);}
+
 async function saveAbsGradeCuts(){
-  if(!S.config.gradeCuts)S.config.gradeCuts={abs:{},march:{},june:{}};
+  if(!S.config.gradeCuts)S.config.gradeCuts={};
   if(!S.config.gradeCuts.abs)S.config.gradeCuts.abs={};
   for(const [key,,] of GC_ABS_SUBJS){
     const vals=[];let hasVal=false;
     for(let i=0;i<8;i++){const v=_('gca-'+key+'-'+i)?.value;vals.push(v!==''?Number(v):'');if(v!=='')hasVal=true;}
-    if(hasVal)S.config.gradeCuts.abs[key]=vals;
-    else delete S.config.gradeCuts.abs[key];
+    if(hasVal)S.config.gradeCuts.abs[key]=vals;else delete S.config.gradeCuts.abs[key];
   }
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);alert('절대평가 등급컷이 저장되었습니다.');}
   catch(e){alert('저장 실패: '+e.message);}
-  showLoad(false);
-}
-
-async function saveExamGradeCuts(examKey){
-  if(!S.config.gradeCuts)S.config.gradeCuts={abs:{},march:{},june:{}};
-  if(!S.config.gradeCuts[examKey])S.config.gradeCuts[examKey]={};
-  for(let si=0;si<GC_ALL_REL.length;si++){
-    const subj=GC_ALL_REL[si],vals=[];let hasVal=false;
-    for(let i=0;i<8;i++){const v=_('gc-'+examKey+'-'+si+'-'+i)?.value;vals.push(v!==''?Number(v):'');if(v!=='')hasVal=true;}
-    if(hasVal)S.config.gradeCuts[examKey][subj]=vals;
-    else delete S.config.gradeCuts[examKey][subj];
-  }
-  showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);alert((examKey==='march'?'3월 모의고사':'6월 모의평가')+' 등급컷이 저장되었습니다.');}
-  catch(e){alert('저장 실패: '+e.message);}
-  showLoad(false);
-}
+  showLoad(false);}
 
 /* ── ADMIN: 일정 ── */
 function renderAdminSchedule(){
-  const open=isScoreOpen();
-  const marchOpen=isMarchScoreOpen();
-  const marchCfgCard=`<div class="card" style="margin-bottom:16px">
-    <div class="cfg-hdr" style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📝 3월 모의고사 성적 입력 기간</p>${marchOpen?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
-    <div class="frow"><div class="fg"><label class="fl">시작일</label><input class="fi" id="cfgMS" type="date" value="${S.config.marchScoreStart||''}"></div><div class="fg"><label class="fl">종료일</label><input class="fi" id="cfgME" type="date" value="${S.config.marchScoreEnd||''}"></div></div>
-    <div class="cfg-save" style="display:flex;align-items:center;gap:10px"><button class="btn bp bsm" onclick="saveCfgSettings()">저장</button>${S.config.marchScoreStart?`<span style="font-size:12px;color:#6b7280">${S.config.marchScoreStart} ~ ${S.config.marchScoreEnd||'무기한'}</span>`:''}</div>
-  </div>`;
-  const cfgCard=`<div class="card" style="margin-bottom:16px">
-    <div class="cfg-hdr" style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">📝 6월 모의평가 성적 입력 기간</p>${open?'<span class="bx bg">현재 입력 가능</span>':'<span class="bx bgr">현재 마감</span>'}</div>
-    <div class="frow"><div class="fg"><label class="fl">시작일</label><input class="fi" id="cfgS" type="date" value="${S.config.scoreStart||''}"></div><div class="fg"><label class="fl">종료일</label><input class="fi" id="cfgE" type="date" value="${S.config.scoreEnd||''}"></div></div>
-    <div class="cfg-save" style="display:flex;align-items:center;gap:10px"><button class="btn bp bsm" onclick="saveCfgSettings()">저장</button>${S.config.scoreStart?`<span style="font-size:12px;color:#6b7280">${S.config.scoreStart} ~ ${S.config.scoreEnd||'무기한'}</span>`:''}</div>
-  </div>`;
   const datesHtml=S.schedule.dates.map(d=>{
     const slotHtml=d.slots.map(sl=>`<span style="display:inline-flex;align-items:center;gap:3px;background:#f3f4f6;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;margin:2px">${sl}<button onclick="rmSlot('${d.id}','${sl}')" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0;margin-left:2px">×</button></span>`).join('');
     return `<div class="card" style="margin-bottom:12px">
@@ -905,12 +919,7 @@ function renderAdminSchedule(){
         <button class="btn bp bsm" style="height:36px" onclick="openBulk('${d.id}')">일괄 추가 (30분)</button>
       </div>
     </div>`;}).join('');
-  _('adminC').innerHTML=marchCfgCard+cfgCard+`<div class="sh"><span class="shtitle">예약 일정 관리</span><button class="btn bp bsm" onclick="openAddDate()">+ 날짜 추가</button></div>${datesHtml||'<div class="card empty">등록된 날짜가 없습니다.</div>'}`;}
-
-async function saveCfgSettings(){
-  S.config.scoreStart=_('cfgS')?.value||S.config.scoreStart||'';S.config.scoreEnd=_('cfgE')?.value||S.config.scoreEnd||'';
-  S.config.marchScoreStart=_('cfgMS')?.value||S.config.marchScoreStart||'';S.config.marchScoreEnd=_('cfgME')?.value||S.config.marchScoreEnd||'';
-  showLoad(true);try{await db.collection('config').doc('main').set(S.config);renderAdminSchedule();}catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">예약 일정 관리</span><button class="btn bp bsm" onclick="openAddDate()">+ 날짜 추가</button></div>${datesHtml||'<div class="card empty">등록된 날짜가 없습니다.</div>'}`;}
 
 function openAddDate(){_('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">날짜 추가</p>
   <div class="fg"><label class="fl">날짜 레이블</label><input class="fi" id="dl" placeholder="6월 9일 (화)"></div>
@@ -975,11 +984,11 @@ function renderAdminBookings(){
   const bookedIds=new Set(S.bookings.map(b=>b.studentId));
   const unbooked=S.students.filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
   const rows=sorted.map(b=>{
-    const stu=S.students.find(s=>s._docId===b.studentId),hasSc=stu?.score&&Object.values(stu.score).some(v=>v),hasMarchSc=stu?.marchScore&&Object.values(stu.marchScore).some(v=>v);
+    const stu=S.students.find(s=>s._docId===b.studentId);
+    const examStatCells=getExams().map(ex=>`<td style="text-align:center">${hasStuExamScore(stu,ex.id)?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>`).join('');
     return `<tr><td><span class="bx bb" style="font-size:11px">${b.dateLabel}</span></td><td style="font-weight:700;color:#1C64F2">${b.slot}</td><td style="font-weight:600">${b.studentName}</td><td>${stu?.school||'—'}</td>
     <td><span class="bx ${stu?.grade==='고3'?'br':stu?.grade==='고2'?'bb':'bg'}">${stu?.grade||'—'}</span></td><td style="text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td><td>${stu?.studentPhone||'—'}</td>
-    <td style="text-align:center">${hasMarchSc?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
-    <td style="text-align:center">${hasSc?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
+    ${examStatCells}
     <td style="text-align:center">${b.question?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
     <td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button><button class="btn bs bsm np" onclick="openAdminBook('${b._docId}')">변경</button><button class="btn bd bsm np" onclick="adminDelBook('${b._docId}')">삭제</button></div></td></tr>`;}).join('');
   const unbookedRows=unbooked.map(s=>`<tr><td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td><td style="font-weight:600">${s.name}</td><td>${s.school}</td><td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td><td>${s.studentPhone}</td><td>${s.guardianPhone}</td><td style="color:#9ca3af;font-size:12px">${s.memo||'—'}</td><td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openStuDetail('${s._docId}')">상세</button><button class="btn bp bsm" onclick="openNewBookForStu('${s._docId}')">예약</button></div></td></tr>`).join('');
@@ -989,8 +998,8 @@ function renderAdminBookings(){
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
     <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${sorted.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
     <div class="card np" style="padding:0;margin-bottom:24px"><div class="tw"><table>
-      <thead><tr><th>날짜</th><th>시간</th><th>학생명</th><th>학교</th><th>학년</th><th>좌석</th><th>연락처</th><th>3월</th><th>6월</th><th>질문</th><th>관리</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="11" class="empty">예약 내역이 없습니다.</td></tr>'}</tbody>
+      <thead><tr><th>날짜</th><th>시간</th><th>학생명</th><th>학교</th><th>학년</th><th>좌석</th><th>연락처</th>${getExams().map(ex=>`<th>${ex.name.replace(/\s*모의.*$/,'')}</th>`).join('')}<th>질문</th><th>관리</th></tr></thead>
+      <tbody>${rows||`<tr><td colspan="${9+getExams().length}" class="empty">예약 내역이 없습니다.</td></tr>`}</tbody>
     </table></div></div>
     ${renderRequestsSection()}
     <div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx br">미예약</span>예약하지 않은 학생 <span style="font-size:13px;font-weight:400;color:#6b7280">(${unbooked.length}명)</span></span></div>
@@ -1096,35 +1105,35 @@ async function refreshBookings(){showLoad(true);try{const[bkSnap,reqSnap]=await 
 function openBookDetail(docId){
   const b=S.bookings.find(x=>x._docId===docId);if(!b)return;
   const stu=S.students.find(s=>s._docId===b.studentId);
-  const hasSc=stu?.score&&Object.values(stu.score).some(v=>v);
-  const hasMarchSc=stu?.marchScore&&Object.values(stu.marchScore).some(v=>v);
-  const isAdmin=S.user.type==='admin';
-  const stuId=b.studentId;
-  const marchBtns=isAdmin?`<div style="display:flex;gap:6px">${hasMarchSc?`<button class="btn bd bsm" onclick="adminDelMarchScore('${stuId}','booking','${docId}')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuId}','marchScore','booking','${docId}')">${hasMarchSc?'수정':'입력'}</button></div>`:'';
-  const scoreBtns=isAdmin?`<div style="display:flex;gap:6px">${hasSc?`<button class="btn bd bsm" onclick="adminDelScore('${stuId}','booking','${docId}')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuId}','score','booking','${docId}')">${hasSc?'수정':'입력'}</button></div>`:'';
+  const isAdmin=S.user.type==='admin';const stuId=b.studentId;
+  const examSections=getExams().map(ex=>{
+    const hasSc=hasStuExamScore(stu,ex.id);const sc=getStuExamScore(stu,ex.id);
+    const btns=isAdmin?`<div style="display:flex;gap:6px">${hasSc?`<button class="btn bd bsm" onclick="adminDelExamScore('${stuId}','${ex.id}','booking','${docId}')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuId}','${ex.id}','booking','${docId}')">${hasSc?'수정':'입력'}</button></div>`:'';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px"><p style="font-size:14px;font-weight:700">${ex.name} 성적</p>${btns}</div>
+    ${hasSc?examScoreTblHtml(ex,sc):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}`;
+  }).join('');
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">예약 상세 정보</p>
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${b.studentName}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">예약 일시</p><p style="font-weight:700;font-size:14px">${b.dateLabel} ${b.slot}</p></div>
       ${stu?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div><div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.studentPhone}</p></div>${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}${stu.memo?`<div style="grid-column:1/-1"><p style="font-size:11px;color:#6b7280;margin-bottom:2px">메모</p><p style="font-size:13px">${stu.memo}</p></div>`:''}`:''}
     </div></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><p style="font-size:14px;font-weight:700">3월 모의고사 성적</p>${marchBtns}</div>
-    ${hasMarchSc?marchScoreTblHtml(stu.marchScore):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
-    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px"><p style="font-size:14px;font-weight:700">6월 모의평가 성적</p>${scoreBtns}</div>
-    ${hasSc?scoreTblHtml(stu.score):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    ${examSections}
     <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px"><p style="font-size:14px;font-weight:700">질문 & 고민</p>${isAdmin&&b.question?`<button class="btn bd bsm" onclick="adminDelQuestion('${docId}')">고민 삭제</button>`:''}</div>
     <div style="background:#f9fafb;border-radius:10px;padding:12px;min-height:60px"><p style="font-size:13px;color:${b.question?'#111827':'#9ca3af'};white-space:pre-wrap;line-height:1.6">${b.question||'입력된 내용이 없습니다.'}</p></div>
     <button class="btn bs bfw" style="margin-top:16px" onclick="closeModal()">닫기</button>`;openModal();}
 
-async function adminDelScore(stuDocId, from, bookDocId){
-  if(!confirm('이 학생의 6월 모의평가 성적을 삭제하시겠습니까?'))return;
+async function adminDelExamScore(stuDocId, examId, from, bookDocId){
+  const ex=getExam(examId);if(!ex)return;
+  if(!confirm(`이 학생의 ${ex.name} 성적을 삭제하시겠습니까?`))return;
   showLoad(true);
-  try{await db.collection('students').doc(stuDocId).update({score:{}});
-  const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.score={};
-  if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
-  else if(from==='stuDetail'){closeModal();openStuDetail(stuDocId);}
-  else{closeModal();renderAdminScores();}}
-  catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
+  try{
+    await db.collection('students').doc(stuDocId).update({['scores.'+examId]:firebase.firestore.FieldValue.delete()});
+    const stu=S.students.find(x=>x._docId===stuDocId);if(stu&&stu.scores)delete stu.scores[examId];
+    if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
+    else if(from==='stuDetail'){closeModal();openStuDetail(stuDocId);}
+    else{closeModal();renderAdminScores();}
+  }catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
 
 async function adminDelQuestion(docId){
   if(!confirm('이 학생의 질문 & 고민 내용을 삭제하시겠습니까?'))return;
@@ -1134,74 +1143,42 @@ async function adminDelQuestion(docId){
   closeModal();renderAdminBookings();}
   catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
 
-async function adminDelMarchScore(stuDocId, from, bookDocId){
-  if(!confirm('이 학생의 3월 모의고사 성적을 삭제하시겠습니까?'))return;
-  showLoad(true);
-  try{await db.collection('students').doc(stuDocId).update({marchScore:{}});
-  const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.marchScore={};
-  if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
-  else if(from==='stuDetail'){closeModal();openStuDetail(stuDocId);}
-  else{closeModal();renderAdminScores();}}
-  catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
-
-function openAdminScoreEdit(stuDocId, type, from, bookDocId){
+function openAdminScoreEdit(stuDocId, examId, from, bookDocId){
   const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
-  const isMarch=type==='marchScore';
-  const sc=isMarch?(stu.marchScore||{}):(stu.score||{});
-  const title=isMarch?'3월 모의고사 성적 입력/수정':'6월 모의평가 성적 입력/수정';
+  const exam=getExam(examId);if(!exam)return;
+  const sc=getStuExamScore(stu,examId)||{};
   const backAction=from==='booking'&&bookDocId?`openBookDetail('${bookDocId}')`:from==='stuDetail'?`openStuDetail('${stuDocId}')`:`closeModal();renderAdminScores()`;
-  let formHtml='';
-  if(isMarch){
-    formHtml=`
+  let formHtml=`
     <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="as-ks"><option value="">선택</option><option ${sc.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${sc.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
     <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div></div>
     <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="as-ms"><option value="">선택</option><option ${sc.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${sc.matSubj==='미적분'?'selected':''}>미적분</option><option ${sc.matSubj==='기하'?'selected':''}>기하</option></select></div>
     <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="as-mr" type="number" min="0" max="100" value="${sc.matRaw||''}" placeholder="0–100"></div></div>
     <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="as-eg"><option value="">등급</option>${gradeOpts(sc.engGrade||'')}</select></div>
     <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="as-hg"><option value="">등급</option>${gradeOpts(sc.hisGrade||'')}</select></div></div>
-    <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'')}</select></div>
+    <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'',exam.hasScienceII)}</select></div>
     <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="as-e1r" type="number" min="0" max="50" value="${sc.exp1Raw||''}" placeholder="0–50"></div></div>
-    <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'')}</select></div>
+    <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'',exam.hasScienceII)}</select></div>
     <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="as-e2r" type="number" min="0" max="50" value="${sc.exp2Raw||''}" placeholder="0–50"></div></div>`;
-  }else{
-    formHtml=`
-    <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="as-ks"><option value="">선택</option><option ${sc.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${sc.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
-    <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div></div>
-    <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="as-ms"><option value="">선택</option><option ${sc.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${sc.matSubj==='미적분'?'selected':''}>미적분</option><option ${sc.matSubj==='기하'?'selected':''}>기하</option></select></div>
-    <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="as-mr" type="number" min="0" max="100" value="${sc.matRaw||''}" placeholder="0–100"></div></div>
-    <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="as-eg"><option value="">등급</option>${gradeOpts(sc.engGrade||'')}</select></div>
-    <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="as-hg"><option value="">등급</option>${gradeOpts(sc.hisGrade||'')}</select></div></div>
-    <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'')}</select></div>
-    <div class="fg"><label class="fl">탐구 1 원점수</label><input class="fi" id="as-e1r" type="number" min="0" max="50" value="${sc.exp1Raw||''}" placeholder="0–50"></div></div>
-    <div class="frow"><div class="fg"><label class="fl">탐구 2 과목</label><select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'')}</select></div>
-    <div class="fg"><label class="fl">탐구 2 원점수</label><input class="fi" id="as-e2r" type="number" min="0" max="50" value="${sc.exp2Raw||''}" placeholder="0–50"></div></div>
+  if(exam.hasLang2){formHtml+=`
     <div class="frow"><div class="fg"><label class="fl">제2외국어 과목</label><select class="fi fsel" id="as-l2s">${l2Opts(sc.lang2Subj||'')}</select></div>
-    <div class="fg"><label class="fl">제2외국어 원점수</label><input class="fi" id="as-l2r" type="number" min="0" max="50" value="${sc.lang2Raw||''}" placeholder="0–50"></div></div>`;
-  }
-  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${title}</p>
+    <div class="fg"><label class="fl">제2외국어 원점수</label><input class="fi" id="as-l2r" type="number" min="0" max="50" value="${sc.lang2Raw||''}" placeholder="0–50"></div></div>`;}
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${exam.name} 성적 입력/수정</p>
     <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${stu.name} 학생</p>
     ${formHtml}
-    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="${backAction}">← 돌아가기</button><button class="btn bp" style="flex:1" onclick="saveAdminScore('${stuDocId}','${type}','${from||''}','${bookDocId||''}')">저장</button></div>`;
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="${backAction}">← 돌아가기</button><button class="btn bp" style="flex:1" onclick="saveAdminScore('${stuDocId}','${examId}','${from||''}','${bookDocId||''}')">저장</button></div>`;
   if(!_('mOv').classList.contains('hidden'))return;openModal();
 }
 
-async function saveAdminScore(stuDocId, type, from, bookDocId){
-  const isMarch=type==='marchScore';
-  let scoreData;
+async function saveAdminScore(stuDocId, examId, from, bookDocId){
+  const exam=getExam(examId);if(!exam)return;
   const korSubj=_('as-ks')?.value||'',korRaw=_('as-kr')?.value||'',matSubj=_('as-ms')?.value||'',matRaw=_('as-mr')?.value||'';
   const exp1Subj=_('as-e1s')?.value||'',exp1Raw=_('as-e1r')?.value||'',exp2Subj=_('as-e2s')?.value||'',exp2Raw=_('as-e2r')?.value||'';
-  const exam=isMarch?'march':'june';
-  if(isMarch){
-    scoreData={korSubj,korRaw,korGrade:getRelGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getRelGrade(exam,matSubj,matRaw),engGrade:_('as-eg')?.value||'',hisGrade:_('as-hg')?.value||'',exp1Subj,exp1Raw,exp1Grade:getRelGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getRelGrade(exam,exp2Subj,exp2Raw)};
-  }else{
-    const lang2Subj=_('as-l2s')?.value||'',lang2Raw=_('as-l2r')?.value||'';
-    scoreData={korSubj,korRaw,korGrade:getRelGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getRelGrade(exam,matSubj,matRaw),engGrade:_('as-eg')?.value||'',hisGrade:_('as-hg')?.value||'',exp1Subj,exp1Raw,exp1Grade:getRelGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getRelGrade(exam,exp2Subj,exp2Raw),lang2Subj,lang2Raw,lang2Grade:getAbsGrade('lang2',lang2Raw)};
-  }
+  const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engGrade:_('as-eg')?.value||'',hisGrade:_('as-hg')?.value||'',exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
+  if(exam.hasLang2){scoreData.lang2Subj=_('as-l2s')?.value||'';scoreData.lang2Raw=_('as-l2r')?.value||'';scoreData.lang2Grade=getAbsGrade('lang2',scoreData.lang2Raw);}
   showLoad(true);
   try{
-    const update={};update[type]=scoreData;
-    await db.collection('students').doc(stuDocId).update(update);
-    const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu[type]=scoreData;
+    await db.collection('students').doc(stuDocId).update({['scores.'+examId]:scoreData});
+    const stu=S.students.find(x=>x._docId===stuDocId);if(stu){if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;}
     if(from==='booking'&&bookDocId)openBookDetail(bookDocId);
     else if(from==='stuDetail')openStuDetail(stuDocId);
     else{closeModal();renderAdminScores();}
@@ -1238,11 +1215,13 @@ async function adminDelBook(docId){
 
 function openStuDetail(stuDocId){
   const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
-  const hasSc=stu.score&&Object.values(stu.score).some(v=>v);
-  const hasMarchSc=stu.marchScore&&Object.values(stu.marchScore).some(v=>v);
   const isAdmin=S.user.type==='admin';
-  const marchBtns=isAdmin?`<div style="display:flex;gap:6px">${hasMarchSc?`<button class="btn bd bsm" onclick="adminDelMarchScore('${stuDocId}','stuDetail','')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','marchScore','stuDetail','')">${hasMarchSc?'수정':'입력'}</button></div>`:'';
-  const scoreBtns=isAdmin?`<div style="display:flex;gap:6px">${hasSc?`<button class="btn bd bsm" onclick="adminDelScore('${stuDocId}','stuDetail','')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','score','stuDetail','')">${hasSc?'수정':'입력'}</button></div>`:'';
+  const examSections=getExams().map(ex=>{
+    const hasSc=hasStuExamScore(stu,ex.id);const sc=getStuExamScore(stu,ex.id);
+    const btns=isAdmin?`<div style="display:flex;gap:6px">${hasSc?`<button class="btn bd bsm" onclick="adminDelExamScore('${stuDocId}','${ex.id}','stuDetail','')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuDocId}','${ex.id}','stuDetail','')">${hasSc?'수정':'입력'}</button></div>`:'';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px"><p style="font-size:14px;font-weight:700">${ex.name} 성적</p>${btns}</div>
+    ${hasSc?examScoreTblHtml(ex,sc):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}`;
+  }).join('');
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">학생 상세 정보</p>
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${stu.name}</p></div>
@@ -1252,10 +1231,7 @@ function openStuDetail(stuDocId){
       ${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}
       ${stu.memo?`<div style="grid-column:1/-1"><p style="font-size:11px;color:#6b7280;margin-bottom:2px">메모</p><p style="font-size:13px">${stu.memo}</p></div>`:''}
     </div></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><p style="font-size:14px;font-weight:700">3월 모의고사 성적</p>${marchBtns}</div>
-    ${hasMarchSc?marchScoreTblHtml(stu.marchScore):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
-    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px"><p style="font-size:14px;font-weight:700">6월 모의평가 성적</p>${scoreBtns}</div>
-    ${hasSc?scoreTblHtml(stu.score):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}
+    ${examSections}
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1" onclick="closeModal();openNewBookForStu('${stuDocId}')">예약 등록</button></div>`;openModal();}
 
 function openNewBookForStu(stuDocId){
