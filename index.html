@@ -292,9 +292,20 @@ function calcGrade(raw,cuts){
   for(let i=0;i<cuts.length;i++){if(r>=Number(cuts[i]))return String(i+1);}
   return '9';
 }
+function calcEstGrade(raw,estCuts){
+  if(!estCuts||!estCuts.length||raw===''||raw===undefined||raw===null)return '';
+  const r=Number(raw);if(isNaN(r))return '';
+  let best=9,worst=9;
+  for(let i=0;i<estCuts.length;i++){const lo=Number(estCuts[i][0]),hi=Number(estCuts[i][1]);if(r>=hi){best=Math.min(best,i+1);worst=Math.min(worst,i+1);break;}else if(r>=lo){best=Math.min(best,i+1);break;}}
+  if(worst===9){for(let i=0;i<estCuts.length;i++){const hi=Number(estCuts[i][1]);if(r>=hi){worst=i+1;break;}}}
+  if(best===worst)return String(best);
+  return best+'-'+worst;
+}
 function getExamGrade(exam,subj,raw){
-  if(!exam||!exam.gradeCuts||!subj||raw===''||raw===undefined)return '';
-  const cuts=exam.gradeCuts[subj];return cuts?calcGrade(raw,cuts):'';
+  if(!exam||!subj||raw===''||raw===undefined)return '';
+  if(exam.gradeCuts){const cuts=exam.gradeCuts[subj];if(cuts)return calcGrade(raw,cuts);}
+  if(exam.estGradeCuts){const ec=exam.estGradeCuts[subj];if(ec)return calcEstGrade(raw,ec);}
+  return '';
 }
 function getAbsGrade(type,raw){
   const gc=S.config.gradeCuts;if(!gc||!gc.abs||raw===''||raw===undefined)return '';
@@ -302,7 +313,9 @@ function getAbsGrade(type,raw){
 }
 function examGradeCell(exam,subj,raw){
   const g=getExamGrade(exam,subj,raw);
-  return g?`<td class="vl">${g}</td>`:'<td class="dl"></td>';
+  if(!g)return '<td class="dl"></td>';
+  const isEst=g.includes('-');
+  return isEst?`<td class="vl" style="color:#f59e0b;font-weight:700">${g}</td>`:`<td class="vl">${g}</td>`;
 }
 function absGradeCell(type,raw){
   const g=getAbsGrade(type,raw);
@@ -1162,13 +1175,14 @@ async function resetPw(docId){
 
 /* ── ADMIN: 시험 관리 ── */
 function gcCutRow(prefix,name,cuts,max){cuts=cuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>`<td><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}" value="${cuts[i]!=null?cuts[i]:''}"></td>`).join('')}</tr>`;}
+function gcEstCutRow(prefix,name,estCuts,max){estCuts=estCuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>{const lo=estCuts[i]?estCuts[i][0]:'';const hi=estCuts[i]?estCuts[i][1]:'';return `<td><div style="display:flex;gap:1px;align-items:center"><input type="number" min="0" max="${max}" class="gc-in" style="width:46%;padding:0 2px" id="${prefix}-${i}-lo" value="${lo!=null&&lo!==''?lo:''}"><span style="font-size:9px;color:#9ca3af">-</span><input type="number" min="0" max="${max}" class="gc-in" style="width:46%;padding:0 2px" id="${prefix}-${i}-hi" value="${hi!=null&&hi!==''?hi:''}"></div></td>`;}).join('')}</tr>`;}
 function gcTblHeader(){return `<tr><th style="min-width:80px">과목</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th><th>6등급</th><th>7등급</th><th>8등급</th></tr>`;}
 
 function renderAdminExams(){
   const exams=getExams();const gc=S.config.gradeCuts||{};
   const absRows=GC_ABS_SUBJS.map(([key,name,max])=>gcCutRow('gca-'+key,name,gc.abs?.[key],max)).join('');
   const examCards=exams.map(ex=>{
-    const open=isExamOpen(ex);const gcCount=ex.gradeCuts?Object.keys(ex.gradeCuts).length:0;
+    const open=isExamOpen(ex);const gcCount=ex.gradeCuts?Object.keys(ex.gradeCuts).length:0;const ecCount=ex.estGradeCuts?Object.keys(ex.estGradeCuts).length:0;
     return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:8px"><p style="font-size:15px;font-weight:700">${ex.name}</p>${open?'<span class="bx bg">입력 가능</span>':'<span class="bx bgr">마감</span>'}</div>
@@ -1177,10 +1191,11 @@ function renderAdminExams(){
       <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#6b7280">
         <span>${ex.scoreStart?'기간: '+ex.scoreStart+' ~ '+(ex.scoreEnd||'무기한'):'기간: 미설정'}</span>
         <span>|</span><span>등급컷: ${gcCount?gcCount+'개 과목 설정':'미설정'}</span>
+        ${ecCount?`<span>|</span><span style="color:#f59e0b">예상 등급컷: ${ecCount}개 과목</span>`:''}
         <span>|</span><span>제2외국어/한문: ${ex.hasLang2?'O':'X'}</span>
         <span>|</span><span>과탐II: ${ex.hasScienceII?'O':'X'}</span>
       </div>
-      <div style="margin-top:10px"><button class="btn bs bsm" onclick="openExamGradeCuts('${ex.id}')">등급컷 설정</button></div>
+      <div style="margin-top:10px;display:flex;gap:6px"><button class="btn bs bsm" onclick="openExamGradeCuts('${ex.id}')">등급컷 설정</button><button class="btn bs bsm" style="color:#f59e0b;border-color:#fbbf24" onclick="openEstGradeCuts('${ex.id}')">예상 등급컷</button></div>
     </div>`;}).join('');
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">시험 관리</span><button class="btn bp bsm" onclick="openAddExam()">+ 시험 추가</button></div>
     ${examCards||'<div class="card empty">등록된 시험이 없습니다.</div>'}
@@ -1224,8 +1239,8 @@ async function saveExamForm(){
   const examData={id:examId,name,scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',hasLang2:_('exLang2')?.checked||false,hasScienceII:_('exSci2')?.checked||false};
   if(!S.config.exams)S.config.exams=[];
   const idx=S.config.exams.findIndex(e=>e.id===examId);
-  if(idx>=0){examData.gradeCuts=S.config.exams[idx].gradeCuts||{};S.config.exams[idx]=examData;}
-  else{examData.gradeCuts={};S.config.exams.push(examData);}
+  if(idx>=0){examData.gradeCuts=S.config.exams[idx].gradeCuts||{};examData.estGradeCuts=S.config.exams[idx].estGradeCuts||{};S.config.exams[idx]=examData;}
+  else{examData.gradeCuts={};examData.estGradeCuts={};S.config.exams.push(examData);}
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();}
   catch(e){showErr('mErr','저장 실패: '+e.message);}
@@ -1262,6 +1277,32 @@ async function saveExamGradeCutsFromModal(examId){
   }
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();alert('등급컷이 저장되었습니다.');}
+  catch(e){alert('저장 실패: '+e.message);}
+  showLoad(false);}
+
+function openEstGradeCuts(examId){
+  const ex=getExam(examId);if(!ex)return;
+  const ec=ex.estGradeCuts||{};const allRel=gcAllRel(ex);const groups=gcRelGroups(ex);
+  let rows='';
+  for(const [group,subjs,max] of groups){
+    rows+=`<tr><td class="gc-grp" colspan="9">${group}</td></tr>`;
+    for(const subj of subjs){rows+=gcEstCutRow('ec-'+allRel.indexOf(subj),subj,ec[subj],max);}
+  }
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${ex.name} 예상 등급컷</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">각 등급의 예상 최저 원점수 범위(하한-상한)를 입력하세요.</p>
+    <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${rows}</table></div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal();renderAdminExams()">취소</button><button class="btn bp" style="flex:1" onclick="saveEstGradeCutsFromModal('${examId}')">저장</button></div>`;openModal();}
+
+async function saveEstGradeCutsFromModal(examId){
+  const ex=getExam(examId);if(!ex)return;
+  const allRel=gcAllRel(ex);ex.estGradeCuts={};
+  for(let si=0;si<allRel.length;si++){
+    const subj=allRel[si],vals=[];let hasVal=false;
+    for(let i=0;i<8;i++){const lo=_('ec-'+si+'-'+i+'-lo')?.value;const hi=_('ec-'+si+'-'+i+'-hi')?.value;if(lo!==''||hi!==''){vals.push([lo!==''?Number(lo):'',hi!==''?Number(hi):'']);hasVal=true;}else{vals.push(['','']);}}
+    if(hasVal)ex.estGradeCuts[subj]=vals;
+  }
+  showLoad(true);
+  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();alert('예상 등급컷이 저장되었습니다.');}
   catch(e){alert('저장 실패: '+e.message);}
   showLoad(false);}
 
