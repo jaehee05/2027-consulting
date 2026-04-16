@@ -928,19 +928,23 @@ function getGradeSubjects(stu){
     if(sc.exp1Subj)expSet.add(sc.exp1Subj);
     if(sc.exp2Subj)expSet.add(sc.exp2Subj);
   }
-  if(korSet.size>1){for(const subj of korSet)subjects.push({key:'kor_'+subj,label:subj,getGrade:(ex,sc)=>sc?.korSubj===subj?(sc.korGrade||getExamGrade(ex,sc.korSubj,sc.korRaw)):'',isEst:(ex,sc)=>sc?.korSubj===subj&&!sc.korGrade&&isEstGrade(ex,sc.korSubj)});}
-  else subjects.push({key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw),isEst:(ex,sc)=>!sc?.korGrade&&isEstGrade(ex,sc?.korSubj)});
-  if(matSet.size>1){for(const subj of matSet)subjects.push({key:'mat_'+subj,label:subj,getGrade:(ex,sc)=>sc?.matSubj===subj?(sc.matGrade||getExamGrade(ex,sc.matSubj,sc.matRaw)):'',isEst:(ex,sc)=>sc?.matSubj===subj&&!sc.matGrade&&isEstGrade(ex,sc.matSubj)});}
-  else subjects.push({key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw),isEst:(ex,sc)=>!sc?.matGrade&&isEstGrade(ex,sc?.matSubj)});
-  subjects.push({key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGrade||getAbsGrade('eng',sc?.engRaw),isEst:()=>false});
-  subjects.push({key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGrade||getAbsGrade('his',sc?.hisRaw),isEst:()=>false});
+  function _hasCuts(ex,subj){return !!(ex.gradeCuts&&ex.gradeCuts[subj]||ex.estGradeCuts&&ex.estGradeCuts[subj]);}
+  function _hasAbsCuts(type){const gc=S.config.gradeCuts;return !!(gc&&gc.abs&&gc.abs[type]);}
+  if(korSet.size>1){for(const subj of korSet)subjects.push({key:'kor_'+subj,label:subj,getGrade:(ex,sc)=>sc?.korSubj===subj?(sc.korGrade||getExamGrade(ex,sc.korSubj,sc.korRaw)):'',isEst:(ex,sc)=>sc?.korSubj===subj&&!sc.korGrade&&isEstGrade(ex,sc.korSubj),hasCuts:(ex,sc)=>sc?.korSubj===subj&&_hasCuts(ex,subj)});}
+  else subjects.push({key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw),isEst:(ex,sc)=>!sc?.korGrade&&isEstGrade(ex,sc?.korSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.korSubj)});
+  if(matSet.size>1){for(const subj of matSet)subjects.push({key:'mat_'+subj,label:subj,getGrade:(ex,sc)=>sc?.matSubj===subj?(sc.matGrade||getExamGrade(ex,sc.matSubj,sc.matRaw)):'',isEst:(ex,sc)=>sc?.matSubj===subj&&!sc.matGrade&&isEstGrade(ex,sc.matSubj),hasCuts:(ex,sc)=>sc?.matSubj===subj&&_hasCuts(ex,subj)});}
+  else subjects.push({key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw),isEst:(ex,sc)=>!sc?.matGrade&&isEstGrade(ex,sc?.matSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.matSubj)});
+  subjects.push({key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGrade||getAbsGrade('eng',sc?.engRaw),isEst:()=>false,hasCuts:()=>_hasAbsCuts('eng')});
+  subjects.push({key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGrade||getAbsGrade('his',sc?.hisRaw),isEst:()=>false,hasCuts:()=>_hasAbsCuts('his')});
   if(expSet.size){for(const subj of expSet)subjects.push({key:'exp_'+subj,label:subj,getGrade:(ex,sc)=>{
     if(sc?.exp1Subj===subj)return sc.exp1Grade||getExamGrade(ex,sc.exp1Subj,sc.exp1Raw);
     if(sc?.exp2Subj===subj)return sc.exp2Grade||getExamGrade(ex,sc.exp2Subj,sc.exp2Raw);return '';
   },isEst:(ex,sc)=>{
     if(sc?.exp1Subj===subj&&!sc.exp1Grade)return isEstGrade(ex,subj);
     if(sc?.exp2Subj===subj&&!sc.exp2Grade)return isEstGrade(ex,subj);return false;
-  }});}else{subjects.push({key:'exp1',label:'탐구 1',getGrade:()=>'',isEst:()=>false});subjects.push({key:'exp2',label:'탐구 2',getGrade:()=>'',isEst:()=>false});}
+  },hasCuts:(ex,sc)=>{
+    if(sc?.exp1Subj===subj||sc?.exp2Subj===subj)return _hasCuts(ex,subj);return false;
+  }});}else{subjects.push({key:'exp1',label:'탐구 1',getGrade:()=>'',isEst:()=>false,hasCuts:()=>false});subjects.push({key:'exp2',label:'탐구 2',getGrade:()=>'',isEst:()=>false,hasCuts:()=>false});}
   return subjects;
 }
 
@@ -950,7 +954,9 @@ function drawGradeGraph(exams,stu,subjInfo){
   const pts=[],estPts=[];
   exams.forEach((ex,i)=>{
     const sc=getStuExamScore(stu,ex.id);
-    const g=sc?subjInfo.getGrade(ex,sc):'';
+    if(!sc)return;
+    if(subjInfo.hasCuts&&!subjInfo.hasCuts(ex,sc))return;
+    const g=subjInfo.getGrade(ex,sc);
     if(!g)return;
     const x=PL+(exams.length>1?i*(cw/(exams.length-1)):cw/2);
     const gs=String(g);
@@ -1042,15 +1048,8 @@ function drawGradeGraph(exams,stu,subjInfo){
       }
     });
   }
-  /* legend */
-  let legend='';
-  if(estPts.length){
-    legend=`<g transform="translate(${W-PR-140},${PT-6})">`;
-    if(pts.length)legend+=`<line x1="0" y1="0" x2="16" y2="0" stroke="#1C64F2" stroke-width="2.5"/><text x="20" y="3.5" font-size="9" fill="#1C64F2" font-weight="600">확정 등급</text>`;
-    legend+=`<line x1="${pts.length?80:0}" y1="0" x2="${pts.length?96:16}" y2="0" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6,4"/><text x="${pts.length?100:20}" y="3.5" font-size="9" fill="#f59e0b" font-weight="600">예상 등급</text></g>`;
-  }
   if(!pts.length&&!estPts.length)return `<div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px">입력된 성적이 없습니다.</div>`;
-  return `<div style="overflow-x:auto;display:flex;justify-content:center"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${gridLines}${xLabels}${path}${dots}${estPath}${estDots}${legend}</svg></div>`;
+  return `<div style="overflow-x:auto;display:flex;justify-content:center"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${gridLines}${xLabels}${path}${dots}${estPath}${estDots}</svg></div>`;
 }
 
 function renderConsultDetail(){
