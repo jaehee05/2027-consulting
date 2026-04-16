@@ -1031,11 +1031,15 @@ function drawGradeGraph(exams,stu,subjInfo){
       estPath+=`<path d="${fwd}${rev}Z" fill="#f59e0b" opacity="0.08"/>`;
     }
     estPts.forEach(p=>{
+      if(p.range){
+        /* vertical bar connecting best & worst */
+        estDots+=`<line x1="${p.x}" y1="${p.yBest}" x2="${p.x}" y2="${p.yWorst}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,3" opacity="0.4"/>`;
+      }
       estDots+=`<circle cx="${p.x}" cy="${p.yBest}" r="4.5" fill="#fff" stroke="#f59e0b" stroke-width="2.5"/>`;
-      estDots+=`<text x="${p.x}" y="${p.yBest-10}" text-anchor="middle" font-size="10" fill="#f59e0b" font-weight="700">${p.range?p.best+'등급':p.best+'등급'}</text>`;
+      estDots+=`<text x="${p.x}" y="${p.yBest-10}" text-anchor="middle" font-size="10" fill="#f59e0b" font-weight="700">${p.best}등급</text>`;
       if(p.range){
         estDots+=`<circle cx="${p.x}" cy="${p.yWorst}" r="4.5" fill="#fff" stroke="#f59e0b" stroke-width="2.5" opacity="0.5"/>`;
-        estDots+=`<text x="${p.x}" y="${p.yWorst+16}" text-anchor="middle" font-size="10" fill="#f59e0b" font-weight="700" opacity="0.7">${p.worst+'등급'}</text>`;
+        estDots+=`<text x="${p.x}" y="${p.yWorst+16}" text-anchor="middle" font-size="10" fill="#f59e0b" font-weight="700" opacity="0.7">${p.worst}등급</text>`;
       }
     });
   }
