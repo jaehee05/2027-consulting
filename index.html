@@ -1771,6 +1771,7 @@ window.addEventListener('popstate',function(e){
       else if(st.p==='wizard'){showView('vStu');S.scoreWizardExamId=st.examId;S.scoreStep=st.step;_origRenderScoreWizard();}
     }else if(st.v==='vAdmin'){
       showView('vAdmin');
+      if(S.consultStuId&&(!st.consultStuId||st.tab!=='consult')){var cId=S.consultStuId;var cNote=_('consultInput')?.value||'';var cStu=S.students.find(function(x){return x._docId===cId;});if(cStu&&cNote!==(cStu.consultNote||'')){db.collection('students').doc(cId).update({consultNote:cNote}).catch(function(){});cStu.consultNote=cNote;}}
       if(st.consultStuId){S.consultStuId=st.consultStuId;S.tab='consult';_origSetTab('consult');}
       else if(st.tab){if(st.tab==='consult')S.consultStuId=null;_origSetTab(st.tab);}
     }
