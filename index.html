@@ -1176,7 +1176,7 @@ async function resetPw(docId){
 
 /* ── ADMIN: 시험 관리 ── */
 function gcCutRow(prefix,name,cuts,max){cuts=cuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>`<td><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}" value="${cuts[i]!=null?cuts[i]:''}"></td>`).join('')}</tr>`;}
-function gcEstCutRow(prefix,name,estCuts,max){estCuts=estCuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>{const e=estCuts[i];const [lo,hi]=e?ecGetLoHi(e):['',''];return `<td style="min-width:80px;padding:4px"><div style="display:flex;flex-direction:column;gap:3px"><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}-lo" value="${lo!=null&&lo!==''?lo:''}" placeholder="하한"><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}-hi" value="${hi!=null&&hi!==''?hi:''}" placeholder="상한"></div></td>`;}).join('')}</tr>`;}
+function gcEstCutRow(prefix,name,estCuts,max){estCuts=estCuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>{const e=estCuts[i];const [lo,hi]=e?ecGetLoHi(e):['',''];return `<td style="padding:4px"><div style="display:flex;flex-direction:column;gap:3px"><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}-hi" value="${hi!=null&&hi!==''?hi:''}" placeholder="상한"><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}-lo" value="${lo!=null&&lo!==''?lo:''}" placeholder="하한"></div></td>`;}).join('')}</tr>`;}
 function gcTblHeader(){return `<tr><th style="min-width:80px">과목</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th><th>6등급</th><th>7등급</th><th>8등급</th></tr>`;}
 
 function renderAdminExams(){
@@ -1289,9 +1289,10 @@ function openEstGradeCuts(examId){
     rows+=`<tr><td class="gc-grp" colspan="9">${group}</td></tr>`;
     for(const subj of subjs){rows+=gcEstCutRow('ec-'+allRel.indexOf(subj),subj,ec[subj],max);}
   }
+  _('mCt').style.maxWidth='900px';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${ex.name} 예상 등급컷</p>
-    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">각 등급의 예상 최저 원점수 범위(하한-상한)를 입력하세요.</p>
-    <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${rows}</table></div>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">각 등급의 예상 최저 원점수 범위를 입력하세요. (위: 상한, 아래: 하한)</p>
+    <table class="gc-tbl" style="table-layout:fixed;width:100%">${gcTblHeader()}${rows}</table>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal();renderAdminExams()">취소</button><button class="btn bp" style="flex:1" onclick="saveEstGradeCutsFromModal('${examId}')">저장</button></div>`;openModal();}
 
 async function saveEstGradeCutsFromModal(examId){
@@ -1727,7 +1728,7 @@ async function delAcct(id){
 
 /* ── MODAL ── */
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
-function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';}
+function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';}
 
 /* ── INIT ── */
 async function init(){
