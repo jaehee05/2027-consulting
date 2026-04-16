@@ -311,6 +311,7 @@ function absGradeCell(type,raw){
 
 function showLoad(v){_('vLoad').style.display=v?'flex':'none';}
 
+var _skipPush=false;
 function showView(id){
   ['vSetup','vLogin','vCpw','vStu','vAdmin'].forEach(v=>{
     const el=_(v);el.classList.toggle('hidden',v!==id);
@@ -1726,6 +1727,55 @@ async function init(){
     _('vLoad').style.display='flex';}
 }
 init();
+
+/* ── HISTORY (뒤로가기/앞으로가기) ── */
+function navPush(state){if(!_skipPush)history.pushState(state,'');}
+function navGetState(){
+  if(S.user&&S.user.type==='student'){
+    if(S.scoreWizardExamId)return{v:'vStu',p:'wizard',examId:S.scoreWizardExamId,step:S.scoreStep};
+    var stuC=_('stuC');
+    if(stuC&&stuC.innerHTML.indexOf('상담 예약')>-1&&stuC.innerHTML.indexOf('예약 가능 시간')>-1)return{v:'vStu',p:'book'};
+    if(stuC&&stuC.innerHTML.indexOf('취소 요청')>-1)return{v:'vStu',p:'cancel'};
+    if(stuC&&stuC.innerHTML.indexOf('변경 요청')>-1&&stuC.innerHTML.indexOf('변경 사유')>-1)return{v:'vStu',p:'change'};
+    return{v:'vStu',p:'main'};
+  }
+  if(S.user&&(S.user.type==='admin'||S.user.type==='operator')){
+    if(S.tab==='consult'&&S.consultStuId)return{v:'vAdmin',tab:S.tab,consultStuId:S.consultStuId};
+    return{v:'vAdmin',tab:S.tab};
+  }
+  return null;
+}
+
+var _origRenderStu=renderStu;
+renderStu=function(){_origRenderStu();if(!_skipPush)navPush({v:'vStu',p:'main'});};
+
+var _origShowBookForm=showBookForm;
+showBookForm=function(c){_origShowBookForm(c);if(!_skipPush)navPush({v:'vStu',p:'book'});};
+
+var _origRenderScoreWizard=renderScoreWizard;
+renderScoreWizard=function(){_origRenderScoreWizard();if(!_skipPush)navPush({v:'vStu',p:'wizard',examId:S.scoreWizardExamId,step:S.scoreStep});};
+
+var _origSetTab=setTab;
+setTab=async function(tab){await _origSetTab(tab);if(!_skipPush)navPush({v:'vAdmin',tab:tab});};
+
+var _origRenderAdminConsult=renderAdminConsult;
+renderAdminConsult=function(){_origRenderAdminConsult();if(!_skipPush&&S.consultStuId)navPush({v:'vAdmin',tab:'consult',consultStuId:S.consultStuId});};
+
+window.addEventListener('popstate',function(e){
+  var st=e.state;if(!st)return;
+  _skipPush=true;
+  try{
+    if(st.v==='vStu'){
+      if(st.p==='main'){S.scoreWizardExamId=null;showView('vStu');_origRenderStu();}
+      else if(st.p==='book'){S.scoreWizardExamId=null;showView('vStu');var myB=S.bookings.find(function(b){return b.studentId===S.studentDocId;});_origShowBookForm(!!myB);}
+      else if(st.p==='wizard'){showView('vStu');S.scoreWizardExamId=st.examId;S.scoreStep=st.step;_origRenderScoreWizard();}
+    }else if(st.v==='vAdmin'){
+      showView('vAdmin');
+      if(st.consultStuId){S.consultStuId=st.consultStuId;S.tab='consult';_origSetTab('consult');}
+      else if(st.tab){if(st.tab==='consult')S.consultStuId=null;_origSetTab(st.tab);}
+    }
+  }finally{_skipPush=false;}
+});
 </script>
 <script>
   (function(){var w=window;if(w.ChannelIO){return w.console.error("ChannelIO script included twice.");}var ch=function(){ch.c(arguments);};ch.q=[];ch.c=function(args){ch.q.push(args);};w.ChannelIO=ch;function l(){if(w.ChannelIOInitialized){return;}w.ChannelIOInitialized=true;var s=document.createElement("script");s.type="text/javascript";s.async=true;s.src="https://cdn.channel.io/plugin/ch-plugin-web.js";var x=document.getElementsByTagName("script")[0];if(x.parentNode){x.parentNode.insertBefore(s,x);}}if(document.readyState==="complete"){l();}else{w.addEventListener("DOMContentLoaded",l);w.addEventListener("load",l);}})();
