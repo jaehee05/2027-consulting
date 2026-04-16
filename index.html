@@ -864,14 +864,14 @@ function renderAdminConsult(){
   const rows=sorted.map(s=>{
     const booked=S.bookings.some(b=>b.studentId===s._docId);
     const hasNote=s.consultNote&&s.consultNote.trim();
-    const scoreCells=cExams.map(ex=>`<td style="text-align:center">${hasStuExamScore(s,ex.id)?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>`).join('');
+    const scoreCells=cExams.map(ex=>`<td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(s,ex.id)?'#22c55e':'#d1d5db'}"></span></td>`).join('');
     return `<tr style="cursor:pointer" onclick="S.consultStuId='${s._docId}';S.consultScoreTab=0;S.consultGraphTab=0;renderAdminConsult()">
       <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
-      <td style="text-align:center">${booked?'<span class="bx bg">예약</span>':'<span style="color:#d1d5db">—</span>'}</td>
+      <td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${booked?'#22c55e':'#d1d5db'}"></span></td>
       ${scoreCells}
-      <td style="text-align:center">${hasNote?'<span class="bx bg">작성</span>':'<span style="color:#d1d5db">—</span>'}</td>
+      <td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasNote?'#22c55e':'#d1d5db'}"></span></td>
     </tr>`;}).join('');
   const sortOpts=[['seat','좌석순'],['grade','학년순'],['name','이름순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminConsult()">${l}</button>`).join('');
@@ -1052,7 +1052,7 @@ function renderAdminScores(){
   });
   const examsForRows=getExams();
   const rows=sorted.map(s=>{
-    const examCells=examsForRows.map(ex=>`<td style="text-align:center">${hasStuExamScore(s,ex.id)?'<span class="bx bg">입력 완료</span>':'<span style="color:#d1d5db">—</span>'}</td>`).join('');
+    const examCells=examsForRows.map(ex=>`<td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(s,ex.id)?'#22c55e':'#d1d5db'}"></span></td>`).join('');
     return `<tr>
       <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
@@ -1355,11 +1355,11 @@ function renderAdminBookings(){
   const unbooked=S.students.filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
   const rows=sorted.map(b=>{
     const stu=S.students.find(s=>s._docId===b.studentId);
-    const examStatCells=getExams().map(ex=>`<td style="text-align:center">${hasStuExamScore(stu,ex.id)?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>`).join('');
+    const examStatCells=getExams().map(ex=>`<td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(stu,ex.id)?'#22c55e':'#d1d5db'}"></span></td>`).join('');
     return `<tr><td><span class="bx bb" style="font-size:11px">${b.dateLabel}</span></td><td style="font-weight:700;color:#1C64F2">${b.slot}</td><td style="font-weight:600">${b.studentName}</td><td>${stu?.school||'—'}</td>
     <td><span class="bx ${stu?.grade==='고3'?'br':stu?.grade==='고2'?'bb':'bg'}">${stu?.grade||'—'}</span></td><td style="text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td><td>${stu?.studentPhone||'—'}</td>
     ${examStatCells}
-    <td style="text-align:center">${b.question?'<span class="bx bg">✓</span>':'<span style="color:#d1d5db">—</span>'}</td>
+    <td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${b.question?'#22c55e':'#d1d5db'}"></span></td>
     <td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button><button class="btn bs bsm np" onclick="openAdminBook('${b._docId}')">변경</button><button class="btn bd bsm np" onclick="adminDelBook('${b._docId}')">삭제</button></div></td></tr>`;}).join('');
   const unbookedRows=unbooked.map(s=>`<tr><td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td><td style="font-weight:600">${s.name}</td><td>${s.school}</td><td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td><td>${s.studentPhone}</td><td>${s.guardianPhone}</td><td style="color:#9ca3af;font-size:12px">${s.memo||'—'}</td><td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openStuDetail('${s._docId}')">상세</button><button class="btn bp bsm" onclick="openNewBookForStu('${s._docId}')">예약</button></div></td></tr>`).join('');
   const byDate={};sorted.forEach(b=>{if(!byDate[b.date])byDate[b.date]={label:b.dateLabel,items:[]};byDate[b.date].items.push(b);});
