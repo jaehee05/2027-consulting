@@ -953,26 +953,25 @@ function drawGradeGraph(exams,stu,subjInfo){
     const g=sc?subjInfo.getGrade(ex,sc):'';
     if(!g)return;
     const x=PL+(exams.length>1?i*(cw/(exams.length-1)):cw/2);
-    const est=subjInfo.isEst?subjInfo.isEst(ex,sc):false;
-    if(est){
-      /* estimated: could be "3" or "2-3" */
-      if(g.includes('-')){
-        const [best,worst]=g.split('-').map(Number);
-        if(best>=1&&best<=9&&worst>=1&&worst<=9){
-          estPts.push({x,yBest:PT+(best-1)*(ch/8),yWorst:PT+(worst-1)*(ch/8),best,worst,range:true,label:g,exam:ex.name});
-        }
-      }else{
-        const gNum=Number(g);
-        if(gNum>=1&&gNum<=9){
-          const y=PT+(gNum-1)*(ch/8);
-          estPts.push({x,yBest:y,yWorst:y,best:gNum,worst:gNum,range:false,label:g,exam:ex.name});
-        }
+    const gs=String(g);
+    const est=(subjInfo.isEst?subjInfo.isEst(ex,sc):false)||gs.includes('-');
+    if(gs.includes('-')){
+      /* range grade like "2-3" — always estimated */
+      const [best,worst]=gs.split('-').map(Number);
+      if(best>=1&&best<=9&&worst>=1&&worst<=9){
+        estPts.push({x,yBest:PT+(best-1)*(ch/8),yWorst:PT+(worst-1)*(ch/8),best,worst,range:true,label:gs,exam:ex.name});
       }
-    }else{
-      const gNum=Number(g);
+    }else if(est){
+      const gNum=Number(gs);
       if(gNum>=1&&gNum<=9){
         const y=PT+(gNum-1)*(ch/8);
-        pts.push({x,y,g:gNum,label:g,exam:ex.name});
+        estPts.push({x,yBest:y,yWorst:y,best:gNum,worst:gNum,range:false,label:gs,exam:ex.name});
+      }
+    }else{
+      const gNum=Number(gs);
+      if(gNum>=1&&gNum<=9){
+        const y=PT+(gNum-1)*(ch/8);
+        pts.push({x,y,g:gNum,label:gs,exam:ex.name});
       }
     }
   });
