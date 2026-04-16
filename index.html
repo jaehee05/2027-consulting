@@ -1739,9 +1739,6 @@ init();
     if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'||e.key==='C'))||(e.ctrlKey&&e.key==='u')){e.preventDefault();}
   });
   document.addEventListener('contextmenu',function(e){e.preventDefault();});
-  var el=new Image();Object.defineProperty(el,'id',{get:function(){window.location.replace('about:blank');}});
-  setInterval(function(){console.log(el);},1000);
-  var t=160;setInterval(function(){var s=performance.now();debugger;if(performance.now()-s>t){window.location.replace('about:blank');}},500);
 })();
 </script>
 </body>
