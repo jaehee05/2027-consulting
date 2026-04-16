@@ -292,12 +292,13 @@ function calcGrade(raw,cuts){
   for(let i=0;i<cuts.length;i++){if(r>=Number(cuts[i]))return String(i+1);}
   return '9';
 }
+function ecGetLoHi(e){return Array.isArray(e)?[e[0],e[1]]:[e.lo,e.hi];}
 function calcEstGrade(raw,estCuts){
   if(!estCuts||!estCuts.length||raw===''||raw===undefined||raw===null)return '';
   const r=Number(raw);if(isNaN(r))return '';
   let best=9,worst=9;
-  for(let i=0;i<estCuts.length;i++){const lo=Number(estCuts[i][0]),hi=Number(estCuts[i][1]);if(r>=hi){best=Math.min(best,i+1);worst=Math.min(worst,i+1);break;}else if(r>=lo){best=Math.min(best,i+1);break;}}
-  if(worst===9){for(let i=0;i<estCuts.length;i++){const hi=Number(estCuts[i][1]);if(r>=hi){worst=i+1;break;}}}
+  for(let i=0;i<estCuts.length;i++){const [lo,hi]=ecGetLoHi(estCuts[i]);if(lo===''&&hi==='')continue;const nlo=Number(lo),nhi=Number(hi);if(r>=nhi){best=Math.min(best,i+1);worst=Math.min(worst,i+1);break;}else if(r>=nlo){best=Math.min(best,i+1);break;}}
+  if(worst===9){for(let i=0;i<estCuts.length;i++){const [,hi]=ecGetLoHi(estCuts[i]);if(hi===''||hi===undefined)continue;if(r>=Number(hi)){worst=i+1;break;}}}
   if(best===worst)return String(best);
   return best+'-'+worst;
 }
@@ -1175,7 +1176,7 @@ async function resetPw(docId){
 
 /* ── ADMIN: 시험 관리 ── */
 function gcCutRow(prefix,name,cuts,max){cuts=cuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>`<td><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}" value="${cuts[i]!=null?cuts[i]:''}"></td>`).join('')}</tr>`;}
-function gcEstCutRow(prefix,name,estCuts,max){estCuts=estCuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>{const lo=estCuts[i]?estCuts[i][0]:'';const hi=estCuts[i]?estCuts[i][1]:'';return `<td style="min-width:80px;padding:4px"><div style="display:flex;flex-direction:column;gap:3px"><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}-lo" value="${lo!=null&&lo!==''?lo:''}" placeholder="하한"><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}-hi" value="${hi!=null&&hi!==''?hi:''}" placeholder="상한"></div></td>`;}).join('')}</tr>`;}
+function gcEstCutRow(prefix,name,estCuts,max){estCuts=estCuts||[];return `<tr><td class="gc-subj">${name}</td>${[0,1,2,3,4,5,6,7].map(i=>{const e=estCuts[i];const [lo,hi]=e?ecGetLoHi(e):['',''];return `<td style="min-width:80px;padding:4px"><div style="display:flex;flex-direction:column;gap:3px"><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}-lo" value="${lo!=null&&lo!==''?lo:''}" placeholder="하한"><input type="number" min="0" max="${max}" class="gc-in" id="${prefix}-${i}-hi" value="${hi!=null&&hi!==''?hi:''}" placeholder="상한"></div></td>`;}).join('')}</tr>`;}
 function gcTblHeader(){return `<tr><th style="min-width:80px">과목</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th><th>6등급</th><th>7등급</th><th>8등급</th></tr>`;}
 
 function renderAdminExams(){
@@ -1298,7 +1299,7 @@ async function saveEstGradeCutsFromModal(examId){
   const allRel=gcAllRel(ex);ex.estGradeCuts={};
   for(let si=0;si<allRel.length;si++){
     const subj=allRel[si],vals=[];let hasVal=false;
-    for(let i=0;i<8;i++){const lo=_('ec-'+si+'-'+i+'-lo')?.value;const hi=_('ec-'+si+'-'+i+'-hi')?.value;if(lo!==''||hi!==''){vals.push([lo!==''?Number(lo):'',hi!==''?Number(hi):'']);hasVal=true;}else{vals.push(['','']);}}
+    for(let i=0;i<8;i++){const lo=_('ec-'+si+'-'+i+'-lo')?.value;const hi=_('ec-'+si+'-'+i+'-hi')?.value;if(lo!==''||hi!==''){vals.push({lo:lo!==''?Number(lo):'',hi:hi!==''?Number(hi):''});hasVal=true;}else{vals.push({lo:'',hi:''});}}
     if(hasVal)ex.estGradeCuts[subj]=vals;
   }
   showLoad(true);
