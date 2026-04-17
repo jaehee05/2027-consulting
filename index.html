@@ -253,7 +253,7 @@ const S = {
   user:null, studentDocId:null,
   students:[], schedule:{dates:JSON.parse(JSON.stringify(DFLT_DATES))},
   bookings:[], config:{scoreStart:'',scoreEnd:''},
-  admins:[], requests:[],
+  admins:[], requests:[], reqSlots:[],
   tab:null, selDate:null, adminSel:null,
   editingExamId:null, lang2Open:false, stuSort:'seat',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
@@ -483,12 +483,22 @@ function renderStu(){
 }
 
 function bookCardHtml(b){
-  const pendingReq=S.requests.find(r=>r.bookingId===b._docId&&r.status==='pending');
-  const notifications=S.requests.filter(r=>r.bookingId===b._docId&&(r.status==='rejected'||r.status==='approved')&&!r.dismissed);
+  const adminChangeReq=S.requests.find(r=>r.type==='admin_change'&&r.bookingId===b._docId&&r.status==='pending');
+  const pendingReq=S.requests.find(r=>r.bookingId===b._docId&&r.status==='pending'&&r.type!=='admin_change');
+  const notifications=S.requests.filter(r=>r.bookingId===b._docId&&r.type!=='admin_change'&&(r.status==='rejected'||r.status==='approved')&&!r.dismissed);
   let statusHtml='';
+  if(adminChangeReq){
+    const slotBtns=adminChangeReq.offeredSlots.map((s,i)=>`<button class="sb" style="text-align:left;padding:10px 12px;height:auto" onclick="stuAcceptAdminChange('${adminChangeReq._docId}',${i})"><b>${s.dateLabel}</b> · ${s.slot}</button>`).join('');
+    statusHtml+=`<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:14px 16px;margin-bottom:12px">
+      <p style="font-size:13px;color:#1d4ed8;font-weight:700;margin-bottom:4px">📣 관리자 예약 시간 변경 요청</p>
+      <p style="font-size:12px;color:#1e40af;margin-bottom:12px">현재 예약(<b>${adminChangeReq.currentDateLabel} ${adminChangeReq.currentSlot}</b>)을 아래 시간 중 하나로 변경해 주세요.</p>
+      <div class="sg" style="margin-bottom:10px">${slotBtns}</div>
+      <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="stuOpenRejectAdminChange('${adminChangeReq._docId}')">거절</button></div>
+    </div>`;
+  }
   if(pendingReq){
     const typeLabel=pendingReq.type==='cancel'?'취소':'변경';
-    statusHtml=`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">⏳ 예약 ${typeLabel} 요청이 승인 대기 중입니다.</p><p style="font-size:11px;color:#92400e;margin-top:4px">사유: ${pendingReq.reason}</p>${pendingReq.type==='change'?`<p style="font-size:11px;color:#92400e;margin-top:2px">변경 희망: ${pendingReq.newDateLabel} ${pendingReq.newSlot}</p>`:''}</div>`;
+    statusHtml+=`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">⏳ 예약 ${typeLabel} 요청이 승인 대기 중입니다.</p><p style="font-size:11px;color:#92400e;margin-top:4px">사유: ${pendingReq.reason}</p>${pendingReq.type==='change'?`<p style="font-size:11px;color:#92400e;margin-top:2px">변경 희망: ${pendingReq.newDateLabel} ${pendingReq.newSlot}</p>`:''}</div>`;
   }
   notifications.forEach(r=>{
     const typeLabel=r.type==='cancel'?'취소':'변경';
@@ -820,6 +830,46 @@ async function dismissNotif(reqId){
   const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
   try{await db.collection('requests').doc(reqId).update({dismissed:true});req.dismissed=true;renderStu();}
   catch(e){alert('삭제 실패: '+e.message);}}
+
+async function stuAcceptAdminChange(reqId,slotIdx){
+  const req=S.requests.find(r=>r._docId===reqId);if(!req||req.status!=='pending')return;
+  const chosen=req.offeredSlots[slotIdx];if(!chosen)return;
+  if(!confirm(`${chosen.dateLabel} ${chosen.slot}(으)로 예약을 변경하시겠습니까?`))return;
+  showLoad(true);
+  try{
+    const taken=S.bookings.filter(x=>x.date===chosen.date&&x._docId!==req.bookingId).map(x=>x.slot);
+    if(taken.includes(chosen.slot)){alert('해당 시간이 이미 예약되어 있습니다. 다른 시간을 선택하거나 거절해 주세요.');showLoad(false);return;}
+    await db.collection('bookings').doc(req.bookingId).update({date:chosen.date,dateLabel:chosen.dateLabel,slot:chosen.slot});
+    const b=S.bookings.find(x=>x._docId===req.bookingId);if(b){b.date=chosen.date;b.dateLabel=chosen.dateLabel;b.slot=chosen.slot;}
+    await db.collection('requests').doc(reqId).update({status:'accepted',chosenSlot:chosen,resolvedAt:Date.now()});
+    req.status='accepted';req.chosenSlot=chosen;req.resolvedAt=Date.now();
+    renderStu();alert('예약 시간이 변경되었습니다.');
+  }catch(e){alert('변경 실패: '+e.message);}
+  showLoad(false);
+}
+
+function stuOpenRejectAdminChange(reqId){
+  const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 변경 요청 거절</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:12px">현재 예약: <b>${req.currentDateLabel} ${req.currentSlot}</b></p>
+    <div class="fg"><label class="fl">거절 사유</label><textarea class="fi" id="stuRejReason" rows="3" style="height:auto;padding:10px 12px;resize:vertical" placeholder="거절하시는 이유를 입력해 주세요."></textarea></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bd" style="flex:1" onclick="stuSubmitRejectAdminChange('${reqId}')">거절 제출</button></div>`;
+  openModal();
+}
+
+async function stuSubmitRejectAdminChange(reqId){
+  const reason=_('stuRejReason').value.trim();
+  if(!reason){showErr('mErr','거절 사유를 입력해 주세요.');return;}
+  const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
+  showLoad(true);
+  try{
+    await db.collection('requests').doc(reqId).update({status:'rejected',rejectReason:reason,resolvedAt:Date.now()});
+    req.status='rejected';req.rejectReason=reason;req.resolvedAt=Date.now();
+    closeModal();renderStu();
+  }catch(e){showErr('mErr','거절 실패: '+e.message);}
+  showLoad(false);
+}
 
 async function cancelMyBook(){
   if(!confirm('예약을 취소하시겠습니까?'))return;
@@ -1516,7 +1566,7 @@ function renderAdminBookings(){
     <td><span class="bx ${stu?.grade==='고3'?'br':stu?.grade==='고2'?'bb':'bg'}">${stu?.grade||'—'}</span></td><td style="text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td><td>${stu?.studentPhone||'—'}</td>
     ${examStatCells}
     <td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${b.question?'#22c55e':'#d1d5db'}"></span></td>
-    <td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button><button class="btn bs bsm np" onclick="openAdminBook('${b._docId}')">변경</button><button class="btn bd bsm np" onclick="adminDelBook('${b._docId}')">삭제</button></div></td></tr>`;}).join('');
+    <td style="white-space:nowrap"><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button><button class="btn bs bsm np" onclick="openAdminBook('${b._docId}')">변경</button><button class="btn bs bsm np" style="color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${b._docId}')">변경 요청</button><button class="btn bd bsm np" onclick="adminDelBook('${b._docId}')">삭제</button></div></td></tr>`;}).join('');
   const unbookedRows=unbooked.map(s=>`<tr><td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td><td style="font-weight:600">${s.name}</td><td>${s.school}</td><td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td><td>${s.studentPhone}</td><td>${s.guardianPhone}</td><td style="color:#9ca3af;font-size:12px">${s.memo||'—'}</td><td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openStuDetail('${s._docId}')">상세</button><button class="btn bp bsm" onclick="openNewBookForStu('${s._docId}')">예약</button></div></td></tr>`).join('');
   const byDate={};sorted.forEach(b=>{if(!byDate[b.date])byDate[b.date]={label:b.dateLabel,items:[]};byDate[b.date].items.push(b);});
   const printHtml=Object.values(byDate).map(g=>`<div style="margin-bottom:20px"><p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:8px">${g.label}</p>${g.items.map(b=>{const stu=S.students.find(s=>s._docId===b.studentId);return `<div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><b style="color:#1C64F2;min-width:48px">${b.slot}</b><b style="min-width:60px">${b.studentName}</b><span>${stu?.school||''}</span><span style="color:#6b7280">${stu?.grade||''}</span><span style="color:#6b7280">${stu?.studentPhone||''}</span></div>`;}).join('')}</div>`).join('');
@@ -1535,8 +1585,10 @@ function renderAdminBookings(){
     </table></div></div>`;}
 
 function renderRequestsSection(){
-  const pending=S.requests.filter(r=>r.status==='pending').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  const resolved=S.requests.filter(r=>r.status!=='pending').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,20);
+  const pending=S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const resolved=S.requests.filter(r=>r.status!=='pending'&&r.type!=='admin_change').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,20);
+  const adminChangePending=S.requests.filter(r=>r.type==='admin_change'&&r.status==='pending').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const adminChangeResolved=S.requests.filter(r=>r.type==='admin_change'&&r.status!=='pending').sort((a,b)=>(b.resolvedAt||b.createdAt||0)-(a.resolvedAt||a.createdAt||0)).slice(0,20);
   const pendingRows=pending.map(r=>{
     const typeLabel=r.type==='cancel'?'<span class="bx br">취소</span>':'<span class="bx bb">변경</span>';
     const changeInfo=r.type==='change'?`<br><span style="font-size:11px;color:#1C64F2">→ ${r.newDateLabel} ${r.newSlot}</span>`:'';
@@ -1558,7 +1610,33 @@ function renderRequestsSection(){
   const reqEnabled=S.config.requestEnabled!==false;
   const toggleLabel=reqEnabled?'요청 기능 OFF':'요청 기능 ON';
   const toggleBtn=`<button class="btn ${reqEnabled?'bd':'bp'} bsm" onclick="toggleRequestEnabled()">${toggleLabel}</button>`;
-  return `<div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bb">요청</span>예약 변경/취소 요청 <span style="font-size:13px;font-weight:400;color:#6b7280">(대기 ${pending.length}건)</span></span>${toggleBtn}</div>
+  const acPendingRows=adminChangePending.map(r=>{
+    const offered=r.offeredSlots.map(s=>`${s.dateLabel} ${s.slot}`).join(', ');
+    return `<tr><td style="font-weight:600">${r.studentName}</td>
+      <td style="font-size:12px">${r.currentDateLabel} ${r.currentSlot}</td>
+      <td style="font-size:12px;max-width:260px;white-space:normal">${offered}</td>
+      <td style="font-size:11px;color:#6b7280">${r.createdAt?new Date(r.createdAt).toLocaleDateString('ko-KR'):'—'}</td>
+      <td style="white-space:nowrap"><button class="btn bd bsm" onclick="cancelAdminChangeReq('${r._docId}')">요청 취소</button></td></tr>`;
+  }).join('');
+  const acResolvedRows=adminChangeResolved.map(r=>{
+    const statusLabel=r.status==='accepted'?'<span class="bx bg">수락</span>':'<span class="bx br">거절</span>';
+    const detail=r.status==='accepted'&&r.chosenSlot?`→ <b style="color:#1C64F2">${r.chosenSlot.dateLabel} ${r.chosenSlot.slot}</b>`:r.status==='rejected'&&r.rejectReason?`<span style="color:#dc2626">사유: ${r.rejectReason}</span>`:'';
+    return `<tr><td style="font-weight:600">${r.studentName}</td>
+      <td style="font-size:12px">${r.currentDateLabel} ${r.currentSlot}</td>
+      <td style="font-size:12px">${statusLabel} <span style="font-size:11px">${detail}</span></td>
+      <td style="font-size:11px;color:#6b7280">${r.resolvedAt?new Date(r.resolvedAt).toLocaleDateString('ko-KR'):'—'}</td>
+      ${isAdmin?`<td><button class="btn bd bsm" onclick="deleteRequest('${r._docId}')">삭제</button></td>`:''}</tr>`;
+  }).join('');
+  const acSection=(adminChangePending.length||adminChangeResolved.length)?`<div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bb">관리자 변경 요청</span>관리자가 보낸 예약 변경 요청 <span style="font-size:13px;font-weight:400;color:#6b7280">(응답 대기 ${adminChangePending.length}건)</span></span></div>
+    ${adminChangePending.length?`<div class="card np" style="padding:0;margin-bottom:12px"><div class="tw"><table>
+      <thead><tr><th>학생명</th><th>현재 예약</th><th>제안한 시간</th><th>요청일</th><th>관리</th></tr></thead>
+      <tbody>${acPendingRows}</tbody>
+    </table></div></div>`:''}
+    ${adminChangeResolved.length?`<div class="card np" style="padding:0;margin-bottom:24px"><div class="tw"><table>
+      <thead><tr><th>학생명</th><th>기존 예약</th><th>학생 응답</th><th>처리일</th>${isAdmin?'<th>관리</th>':''}</tr></thead>
+      <tbody>${acResolvedRows}</tbody>
+    </table></div></div>`:''}`:'';
+  return `${acSection}<div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bb">요청</span>예약 변경/취소 요청 <span style="font-size:13px;font-weight:400;color:#6b7280">(대기 ${pending.length}건)</span></span>${toggleBtn}</div>
     <div class="card np" style="padding:0;margin-bottom:24px"><div class="tw"><table>
       <thead><tr><th>유형</th><th>학생명</th><th>현재 예약</th><th>사유</th><th>요청일</th><th>관리</th></tr></thead>
       <tbody>${pendingRows||'<tr><td colspan="6" class="empty">대기 중인 요청이 없습니다.</td></tr>'}</tbody>
@@ -1735,6 +1813,74 @@ async function saveAdminBook(){
   if(!b||!date)return;showLoad(true);
   try{await db.collection('bookings').doc(b._docId).update({date:date.date,dateLabel:date.label,slot});b.date=date.date;b.dateLabel=date.label;b.slot=slot;closeModal();S.adminSel=null;renderAdminBookings();}
   catch(e){alert('변경 실패: '+e.message);}showLoad(false);}
+
+/* ── ADMIN: 예약 변경 요청 보내기 ── */
+function openAdminChangeReq(bookingId){
+  const b=S.bookings.find(x=>x._docId===bookingId);if(!b)return;
+  const existing=S.requests.find(r=>r.type==='admin_change'&&r.bookingId===bookingId&&r.status==='pending');
+  if(existing){alert('이미 이 예약에 대한 변경 요청이 전송되어 학생의 응답을 기다리는 중입니다.');return;}
+  S.reqSlots=[];
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 변경 요청 보내기</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px">${b.studentName} · 현재 <b>${b.dateLabel} ${b.slot}</b></p>
+    <input type="hidden" id="reqBid" value="${bookingId}">
+    <div class="fg"><label class="fl">제안할 시간 (여러 개 선택 가능)</label>
+      <select class="fi fsel" id="reqDate" onchange="renderReqSlots()" style="margin-bottom:10px">${S.schedule.dates.map(d=>`<option value="${d.id}">${d.label}</option>`).join('')}</select>
+      <div class="sg" id="reqSg"></div>
+    </div>
+    <div id="reqSelBox" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:none"><p style="font-size:11px;font-weight:600;color:#1C64F2;margin-bottom:4px">선택된 시간 (<span id="reqSelCnt">0</span>개)</p><div id="reqSelList" style="font-size:12px;color:#1d4ed8"></div></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="sendAdminChangeReq()">요청 전송</button></div>`;
+  openModal();renderReqSlots();
+}
+
+function renderReqSlots(){
+  const dateId=_('reqDate')?.value,date=S.schedule.dates.find(d=>d.id===dateId),cont=_('reqSg'),bookingId=_('reqBid')?.value;
+  if(!date||!cont)return;
+  const b=S.bookings.find(x=>x._docId===bookingId);
+  const taken=S.bookings.filter(x=>x.date===date.date&&x._docId!==bookingId).map(x=>x.slot);
+  cont.innerHTML=date.slots.map(slot=>{
+    const key=dateId+'|'+slot,isTaken=taken.includes(slot),isCur=b&&b.date===date.date&&b.slot===slot,isSel=S.reqSlots.includes(key);
+    const cls=isTaken?'bk':isCur?'mn':isSel?'sl':'';
+    return `<button class="sb ${cls}" ${isTaken||isCur?'disabled':''} onclick="${isTaken||isCur?'':'toggleReqSlot(\''+dateId+'\',\''+slot+'\',this)'}">${slot}${isCur?' (현재)':''}</button>`;
+  }).join('')||'<p style="font-size:13px;color:#9ca3af">슬롯 없음</p>';
+  updateReqSelBox();
+}
+
+function toggleReqSlot(dateId,slot,btn){
+  const key=dateId+'|'+slot,idx=S.reqSlots.indexOf(key);
+  if(idx>=0){S.reqSlots.splice(idx,1);btn.classList.remove('sl');}
+  else{S.reqSlots.push(key);btn.classList.add('sl');}
+  updateReqSelBox();
+}
+
+function updateReqSelBox(){
+  const box=_('reqSelBox'),cnt=_('reqSelCnt'),list=_('reqSelList');if(!box)return;
+  if(S.reqSlots.length===0){box.style.display='none';return;}
+  box.style.display='block';cnt.textContent=S.reqSlots.length;
+  list.innerHTML=S.reqSlots.map(k=>{const[dId,sl]=k.split('|');const d=S.schedule.dates.find(x=>x.id===dId);return d?`<div>• ${d.label} ${sl}</div>`:'';}).join('');
+}
+
+async function sendAdminChangeReq(){
+  const bookingId=_('reqBid').value,b=S.bookings.find(x=>x._docId===bookingId);if(!b)return;
+  if(S.reqSlots.length===0){showErr('mErr','제안할 시간을 하나 이상 선택하세요.');return;}
+  const offeredSlots=S.reqSlots.map(k=>{const[dId,sl]=k.split('|');const d=S.schedule.dates.find(x=>x.id===dId);return{dateId:dId,date:d.date,dateLabel:d.label,slot:sl};});
+  const req={type:'admin_change',status:'pending',bookingId,studentId:b.studentId,studentName:b.studentName,currentDate:b.date,currentDateLabel:b.dateLabel,currentSlot:b.slot,offeredSlots,createdAt:Date.now(),createdBy:S.user.id};
+  showLoad(true);
+  try{
+    const ref=await db.collection('requests').add(req);
+    S.requests.push({_docId:ref.id,...req});
+    closeModal();S.reqSlots=[];renderAdminBookings();alert('변경 요청이 전송되었습니다. 학생이 응답하면 알려드립니다.');
+  }catch(e){showErr('mErr','전송 실패: '+e.message);}
+  showLoad(false);
+}
+
+async function cancelAdminChangeReq(reqId){
+  if(!confirm('이 변경 요청을 취소하시겠습니까?'))return;
+  showLoad(true);
+  try{await db.collection('requests').doc(reqId).delete();S.requests=S.requests.filter(r=>r._docId!==reqId);renderAdminBookings();}
+  catch(e){alert('취소 실패: '+e.message);}
+  showLoad(false);
+}
 
 async function adminDelBook(docId){
   const b=S.bookings.find(x=>x._docId===docId);if(!b||!confirm(`${b.studentName} 학생의 ${b.dateLabel} ${b.slot} 예약을 삭제하시겠습니까?`))return;
