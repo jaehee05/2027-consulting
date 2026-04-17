@@ -384,6 +384,7 @@ async function loadAdmins(){
   const snap=await db.collection('admins').get();
   S.admins=snap.docs.map(d=>({_docId:d.id,...d.data()}));
 }
+function realStu(){return S.students.filter(s=>!s.isTest);}
 async function saveScheduleToDb(){await db.collection('schedule').doc('main').set(S.schedule);}
 
 /* ── AUTH ── */
@@ -405,6 +406,14 @@ async function doLogin(){
     if(adminDoc.exists){
       const a=adminDoc.data();
       if(a.password!==pw){showLoad(false);showErr('lErr','비밀번호가 올바르지 않습니다.');return;}
+      if(a.role==='test'){
+        S.user={type:'student',id:a.id,name:a.name};
+        S.studentDocId=a.linkedStudentId;
+        saveSession({type:'student',id:a.id,name:a.name,studentDocId:a.linkedStudentId},keep);
+        await loadAll();
+        _('stuUname').textContent=a.name+' (테스트)';
+        showView('vStu');renderStu();return;
+      }
       S.user={type:a.role,id:a.id,name:a.name};
       saveSession({type:a.role,id:a.id,name:a.name},keep);
       await loadAll();
@@ -897,7 +906,8 @@ async function setTab(tab){
 /* ── ADMIN: 컨설팅 ── */
 function renderAdminConsult(){
   if(S.consultStuId){renderConsultDetail();return;}
-  const sorted=[...S.students].sort((a,b)=>{
+  const baseStu=realStu();
+  const sorted=[...baseStu].sort((a,b)=>{
     if(S.stuSort==='grade'){const go={'고3':0,'고2':1,'고1':2};return (go[a.grade]??3)-(go[b.grade]??3)||a.name.localeCompare(b.name,'ko');}
     if(S.stuSort==='name')return a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='seat')return (a.seat||999)-(b.seat||999);
@@ -919,7 +929,7 @@ function renderAdminConsult(){
   const sortOpts=[['seat','좌석순'],['grade','학년순'],['name','이름순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminConsult()">${l}</button>`).join('');
   const examHeaders=cExams.map(ex=>`<th>${ex.name.replace(/\s*모의.*$/,'')}</th>`).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">컨설팅 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.students.length}명)</span></span></div>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">컨설팅 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table>
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th>${examHeaders}<th>기록</th></tr></thead>
@@ -1126,7 +1136,8 @@ async function autoSaveConsultNote(){
 /* ── ADMIN: 학생 ── */
 function renderAdminStudents(){
   const gradeOrder={'고3':0,'고2':1,'고1':2};
-  const sorted=[...S.students].sort((a,b)=>{
+  const baseStu=realStu();
+  const sorted=[...baseStu].sort((a,b)=>{
     if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='seat') return ((a.seat||999))-(b.seat||999);
@@ -1143,7 +1154,7 @@ function renderAdminStudents(){
   </tr>`).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.students.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table>
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>계정 ID</th><th>관리</th></tr></thead>
@@ -1153,7 +1164,8 @@ function renderAdminStudents(){
 /* ── ADMIN: 학생 성적 ── */
 function renderAdminScores(){
   const gradeOrder={'고3':0,'고2':1,'고1':2};
-  const sorted=[...S.students].sort((a,b)=>{
+  const baseStu=realStu();
+  const sorted=[...baseStu].sort((a,b)=>{
     if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='seat') return ((a.seat||999))-(b.seat||999);
@@ -1171,14 +1183,14 @@ function renderAdminScores(){
       <td style="white-space:nowrap"><button class="btn bs bsm" onclick="openScoreDetail('${s._docId}')">상세</button></td>
     </tr>`;}).join('');
   const exams=getExams();
-  const examTotals=exams.map(ex=>({ex,total:S.students.filter(s=>hasStuExamScore(s,ex.id)).length}));
+  const examTotals=exams.map(ex=>({ex,total:baseStu.filter(s=>hasStuExamScore(s,ex.id)).length}));
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminScores()">${l}</button>`).join('');
   const examHeaders=exams.map(ex=>`<th>${ex.name}</th>`).join('');
   const colCount=5+exams.length;
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 성적 관리 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.students.length}명)</span></span>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 성적 관리 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span>
     <button class="btn bs bsm" onclick="refreshStudents()">새로고침</button></div>
-  <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">${examTotals.map(({ex,total})=>`<div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1;min-width:120px"><span style="font-size:11px;font-weight:600;color:#6b7280">${ex.name}</span><p style="font-size:18px;font-weight:800;margin-top:2px">${total}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${S.students.length}명</span></p></div>`).join('')}</div>
+  <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">${examTotals.map(({ex,total})=>`<div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1;min-width:120px"><span style="font-size:11px;font-weight:600;color:#6b7280">${ex.name}</span><p style="font-size:18px;font-weight:800;margin-top:2px">${total}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${baseStu.length}명</span></p></div>`).join('')}</div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table>
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th>${examHeaders}<th>관리</th></tr></thead>
@@ -1491,7 +1503,7 @@ async function doBulk(){
 function renderAdminBookings(){
   const sorted=[...S.bookings].sort((a,b)=>{const sA=S.students.find(s=>s._docId===a.studentId)?.seat||999;const sB=S.students.find(s=>s._docId===b.studentId)?.seat||999;if(sA!==sB)return sA-sB;return a.date!==b.date?a.date.localeCompare(b.date):a.slot.localeCompare(b.slot);});
   const bookedIds=new Set(S.bookings.map(b=>b.studentId));
-  const unbooked=S.students.filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
+  const unbooked=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
   const rows=sorted.map(b=>{
     const stu=S.students.find(s=>s._docId===b.studentId);
     const examStatCells=getExams().map(ex=>`<td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(stu,ex.id)?'#22c55e':'#d1d5db'}"></span></td>`).join('');
@@ -1774,48 +1786,89 @@ async function saveNewBookForStu(){
   showLoad(false);}
 
 /* ── ADMIN: 계정 관리 ── */
+function roleLabel(r){return r==='admin'?'ADMIN':r==='test'?'TEST':'OP';}
+function roleBadgeClass(r){return r==='admin'?'br':r==='test'?'bg':'bb';}
+
 function renderAdminAccounts(){
   const rows=S.admins.map(a=>`<tr>
     <td><code>${a.id}</code></td><td style="font-weight:600">${a.name}</td>
-    <td><span class="bx ${a.role==='admin'?'br':'bb'}">${a.role==='admin'?'ADMIN':'OP'}</span></td>
+    <td><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span></td>
     <td style="white-space:nowrap"><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openAcctModal('${a.id}')">수정</button>${a.id!==S.user.id?`<button class="btn bd bsm" onclick="delAcct('${a.id}')">삭제</button>`:'<span style="font-size:11px;color:#9ca3af;padding:0 8px">본인</span>'}</div></td>
   </tr>`).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">ADMIN / OP 계정 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.admins.length}개)</span></span><button class="btn bp bsm" onclick="openAcctModal(null)">+ 계정 추가</button></div>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">ADMIN / OP / TEST 계정 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.admins.length}개)</span></span><button class="btn bp bsm" onclick="openAcctModal(null)">+ 계정 추가</button></div>
   <div class="card" style="padding:0"><div class="tw"><table><thead><tr><th>ID</th><th>이름</th><th>권한</th><th>관리</th></tr></thead>
   <tbody>${rows||'<tr><td colspan="4" class="empty">계정이 없습니다.</td></tr>'}</tbody></table></div></div>
-  <div style="margin-top:14px;padding:14px;background:#fff8e1;border:1px solid #fde68a;border-radius:10px"><p style="font-size:12px;color:#92400e;font-weight:500">💡 OP 권한: 예약 현황 조회·상세보기 및 예약 등록·변경·취소 가능. 학생 정보·일정·계정 관리 불가.</p></div>`;}
+  <div style="margin-top:14px;padding:14px;background:#fff8e1;border:1px solid #fde68a;border-radius:10px"><p style="font-size:12px;color:#92400e;font-weight:500">💡 OP 권한: 예약 현황 조회·상세보기 및 예약 등록·변경·취소 가능. 학생 정보·일정·계정 관리 불가.<br>🧪 TEST 권한: 학생과 동일한 화면으로 로그인되며, 학생 목록에는 표시되지 않습니다.</p></div>`;}
 
 function openAcctModal(accId){
   const a=accId?S.admins.find(x=>x.id===accId):null;
+  const roleDisabled=a&&a.role==='test';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${a?'계정 수정':'계정 추가'}</p>
     ${a?`<div class="fg"><label class="fl">ID</label><input class="fi" value="${a.id}" disabled style="background:#f9fafb;color:#6b7280"></div>`:`<div class="fg"><label class="fl">ID</label><input class="fi" id="acid" placeholder="로그인 아이디"></div>`}
     <div class="fg"><label class="fl">이름</label><input class="fi" id="acname" value="${a?.name||''}" placeholder="김재희"></div>
-    <div class="fg"><label class="fl">권한</label><select class="fi fsel" id="acrole"><option value="admin" ${a?.role==='admin'?'selected':''}>ADMIN</option><option value="viewer" ${a?.role==='viewer'?'selected':''}>OP</option></select></div>
+    <div class="fg"><label class="fl">권한</label><select class="fi fsel" id="acrole" ${roleDisabled?'disabled style="background:#f9fafb;color:#6b7280"':''}>
+      <option value="admin" ${a?.role==='admin'?'selected':''}>ADMIN</option>
+      <option value="viewer" ${a?.role==='viewer'?'selected':''}>OP</option>
+      <option value="test" ${a?.role==='test'?'selected':''}>TEST</option>
+    </select>${roleDisabled?'<p style="font-size:11px;color:#9ca3af;margin-top:4px">TEST 계정의 권한은 변경할 수 없습니다. 삭제 후 재생성하세요.</p>':''}</div>
     ${a?`<div class="fg"><label class="fl">비밀번호 변경 (변경 시에만 입력)</label><input class="fi" id="acpw" type="password" placeholder="새 비밀번호 (비워두면 유지)"></div>`:`<div class="fg"><label class="fl">비밀번호 (6자 이상)</label><input class="fi" id="acpw" type="password" placeholder="비밀번호"></div>`}
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveAcct('${accId||''}')">저장</button></div>`;
   openModal();}
 
 async function saveAcct(accId){
-  const name=_('acname').value.trim(),role=_('acrole').value,pw=_('acpw')?.value;
+  const name=_('acname').value.trim(),pw=_('acpw')?.value;
+  const existing=accId?S.admins.find(x=>x.id===accId):null;
+  const role=existing&&existing.role==='test'?'test':_('acrole').value;
   if(!name){showErr('mErr','이름을 입력하세요.');return;}
   if(accId){
     const update={name,role};if(pw){if(pw.length<6){showErr('mErr','비밀번호는 6자 이상이어야 합니다.');return;}update.password=pw;}
-    showLoad(true);try{await db.collection('admins').doc(accId).update(update);const a=S.admins.find(x=>x.id===accId);if(a)Object.assign(a,update);closeModal();renderAdminAccounts();}catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);
+    showLoad(true);
+    try{
+      await db.collection('admins').doc(accId).update(update);
+      const a=S.admins.find(x=>x.id===accId);if(a)Object.assign(a,update);
+      if(role==='test'&&existing.linkedStudentId){
+        const stuUpdate={name:name+' (테스트)'};if(pw)stuUpdate.accountPw=pw;
+        await db.collection('students').doc(existing.linkedStudentId).update(stuUpdate);
+        const s=S.students.find(x=>x._docId===existing.linkedStudentId);if(s)Object.assign(s,stuUpdate);
+      }
+      closeModal();renderAdminAccounts();
+    }catch(e){showErr('mErr','저장 실패: '+e.message);}
+    showLoad(false);
   }else{
     const id=_('acid').value.trim();if(!id){showErr('mErr','ID를 입력하세요.');return;}if(!pw||pw.length<6){showErr('mErr','비밀번호는 6자 이상이어야 합니다.');return;}
     showLoad(true);
     try{
       const exists=await db.collection('admins').doc(id).get();if(exists.exists){showErr('mErr',`ID '${id}'가 이미 존재합니다.`);showLoad(false);return;}
       const data={id,name,role,password:pw,createdAt:Date.now()};
+      if(role==='test'){
+        const stuData={name:name+' (테스트)',grade:'고3',school:'-',studentPhone:'-',guardianPhone:'-',memo:'',seat:'',accountId:id,accountPw:pw,isFirstLogin:false,isTest:true,scores:{}};
+        const stuRef=await db.collection('students').add(stuData);
+        data.linkedStudentId=stuRef.id;
+        S.students.push({_docId:stuRef.id,...stuData});
+      }
       await db.collection('admins').doc(id).set(data);S.admins.push({_docId:id,...data});closeModal();renderAdminAccounts();
     }catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);}
 }
 
 async function delAcct(id){
   if(id===S.user.id){alert('본인 계정은 삭제할 수 없습니다.');return;}
-  if(!confirm(`'${id}' 계정을 삭제하시겠습니까?`))return;
-  showLoad(true);try{await db.collection('admins').doc(id).delete();S.admins=S.admins.filter(x=>x.id!==id);renderAdminAccounts();}catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
+  const acc=S.admins.find(x=>x.id===id);
+  if(!confirm(`'${id}' 계정을 삭제하시겠습니까?${acc?.role==='test'?'\n(연결된 테스트 학생 데이터도 함께 삭제됩니다)':''}`))return;
+  showLoad(true);
+  try{
+    await db.collection('admins').doc(id).delete();
+    S.admins=S.admins.filter(x=>x.id!==id);
+    if(acc?.role==='test'&&acc.linkedStudentId){
+      const related=S.bookings.filter(b=>b.studentId===acc.linkedStudentId);
+      for(const b of related)await db.collection('bookings').doc(b._docId).delete();
+      await db.collection('students').doc(acc.linkedStudentId).delete();
+      S.students=S.students.filter(x=>x._docId!==acc.linkedStudentId);
+      S.bookings=S.bookings.filter(b=>b.studentId!==acc.linkedStudentId);
+    }
+    renderAdminAccounts();
+  }catch(e){alert('삭제 실패: '+e.message);}
+  showLoad(false);}
 
 /* ── MODAL ── */
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
@@ -1838,7 +1891,7 @@ async function init(){
           await loadAll();
           const stu=stuQ.docs[0].data();
           if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
-          _('stuUname').textContent=sess.name+' 학생';
+          _('stuUname').textContent=stu.isTest?sess.name+' (테스트)':sess.name+' 학생';
           showLoad(false);showView('vStu');renderStu();return;
         }
       }else{
