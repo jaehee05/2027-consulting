@@ -182,8 +182,7 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
     <div class="card">
       <div class="fg"><label class="fl">아이디</label><input class="fi" id="lId" placeholder="아이디 입력" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <div class="fg" style="margin-bottom:14px"><label class="fl">비밀번호</label><input class="fi" id="lPw" type="password" placeholder="비밀번호 입력" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;font-size:13px;color:#374151;font-weight:500"><input type="checkbox" id="lKeep" style="width:15px;height:15px;cursor:pointer;accent-color:#1C64F2">로그인 상태 유지</label>
-      <p style="font-size:11px;color:#9ca3af;margin-bottom:16px;padding-left:23px">공용 기기에서는 체크하지 마세요.</p>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;font-size:13px;color:#374151;font-weight:500"><input type="checkbox" id="lKeep" style="width:15px;height:15px;cursor:pointer;accent-color:#1C64F2">로그인 상태 유지</label>
       <div class="ferr" id="lErr"></div>
       <button class="btn bp bfw" onclick="doLogin()">로그인</button>
     </div>
