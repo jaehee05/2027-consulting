@@ -181,7 +181,9 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
     </div>
     <div class="card">
       <div class="fg"><label class="fl">아이디</label><input class="fi" id="lId" placeholder="아이디 입력" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <div class="fg" style="margin-bottom:20px"><label class="fl">비밀번호</label><input class="fi" id="lPw" type="password" placeholder="비밀번호 입력" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <div class="fg" style="margin-bottom:14px"><label class="fl">비밀번호</label><input class="fi" id="lPw" type="password" placeholder="비밀번호 입력" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;font-size:13px;color:#374151;font-weight:500"><input type="checkbox" id="lKeep" style="width:15px;height:15px;cursor:pointer;accent-color:#1C64F2">로그인 상태 유지</label>
+      <p style="font-size:11px;color:#9ca3af;margin-bottom:16px;padding-left:23px">공용 기기에서는 체크하지 마세요.</p>
       <div class="ferr" id="lErr"></div>
       <button class="btn bp bfw" onclick="doLogin()">로그인</button>
     </div>
@@ -386,8 +388,16 @@ async function loadAdmins(){
 async function saveScheduleToDb(){await db.collection('schedule').doc('main').set(S.schedule);}
 
 /* ── AUTH ── */
+function saveSession(sess,keep){
+  const str=JSON.stringify(sess);
+  if(keep){localStorage.setItem('session',str);sessionStorage.removeItem('session');}
+  else{sessionStorage.setItem('session',str);localStorage.removeItem('session');}
+}
+function clearSession(){sessionStorage.removeItem('session');localStorage.removeItem('session');}
+function readSession(){return localStorage.getItem('session')||sessionStorage.getItem('session');}
+
 async function doLogin(){
-  const id=_('lId').value.trim(),pw=_('lPw').value;
+  const id=_('lId').value.trim(),pw=_('lPw').value,keep=_('lKeep').checked;
   hideErr('lErr');
   if(!id||!pw){showErr('lErr','아이디와 비밀번호를 입력하세요.');return;}
   showLoad(true);
@@ -397,7 +407,7 @@ async function doLogin(){
       const a=adminDoc.data();
       if(a.password!==pw){showLoad(false);showErr('lErr','비밀번호가 올바르지 않습니다.');return;}
       S.user={type:a.role,id:a.id,name:a.name};
-      sessionStorage.setItem('session',JSON.stringify({type:a.role,id:a.id,name:a.name}));
+      saveSession({type:a.role,id:a.id,name:a.name},keep);
       await loadAll();
       _('adminUname').textContent=a.name;
       _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
@@ -411,7 +421,7 @@ async function doLogin(){
       if(stu.accountPw!==pw){showLoad(false);showErr('lErr','비밀번호가 올바르지 않습니다.');return;}
       S.user={type:'student',id,name:stu.name};
       S.studentDocId=stuDoc.id;
-      sessionStorage.setItem('session',JSON.stringify({type:'student',id,name:stu.name,studentDocId:stuDoc.id}));
+      saveSession({type:'student',id,name:stu.name,studentDocId:stuDoc.id},keep);
       await loadAll();
       if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
       _('stuUname').textContent=stu.name+' 학생';
@@ -424,8 +434,8 @@ async function doLogin(){
 
 function doLogout(){
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
-  sessionStorage.removeItem('session');
-  _('lId').value='';_('lPw').value='';hideErr('lErr');showView('vLogin');
+  clearSession();
+  _('lId').value='';_('lPw').value='';_('lKeep').checked=false;hideErr('lErr');showView('vLogin');
 }
 
 async function doChangePw(){
@@ -1818,7 +1828,7 @@ async function init(){
   try{
     const snap=await db.collection('admins').limit(1).get();
     if(snap.empty){showLoad(false);showView('vSetup');return;}
-    const saved=sessionStorage.getItem('session');
+    const saved=readSession();
     if(saved){
       const sess=JSON.parse(saved);
       if(sess.type==='student'){
@@ -1844,7 +1854,7 @@ async function init(){
           setTab(a.role==='admin'?'students':'bookings');return;
         }
       }
-      sessionStorage.removeItem('session');
+      clearSession();
     }
     showLoad(false);showView('vLogin');
   }catch(e){
