@@ -1283,8 +1283,7 @@ function gcEstCutRow(prefix,name,estCuts,max){estCuts=estCuts||[];return `<tr><t
 function gcTblHeader(){return `<tr><th style="min-width:80px">과목</th><th>1등급</th><th>2등급</th><th>3등급</th><th>4등급</th><th>5등급</th><th>6등급</th><th>7등급</th><th>8등급</th></tr>`;}
 
 function renderAdminExams(){
-  const exams=getExams();const gc=S.config.gradeCuts||{};
-  const absRows=GC_ABS_SUBJS.map(([key,name,max])=>gcCutRow('gca-'+key,name,gc.abs?.[key],max)).join('');
+  const exams=getExams();
   const examCards=exams.map(ex=>{
     const open=isExamOpen(ex);const gcCount=ex.gradeCuts?Object.keys(ex.gradeCuts).length:0;const ecCount=ex.estGradeCuts?Object.keys(ex.estGradeCuts).length:0;
     return `<div class="card" style="margin-bottom:12px">
@@ -1303,12 +1302,17 @@ function renderAdminExams(){
     </div>`;}).join('');
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">시험 관리</span><button class="btn bp bsm" onclick="openAddExam()">+ 시험 추가</button></div>
     ${examCards||'<div class="card empty">등록된 시험이 없습니다.</div>'}
-    <div class="card" style="margin-top:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:14px;font-weight:700">절대평가 과목 등급컷</p><span class="bx bb" style="font-size:10px">모든 시험 공통</span></div>
-      <p style="font-size:11px;color:#6b7280;margin-bottom:10px">영어, 한국사, 제2외국어/한문는 절대평가이므로 모든 시험에 동일하게 적용됩니다.</p>
-      <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${absRows}</table></div>
-      <button class="btn bp bsm" style="margin-top:12px" onclick="saveAbsGradeCuts()">절대평가 등급컷 저장</button>
-    </div>`;
+    <div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn bs bsm" onclick="openAbsGradeCutsModal()">절대평가 등급컷 수정</button></div>`;
+}
+
+function openAbsGradeCutsModal(){
+  const gc=S.config.gradeCuts||{};
+  const absRows=GC_ABS_SUBJS.map(([key,name,max])=>gcCutRow('gca-'+key,name,gc.abs?.[key],max)).join('');
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:6px">절대평가 과목 등급컷 <span class="bx bb" style="font-size:10px;margin-left:6px">모든 시험 공통</span></p>
+    <p style="font-size:11px;color:#6b7280;margin-bottom:14px">영어, 한국사, 제2외국어/한문은 절대평가이므로 모든 시험에 동일하게 적용됩니다.</p>
+    <div style="overflow-x:auto"><table class="gc-tbl">${gcTblHeader()}${absRows}</table></div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveAbsGradeCuts()">저장</button></div>`;
+  openModal();
 }
 
 function openAddExam(){
@@ -1420,7 +1424,7 @@ async function saveAbsGradeCuts(){
     if(hasVal)S.config.gradeCuts.abs[key]=vals;else delete S.config.gradeCuts.abs[key];
   }
   showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);alert('절대평가 등급컷이 저장되었습니다.');}
+  try{await db.collection('config').doc('main').set(S.config);closeModal();alert('절대평가 등급컷이 저장되었습니다.');}
   catch(e){alert('저장 실패: '+e.message);}
   showLoad(false);}
 
