@@ -361,9 +361,11 @@ async function enableNotifications(){
   }catch(e){alert('권한 요청 실패: '+e.message);}
   updateNotifButton();
 }
-function showBrowserNotif(title,body){
+var _notifiedReqIds=new Set();
+function showBrowserNotif(title,body,tagId){
   if(!notifSupported()||Notification.permission!=='granted')return;
-  try{const n=new Notification(title,{body,tag:'req-'+Date.now()});n.onclick=function(){window.focus();try{n.close();}catch(e){}};}catch(e){}
+  if(tagId){if(_notifiedReqIds.has(tagId))return;_notifiedReqIds.add(tagId);}
+  try{const n=new Notification(title,{body,tag:tagId?'req-'+tagId:'req-'+Date.now(),renotify:false});n.onclick=function(){window.focus();try{n.close();}catch(e){}};}catch(e){}
 }
 function pendingReqCountForAdmin(){return S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change').length;}
 function updateAdminTabs(){
@@ -400,10 +402,10 @@ function startRequestsListener(){
         if(_reqSeedDone&&ch.type==='added'){
           if(isAdminUser&&d.type!=='admin_change'&&d.status==='pending'){
             const label=d.type==='cancel'?'취소':'변경';
-            showBrowserNotif(`새 예약 ${label} 요청`,`${d.studentName||''} · ${d.currentDateLabel||''} ${d.currentSlot||''}`);
+            showBrowserNotif(`새 예약 ${label} 요청`,`${d.studentName||''} · ${d.currentDateLabel||''} ${d.currentSlot||''}`,d._docId);
             needAdminRerender=true;
           }else if(isStudent&&d.type==='admin_change'&&d.studentId===S.studentDocId&&d.status==='pending'){
-            showBrowserNotif('관리자 예약 변경 요청',`${d.currentDateLabel||''} ${d.currentSlot||''} 예약을 변경해주세요.`);
+            showBrowserNotif('관리자 예약 변경 요청',`${d.currentDateLabel||''} ${d.currentSlot||''} 예약을 변경해주세요.`,d._docId);
             needStuRerender=true;
           }
         }
