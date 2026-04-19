@@ -987,7 +987,8 @@ async function submitCancelRequest(){
   try{
     const req={type:'cancel',bookingId:myB._docId,studentId:S.studentDocId,studentName:S.user.name,reason,currentDate:myB.date,currentDateLabel:myB.dateLabel,currentSlot:myB.slot,status:'pending',createdAt:Date.now()};
     const ref=await db.collection('requests').add(req);
-    S.requests.push({_docId:ref.id,...req});renderStu();
+    if(!S.requests.find(r=>r._docId===ref.id))S.requests.push({_docId:ref.id,...req});
+    renderStu();
   }catch(e){alert('요청 실패: '+e.message);}
   showLoad(false);}
 
@@ -1026,7 +1027,8 @@ async function submitChangeRequest(){
   try{
     const req={type:'change',bookingId:myB._docId,studentId:S.studentDocId,studentName:S.user.name,reason,currentDate:myB.date,currentDateLabel:myB.dateLabel,currentSlot:myB.slot,newDate:date.date,newDateLabel:date.label,newSlot:slot,status:'pending',createdAt:Date.now()};
     const ref=await db.collection('requests').add(req);
-    S.requests.push({_docId:ref.id,...req});S.adminSel=null;renderStu();
+    if(!S.requests.find(r=>r._docId===ref.id))S.requests.push({_docId:ref.id,...req});
+    S.adminSel=null;renderStu();
   }catch(e){alert('요청 실패: '+e.message);}
   showLoad(false);}
 
@@ -1957,7 +1959,7 @@ async function sendAdminChangeReq(){
   showLoad(true);
   try{
     const ref=await db.collection('requests').add(req);
-    S.requests.push({_docId:ref.id,...req});
+    if(!S.requests.find(r=>r._docId===ref.id))S.requests.push({_docId:ref.id,...req});
     closeModal();S.reqSlots=[];renderAdminBookings();alert('변경 요청이 전송되었습니다. 학생이 응답하면 알려드립니다.');
   }catch(e){showErr('mErr','전송 실패: '+e.message);}
   showLoad(false);
