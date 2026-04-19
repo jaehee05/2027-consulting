@@ -344,18 +344,21 @@ function showLoad(v){_('vLoad').style.display=v?'flex':'none';}
 var _reqListener=null, _reqSeedDone=false;
 function notifSupported(){return 'Notification' in window;}
 function updateNotifButton(){
-  const show=notifSupported()&&Notification.permission==='default';
   const sb=_('stuNotifBtn'),ab=_('adminNotifBtn');
-  if(sb)sb.style.display=show?'':'none';
-  if(ab)ab.style.display=show?'':'none';
+  if(!notifSupported()){if(sb)sb.style.display='none';if(ab)ab.style.display='none';return;}
+  const p=Notification.permission;
+  const label=p==='granted'?'🔔 알림 켜짐':(p==='denied'?'🔕 알림 차단됨':'🔔 알림 켜기');
+  [sb,ab].forEach(b=>{if(b){b.style.display='';b.textContent=label;}});
 }
 async function enableNotifications(){
   if(!notifSupported()){alert('이 브라우저는 알림을 지원하지 않습니다.');return;}
+  if(Notification.permission==='denied'){alert('알림이 차단되어 있습니다.\n\n해결 방법:\n1) 주소창 왼쪽 자물쇠 🔒 클릭\n2) 사이트 설정 → 알림 → 허용\n3) 페이지 새로고침');return;}
+  if(Notification.permission==='granted'){try{new Notification('알림 테스트',{body:'알림이 정상 작동합니다.'});}catch(e){alert('알림 표시 실패: '+e.message);}return;}
   try{
     const res=await Notification.requestPermission();
     if(res==='granted'){try{new Notification('알림이 켜졌습니다',{body:'새 예약 요청이 오면 알려드릴게요.'});}catch(e){}}
-    else if(res==='denied')alert('알림이 거부되었습니다. 브라우저 주소창 왼쪽 자물쇠 아이콘에서 허용으로 바꿀 수 있어요.');
-  }catch(e){}
+    else if(res==='denied')alert('알림이 거부되었습니다. 주소창 왼쪽 자물쇠 🔒 에서 허용으로 바꿀 수 있어요.');
+  }catch(e){alert('권한 요청 실패: '+e.message);}
   updateNotifButton();
 }
 function showBrowserNotif(title,body){
