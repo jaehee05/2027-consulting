@@ -216,18 +216,17 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
   <div class="page" style="max-width:660px"><div id="stuC"></div></div>
 </div>
 
-<!-- 앱 설치 안내 (학생 모바일 전용) -->
+<!-- 앱 설치 안내 -->
 <div id="vInstall" class="hidden lwrap">
   <div class="card" style="max-width:440px;width:100%">
     <div style="text-align:center;margin-bottom:16px">
       <div style="font-size:36px;margin-bottom:4px">📱</div>
-      <p style="font-size:19px;font-weight:800;margin-bottom:4px">앱 설치가 필요합니다</p>
-      <p style="font-size:13px;color:#6b7280">학생 계정은 <b>홈 화면에 추가한 앱</b>에서만<br>이용할 수 있습니다.</p>
+      <p style="font-size:19px;font-weight:800;margin-bottom:4px">홈 화면에 앱 추가하기</p>
+      <p style="font-size:13px;color:#6b7280">앱으로 설치하면 <b>예약 알림</b>을 받을 수 있어요.</p>
     </div>
     <div id="installSteps"></div>
-    <div style="display:flex;gap:8px;margin-top:18px">
-      <button class="btn bs" style="flex:1" onclick="doLogout()">로그아웃</button>
-      <button class="btn bp" style="flex:1" onclick="checkInstallAndContinue()">설치 완료</button>
+    <div style="margin-top:18px">
+      <button class="btn bp bfw" onclick="backFromInstall()">돌아가기</button>
     </div>
   </div>
 </div>
@@ -491,9 +490,10 @@ function renderInstallGate(){
     <p style="margin-top:12px;font-size:12px;color:#dc2626">※ <b>Chrome</b> 또는 <b>삼성 인터넷</b>으로 접속해야 설치할 수 있습니다. (카카오톡·인스타 등 인앱 브라우저 ❌)</p>`;
   _('installSteps').innerHTML=steps;
 }
-function checkInstallAndContinue(){
-  if(isStandalone()){location.reload();return;}
-  alert('아직 앱이 설치되지 않았거나 브라우저에서 실행 중입니다.\n설치 후 홈 화면의 아이콘으로 실행해 주세요.');
+function backFromInstall(){
+  if(S.user&&(S.user.type==='admin'||S.user.type==='operator'))showView('vAdmin');
+  else if(S.user&&S.user.type==='student'){showView('vStu');renderStu();}
+  else showView('vLogin');
 }
 function showInstallGate(){renderInstallGate();showView('vInstall');}
 
@@ -584,7 +584,6 @@ async function doLogin(){
       await loadAll();
       if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
       _('stuUname').textContent=stu.name+' 학생';
-      if(needInstallGate()){showLoad(false);showInstallGate();return;}
       showView('vStu');renderStu();return;
     }
     showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');
@@ -608,7 +607,6 @@ async function doChangePw(){
     await db.collection('students').doc(S.studentDocId).update({accountPw:p1,isFirstLogin:false});
     const s=S.students.find(x=>x._docId===S.studentDocId);if(s){s.accountPw=p1;s.isFirstLogin=false;}
     _('stuUname').textContent=S.user.name+' 학생';
-    if(needInstallGate()){showLoad(false);showInstallGate();return;}
     showView('vStu');renderStu();
   }catch(e){showErr('pwErr','저장 실패: '+e.message);}
   showLoad(false);
@@ -628,12 +626,24 @@ async function createFirstAdmin(){
 }
 
 /* ── STUDENT ── */
+function installWarnHtml(){
+  if(!needInstallGate())return'';
+  if(sessionStorage.getItem('installWarnDismissed')==='1')return'';
+  return `<div id="installWarn" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-bottom:12px;position:relative">
+    <button onclick="dismissInstallWarn()" aria-label="닫기" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#92400e;line-height:1">&times;</button>
+    <p style="font-size:12px;color:#92400e;font-weight:700;margin-bottom:4px">📱 앱으로 설치하면 더 편해요</p>
+    <p style="font-size:11px;color:#92400e;line-height:1.5;margin-bottom:8px">브라우저에서는 <b>예약 알림을 받을 수 없어요.</b><br>홈 화면에 앱을 추가하면 알림을 받을 수 있습니다.</p>
+    <button class="btn bsm" style="background:#fff;color:#92400e;border:1px solid #fcd34d" onclick="showInstallGate()">설치 방법 보기</button>
+  </div>`;
+}
+function dismissInstallWarn(){sessionStorage.setItem('installWarnDismissed','1');const el=_('installWarn');if(el)el.remove();}
 function renderStu(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
   const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
-  if(myB){_('stuC').innerHTML=bookCardHtml(myB)+examCards+qCardHtml(myB);}
-  else if(myStu){_('stuC').innerHTML=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`+examCards;}
+  const warn=installWarnHtml();
+  if(myB){_('stuC').innerHTML=warn+bookCardHtml(myB)+examCards+qCardHtml(myB);}
+  else if(myStu){_('stuC').innerHTML=warn+`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`+examCards;}
   else showBookForm(false);
 }
 
@@ -2198,8 +2208,7 @@ async function init(){
           const stu=stuQ.docs[0].data();
           if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
           _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
-          if(needInstallGate()){showLoad(false);showInstallGate();return;}
-          showLoad(false);showView('vStu');renderStu();return;
+              showLoad(false);showView('vStu');renderStu();return;
         }
       }else{
         const adminDoc=await db.collection('admins').doc(sess.id).get();
