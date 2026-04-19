@@ -4,9 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="2027 컨설팅">
+<meta name="theme-color" content="#1C64F2">
 <link rel="apple-touch-icon" sizes="180x180" href="https://2027-consulting.vercel.app/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <title>2027 6월 모의평가 컨설팅</title>
 <style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.5/dist/web/static/pretendard-dynamic-subset.css');
@@ -211,6 +214,22 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
     <div class="tr"><button class="btn bs bsm" id="stuNotifBtn" onclick="enableNotifications()" style="display:none">🔔 알림 켜기</button><span class="uname" id="stuUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page" style="max-width:660px"><div id="stuC"></div></div>
+</div>
+
+<!-- 앱 설치 안내 (학생 모바일 전용) -->
+<div id="vInstall" class="hidden lwrap">
+  <div class="card" style="max-width:440px;width:100%">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:36px;margin-bottom:4px">📱</div>
+      <p style="font-size:19px;font-weight:800;margin-bottom:4px">앱 설치가 필요합니다</p>
+      <p style="font-size:13px;color:#6b7280">학생 계정은 <b>홈 화면에 추가한 앱</b>에서만<br>이용할 수 있습니다.</p>
+    </div>
+    <div id="installSteps"></div>
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button class="btn bs" style="flex:1" onclick="doLogout()">로그아웃</button>
+      <button class="btn bp" style="flex:1" onclick="checkInstallAndContinue()">설치 완료</button>
+    </div>
+  </div>
 </div>
 
 <!-- 관리자/뷰어 뷰 -->
@@ -430,11 +449,47 @@ function stopRequestsListener(){if(_reqListener){try{_reqListener();}catch(e){}_
 
 var _skipPush=false;
 function showView(id){
-  ['vSetup','vLogin','vCpw','vStu','vAdmin'].forEach(v=>{
-    const el=_(v);el.classList.toggle('hidden',v!==id);
-    if(['vSetup','vLogin'].includes(v))el.style.display=v===id?'flex':'none';
+  ['vSetup','vLogin','vCpw','vStu','vAdmin','vInstall'].forEach(v=>{
+    const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
+    if(['vSetup','vLogin','vInstall'].includes(v))el.style.display=v===id?'flex':'none';
   });
 }
+
+/* ── PWA INSTALL GATE (학생 모바일 전용) ── */
+function isMobileDevice(){return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile|webOS/i.test(navigator.userAgent);}
+function isIOSDevice(){return /iPhone|iPad|iPod/i.test(navigator.userAgent)&&!window.MSStream;}
+function isStandalone(){return window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;}
+function needInstallGate(){
+  if(!S.user||S.user.type!=='student'||S.user.isTest)return false;
+  if(!isMobileDevice())return false;
+  if(isStandalone())return false;
+  return true;
+}
+function renderInstallGate(){
+  const iOS=isIOSDevice();
+  const steps=iOS?
+    `<ol style="padding-left:20px;font-size:13px;line-height:1.9;color:#374151">
+      <li>Safari 화면 <b>하단 가운데</b>의 <b>공유 버튼</b> <span style="display:inline-block;background:#f3f4f6;border-radius:4px;padding:1px 6px;font-size:11px">⬆️</span> 을 탭하세요.</li>
+      <li>메뉴를 아래로 스크롤해 <b>"홈 화면에 추가"</b>를 선택하세요.</li>
+      <li>오른쪽 위 <b>"추가"</b>를 탭하면 홈 화면에 아이콘이 생깁니다.</li>
+      <li>홈 화면에서 <b>아이콘을 탭해 앱으로 실행</b>해주세요.</li>
+    </ol>
+    <p style="margin-top:12px;font-size:12px;color:#dc2626">※ <b>반드시 Safari 브라우저</b>로 접속해야 설치할 수 있습니다. (Chrome, 인앱 브라우저 ❌)</p>`
+    :
+    `<ol style="padding-left:20px;font-size:13px;line-height:1.9;color:#374151">
+      <li>Chrome 우측 상단 <b>⋮ (점 3개)</b> 메뉴를 탭하세요.</li>
+      <li><b>"앱 설치"</b> 또는 <b>"홈 화면에 추가"</b>를 선택하세요.</li>
+      <li>설치 확인 팝업에서 <b>"설치"</b>를 눌러주세요.</li>
+      <li>홈 화면에서 <b>아이콘을 탭해 앱으로 실행</b>해주세요.</li>
+    </ol>
+    <p style="margin-top:12px;font-size:12px;color:#dc2626">※ <b>반드시 Chrome 브라우저</b>로 접속해야 설치할 수 있습니다. (인앱 브라우저 ❌)</p>`;
+  _('installSteps').innerHTML=steps;
+}
+function checkInstallAndContinue(){
+  if(isStandalone()){location.reload();return;}
+  alert('아직 앱이 설치되지 않았거나 브라우저에서 실행 중입니다.\n설치 후 홈 화면의 아이콘으로 실행해 주세요.');
+}
+function showInstallGate(){renderInstallGate();showView('vInstall');}
 
 /* ── DATA ── */
 async function loadAll(){
@@ -497,9 +552,9 @@ async function doLogin(){
       const a=adminDoc.data();
       if(a.password!==pw){showLoad(false);showErr('lErr','비밀번호가 올바르지 않습니다.');return;}
       if(a.role==='test'){
-        S.user={type:'student',id:a.id,name:a.name};
+        S.user={type:'student',isTest:true,id:a.id,name:a.name};
         S.studentDocId=a.linkedStudentId;
-        saveSession({type:'student',id:a.id,name:a.name,studentDocId:a.linkedStudentId},keep);
+        saveSession({type:'student',isTest:true,id:a.id,name:a.name,studentDocId:a.linkedStudentId},keep);
         await loadAll();
         _('stuUname').textContent=a.name+' (테스트)';
         showView('vStu');renderStu();return;
@@ -523,6 +578,7 @@ async function doLogin(){
       await loadAll();
       if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
       _('stuUname').textContent=stu.name+' 학생';
+      if(needInstallGate()){showLoad(false);showInstallGate();return;}
       showView('vStu');renderStu();return;
     }
     showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');
@@ -545,7 +601,9 @@ async function doChangePw(){
   try{
     await db.collection('students').doc(S.studentDocId).update({accountPw:p1,isFirstLogin:false});
     const s=S.students.find(x=>x._docId===S.studentDocId);if(s){s.accountPw=p1;s.isFirstLogin=false;}
-    _('stuUname').textContent=S.user.name+' 학생';showView('vStu');renderStu();
+    _('stuUname').textContent=S.user.name+' 학생';
+    if(needInstallGate()){showLoad(false);showInstallGate();return;}
+    showView('vStu');renderStu();
   }catch(e){showErr('pwErr','저장 실패: '+e.message);}
   showLoad(false);
 }
@@ -2128,12 +2186,13 @@ async function init(){
       if(sess.type==='student'){
         const stuQ=await db.collection('students').where('accountId','==',sess.id).get();
         if(!stuQ.empty){
-          S.user={type:'student',id:sess.id,name:sess.name};
+          S.user={type:'student',id:sess.id,name:sess.name,isTest:!!sess.isTest};
           S.studentDocId=stuQ.docs[0].id;
           await loadAll();
           const stu=stuQ.docs[0].data();
           if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
-          _('stuUname').textContent=stu.isTest?sess.name+' (테스트)':sess.name+' 학생';
+          _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
+          if(needInstallGate()){showLoad(false);showInstallGate();return;}
           showLoad(false);showView('vStu');renderStu();return;
         }
       }else{
@@ -2220,6 +2279,7 @@ window.addEventListener('popstate',function(e){
   });
   document.addEventListener('contextmenu',function(e){e.preventDefault();});
 })();
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(e){console.warn('SW register failed',e);});});}
 </script>
 </body>
 </html>

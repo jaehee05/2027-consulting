@@ -1,0 +1,13 @@
+{
+  "name": "2027 모의평가 컨설팅",
+  "short_name": "2027 컨설팅",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f4f6",
+  "theme_color": "#1C64F2",
+  "icons": [
+    {"src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any"}
+  ]
+}
