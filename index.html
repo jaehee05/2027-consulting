@@ -1374,7 +1374,7 @@ function renderAdminStudents(){
   </tr>`).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="exportStudentsCSV()">CSV 내보내기</button><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div></div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table>
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>계정 ID</th><th>관리</th></tr></thead>
@@ -1435,6 +1435,22 @@ function openScoreDetail(stuDocId){
     <button class="btn bs bfw" style="margin-top:16px" onclick="closeModal()">닫기</button>`;openModal();}
 
 async function refreshStudents(){showLoad(true);try{const snap=await db.collection('students').get();S.students=snap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminScores();}catch(e){alert('새로고침 실패: '+e.message);}showLoad(false);}
+
+function exportStudentsCSV(){
+  const stus=realStu();
+  if(!stus.length){alert('내보낼 학생이 없습니다.');return;}
+  const gradeOrder={'고3':0,'고2':1,'고1':2};
+  const sorted=[...stus].sort((a,b)=>(gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko'));
+  const esc=v=>{const s=v==null?'':String(v);return /[",\n\r]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
+  const headers=['좌석','학년','이름','학교','학생 연락처','보호자 연락처','메모','계정 ID'];
+  const lines=[headers.join(',')].concat(sorted.map(s=>[s.seat||'',s.grade||'',s.name||'',s.school||'',s.studentPhone||'',s.guardianPhone||'',s.memo||'',s.accountId||''].map(esc).join(',')));
+  const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const d=new Date(),pad=n=>String(n).padStart(2,'0');
+  const a=document.createElement('a');a.href=url;a.download=`학생목록_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.csv`;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 
 function openStuModal(docId){
   const s=docId?S.students.find(x=>x._docId===docId):null;
