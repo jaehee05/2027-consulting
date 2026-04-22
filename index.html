@@ -282,7 +282,7 @@ const S = {
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[], requests:[], reqSlots:[],
   tab:null, selDate:null, adminSel:null,
-  editingExamId:null, lang2Open:false, stuSort:'seat',
+  editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(),
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
   consultStuId:null, consultScoreTab:0, consultGraphTab:0
 };
@@ -1383,22 +1383,61 @@ function renderAdminStudents(){
     if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
     return 0;
   });
-  const rows=sorted.map(s=>`<tr>
+  const selectableIds=sorted.filter(s=>!s.isTest).map(s=>s._docId);
+  const allSelected=selectableIds.length>0&&selectableIds.every(id=>S.stuSelected.has(id));
+  const rows=sorted.map(s=>{
+    const selectable=!s.isTest;
+    const checked=S.stuSelected.has(s._docId);
+    const cb=selectable?`<input type="checkbox" ${checked?'checked':''} onchange="toggleStuSelect('${s._docId}',this.checked)">`:'';
+    return `<tr>
+    <td style="text-align:center">${cb}</td>
     <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
     <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
     <td style="font-weight:600">${s.name}</td><td>${s.school}</td><td>${s.studentPhone}</td><td>${s.guardianPhone}</td>
     <td style="color:#6b7280;font-size:12px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.memo||'—'}</td>
     <td><code>${s.accountId}</code></td>
     <td style="white-space:nowrap"><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="delStu('${s._docId}')">삭제</button></div></td>
-  </tr>`).join('');
+  </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
+  const selCount=selectableIds.filter(id=>S.stuSelected.has(id)).length;
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
+    <span style="flex:1"></span>
+    <button class="btn ${selCount>0?'bp':'bs'} bsm" ${selCount===0?'disabled style="opacity:.5;cursor:not-allowed"':''} onclick="sendAccountInfoBulk()">계정 정보 발송 (${selCount}명)</button>
+  </div>
   <div class="card" style="padding:0"><div class="tw"><table>
-    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>계정 ID</th><th>관리</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="9" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+    <thead><tr><th style="width:36px;text-align:center"><input type="checkbox" ${allSelected?'checked':''} ${selectableIds.length===0?'disabled':''} onchange="toggleStuSelectAll(this.checked)"></th><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>계정 ID</th><th>관리</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="10" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
   </table></div></div>`;}
+function toggleStuSelect(id,checked){if(checked)S.stuSelected.add(id);else S.stuSelected.delete(id);renderAdminStudents();}
+function toggleStuSelectAll(checked){
+  const ids=realStu().filter(s=>!s.isTest).map(s=>s._docId);
+  if(checked)ids.forEach(id=>S.stuSelected.add(id));
+  else ids.forEach(id=>S.stuSelected.delete(id));
+  renderAdminStudents();
+}
+async function sendAccountInfoBulk(){
+  const ids=Array.from(S.stuSelected);
+  if(ids.length===0){alert('발송할 학생을 선택해주세요.');return;}
+  const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
+  if(!confirm(`선택한 ${ids.length}명에게 계정 정보 알림톡을 발송하시겠습니까?\n\n${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`))return;
+  showLoad(true);
+  try{
+    const r=await ppurioCall('sendAccountInfo',{studentIds:ids});
+    const fails=(r.results||[]).filter(x=>!x.ok);
+    let msg=`발송 완료: 성공 ${r.sent}건 / 실패 ${r.failed}건`;
+    if(fails.length>0){
+      const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
+      msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
+    }
+    alert(msg);
+    S.stuSelected.clear();
+    renderAdminStudents();
+  }catch(e){alert('발송 실패: '+e.message);}
+  showLoad(false);
+}
 
 /* ── ADMIN: 학생 성적 ── */
 function renderAdminScores(){

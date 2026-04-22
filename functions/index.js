@@ -115,26 +115,9 @@ exports.onRequestUpdate = onDocumentUpdated("requests/{id}", async (e) => {
   }
 });
 
-// 신규 학생 계정 생성 → 초기 계정 안내
-exports.onStudentCreate = onDocumentCreated("students/{id}", async (e) => {
-  try {
-    const s = e.data.data();
-    if (s?.isTest) return;
-    if (!s?.studentPhone || !/\d{9,}/.test(String(s.studentPhone))) return;
-    const ctx = {
-      phone: s.studentPhone,
-      name: s.name || "",
-      school: s.school || "",
-      grade: s.grade || "",
-      seat: s.seat ?? "",
-      accountId: s.accountId || "",
-      accountPw: s.accountPw || "",
-    };
-    await safeSend("accountCreated", ctx);
-  } catch (err) {
-    console.error("onStudentCreate 실패:", err);
-  }
-});
+// 신규 학생 계정 안내 (accountCreated) 는 자동 발송하지 않는다.
+// 관리자가 학생 관리 탭에서 선택하여 수동으로 발송한다.
+// → ppurioAdmin 의 action='sendAccountInfo' 참고.
 
 // 성적 미입력 리마인더: 매일 오전 9시(KST), 활성 시험 중 D-7/3/1/0 에 미입력 학생에게 발송
 const REMINDER_DAYS = [7, 3, 1, 0];
@@ -279,6 +262,38 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
     if (action === "runScoreReminder") {
       const r = await runScoreReminderPass();
       return res.json({ ok: true, result: r });
+    }
+
+    if (action === "sendAccountInfo") {
+      const ids = Array.isArray(payload?.studentIds) ? payload.studentIds.filter(Boolean) : [];
+      if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });
+      const results = [];
+      for (const id of ids) {
+        const snap = await admin.firestore().doc(`students/${id}`).get();
+        if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
+        const s = snap.data();
+        if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        const phone = String(s.studentPhone || "").replace(/\D/g, "");
+        if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
+        try {
+          const r = await sendAlimtalk("accountCreated", {
+            phone,
+            name: s.name || "",
+            school: s.school || "",
+            grade: s.grade || "",
+            seat: s.seat ?? "",
+            accountId: s.accountId || "",
+            accountPw: s.accountPw || "",
+          });
+          results.push({ id, name: s.name, ok: true, result: r });
+        } catch (err) {
+          console.error(`[accountCreated] ${s.name}(${id}) 발송 실패:`, err);
+          results.push({ id, name: s.name, ok: false, error: String(err.message || err) });
+        }
+      }
+      const sent = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok).length;
+      return res.json({ ok: true, sent, failed, results });
     }
 
     if (action === "test") {
