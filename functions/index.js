@@ -159,6 +159,11 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         newDateLabel: "6월 6일 (토)", newSlot: "14:00",
         reason: "테스트 사유입니다.",
         offeredSlots: "6월 6일 (토) 14:00 / 6월 7일 (일) 10:00",
+        accountId: "test_stu",
+        accountPw: "01012345678",
+        examName: "6월 모의평가",
+        scoreDeadline: "2026-06-20",
+        daysLeft: "3",
       });
       return res.json({ ok: true, result });
     }

@@ -2234,16 +2234,25 @@ async function delAcct(id){
 
 /* ── ADMIN: 알림톡 (뿌리오) ── */
 const ALIMTALK_EVENTS=[
-  ['bookingComplete','학생 예약 완료','${name} ${dateLabel} ${slot}'],
-  ['changeRequest','학생 예약 변경 요청','${name} ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
-  ['cancelRequest','학생 예약 취소 요청','${name} ${dateLabel} ${slot} (사유: ${reason})'],
-  ['changeApproved','변경 요청 승인','${name} ${newDateLabel} ${newSlot}'],
-  ['changeRejected','변경 요청 거절','${name} 사유: ${reason}'],
-  ['cancelApproved','취소 요청 승인','${name} ${dateLabel} ${slot}'],
-  ['cancelRejected','취소 요청 거절','${name} 사유: ${reason}'],
-  ['adminChangeRequest','관리자 예약시간 변경 요청','${name} ${offeredSlots}']
+  ['bookingComplete','[학생] 예약 완료','${name} ${dateLabel} ${slot}'],
+  ['changeRequest','[학생] 변경 요청 접수','${name} ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot} (사유: ${reason})'],
+  ['changeApproved','[학생] 변경 요청 승인','${name} ${newDateLabel} ${newSlot}'],
+  ['changeRejected','[학생] 변경 요청 반려','${name} ${currentDateLabel} ${currentSlot} 사유: ${reason}'],
+  ['cancelRequest','[학생] 취소 요청 접수','${name} ${currentDateLabel} ${currentSlot} (사유: ${reason})'],
+  ['cancelApproved','[학생] 취소 요청 승인','${name} ${currentDateLabel} ${currentSlot}'],
+  ['cancelRejected','[학생] 취소 요청 반려','${name} ${currentDateLabel} ${currentSlot} 사유: ${reason}'],
+  ['adminChangeRequest','[학생] 관리자 발 예약 변경 요청','${name} ${currentDateLabel} ${currentSlot} / ${offeredSlots}'],
+  ['adminChangeApproved','[학생] 관리자 변경 요청 학생 승인(확인)','${name} ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
+  ['adminChangeRejected','[학생] 관리자 변경 요청 학생 거절(확인)','${name} ${currentDateLabel} ${currentSlot}'],
+  ['scoreInputReminder','[학생] 성적 미입력 안내','${name} ${examName} 기한 ${scoreDeadline} D-${daysLeft}'],
+  ['accountCreated','[학생] 초기 계정 안내','${name} ID:${accountId} PW:${accountPw}'],
+  ['adminNotifyBooking','[관리자] 학생 예약 완료','${name}(${grade}/${school}) ${dateLabel} ${slot}'],
+  ['adminNotifyChangeRequest','[관리자] 학생 변경 요청','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot} (사유: ${reason})'],
+  ['adminNotifyCancelRequest','[관리자] 학생 취소 요청','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} (사유: ${reason})'],
+  ['adminNotifyAdminChangeApproved','[관리자] 관리자 변경 요청 학생 승인','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
+  ['adminNotifyAdminChangeRejected','[관리자] 관리자 변경 요청 학생 거절','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot}']
 ];
-const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots}';
+const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft}';
 async function ppurioCall(action,payload){
   if(!PPURIO_ADMIN_URL||PPURIO_ADMIN_URL==='REPLACE_AFTER_DEPLOY')throw new Error('PPURIO_ADMIN_URL이 설정되지 않았습니다. 배포 후 index.html 상단의 상수를 교체하세요.');
   const adminDoc=await db.collection('admins').doc(S.user.id).get();
@@ -2297,7 +2306,7 @@ async function renderAdminAlimtalk(){
       <p style="font-size:12px;color:#4b5563;font-family:monospace;word-break:break-all">${ALIMTALK_TOKENS}</p>
       <p style="font-size:11px;color:#6b7280;margin-top:6px;line-height:1.5">뿌리오 규칙: <code>[*이름*]</code>는 <b>자동</b> 치환(changeWord 불필요). 본문의 <code>[*1*]</code>~<code>[*8*]</code>는 <code>var1</code>~<code>var8</code> 키로 매핑. 예: 본문 "[*이름*]님 [*1*] [*2*]에 예약" → <code>{"var1":"\${dateLabel}","var2":"\${slot}"}</code></p>
     </div>
-    <div class="sh np" style="margin-top:20px"><span class="shtitle" style="font-size:15px">템플릿 (8종)</span></div>
+    <div class="sh np" style="margin-top:20px"><span class="shtitle" style="font-size:15px">템플릿 (${ALIMTALK_EVENTS.length}종)</span></div>
     ${tmplHtml}
     <div class="card" style="margin-top:12px">
       <p style="font-weight:700;font-size:13px;margin-bottom:8px">테스트 발송</p>
