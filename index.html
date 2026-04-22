@@ -263,6 +263,11 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 
+// 뿌리오 알림톡 관리자용 Cloud Function URL.
+// `firebase deploy --only functions` 최초 배포 후 출력되는 URL로 교체하세요.
+// 예: https://ppurioadmin-xxxxxxxxxx-an.a.run.app
+const PPURIO_ADMIN_URL = 'https://ppurioadmin-tymdeyhn3q-du.a.run.app';
+
 const EXCL = ['12:00','12:30','18:00','18:30'];
 const DFLT_DATES = [
   {id:'d1',date:'2026-06-05',label:'6월 5일 (금)',slots:[]},
@@ -294,6 +299,9 @@ function fmtPhoneInput(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.len
 function getExams(){return S.config.exams||[];}
 function getExam(id){return getExams().find(e=>e.id===id);}
 function isExamOpen(exam){if(!exam||!exam.scoreStart)return false;const t=new Date().toISOString().slice(0,10);if(exam.scoreEnd)return t>=exam.scoreStart&&t<=exam.scoreEnd;return t>=exam.scoreStart;}
+function getBookPeriod(){return {start:S.schedule?.bookStart||'',end:S.schedule?.bookEnd||''};}
+function isBookingOpen(){const p=getBookPeriod();if(!p.start&&!p.end)return true;const t=new Date().toISOString().slice(0,10);if(p.start&&t<p.start)return false;if(p.end&&t>p.end)return false;return true;}
+function bookPeriodLabel(){const p=getBookPeriod();if(!p.start&&!p.end)return '';return `${p.start||'무기한'} ~ ${p.end||'무기한'}`;}
 function getStuExamScore(stu,examId){return stu?.scores?.[examId]||null;}
 function hasStuExamScore(stu,examId){const sc=getStuExamScore(stu,examId);return sc&&Object.values(sc).some(v=>v);}
 
@@ -394,7 +402,7 @@ function updateAdminTabs(){
   if(!S.user||(S.user.type!=='admin'&&S.user.type!=='operator'))return;
   const el=_('adminTabs');if(!el)return;
   const isAdmin=S.user.type==='admin';
-  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','컨설팅'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['accounts','계정 관리']]:[['bookings','예약 현황']];
+  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','컨설팅'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['bookings','예약 현황']];
   const n=pendingReqCountForAdmin();
   el.innerHTML=tabs.map(([id,label])=>{
     const badge=(id==='bookings'&&n>0)?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${n}</span>`:'';
@@ -647,7 +655,13 @@ function renderStu(){
   const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
   const warn=installWarnHtml();
   if(myB){_('stuC').innerHTML=warn+bookCardHtml(myB)+examCards+qCardHtml(myB);}
-  else if(myStu){_('stuC').innerHTML=warn+`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`+examCards;}
+  else if(myStu){
+    const bOpen=isBookingOpen();
+    const pl=bookPeriodLabel();
+    const emptyCard=bOpen
+      ?`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`
+      :`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p><p style="color:#6b7280;font-size:13px">${pl?'예약 가능 기간: '+pl:'관리자가 예약 기간을 설정하면 예약할 수 있어요.'}</p></div>`;
+    _('stuC').innerHTML=warn+emptyCard+examCards;}
   else showBookForm(false);
 }
 
@@ -965,7 +979,9 @@ async function saveQuestion(){
 }
 
 function showBookForm(isChange){
-  const c=_('stuC'),avail=S.schedule.dates.filter(d=>d.slots.length>0);
+  const c=_('stuC');
+  if(!isBookingOpen()){const pl=bookPeriodLabel();c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p><p style="color:#6b7280;font-size:13px">${pl?'예약 가능 기간: '+pl:'관리자가 예약 기간을 설정하면 예약할 수 있어요.'}</p>${isChange?'<div style="margin-top:16px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}</div>`;return;}
+  const avail=S.schedule.dates.filter(d=>d.slots.length>0);
   if(!avail.length){c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 가능한 일정이 없습니다</p><p style="color:#6b7280;font-size:13px">관리자가 일정을 등록하면 예약할 수 있어요.</p></div>`;return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
   const sel=avail.find(d=>d.id===S.selDate),taken=S.bookings.filter(b=>b.date===sel.date).map(b=>b.slot),myB=S.bookings.find(b=>b.studentId===S.studentDocId);
@@ -982,6 +998,7 @@ function showBookForm(isChange){
 function selDate(id){S.selDate=id;const myB=S.bookings.find(b=>b.studentId===S.studentDocId);showBookForm(!!myB);}
 
 async function bookSlot(dateId,slot){
+  if(!isBookingOpen()){alert('예약 기간이 아닙니다.');renderStu();return;}
   const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
   if(!confirm(`${d.label} ${slot}에 예약하시겠습니까?`))return;
   showLoad(true);
@@ -1072,6 +1089,7 @@ async function submitCancelRequest(){
 
 function showChangeRequestForm(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  if(!isBookingOpen()){const pl=bookPeriodLabel();alert('예약 기간이 아닙니다.'+(pl?'\n예약 가능 기간: '+pl:''));return;}
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
   if(!avail.length){alert('예약 가능한 일정이 없습니다.');return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
@@ -1121,6 +1139,7 @@ async function setTab(tab){
   else if(tab==='schedule')renderAdminSchedule();
   else if(tab==='bookings')renderAdminBookings();
   else if(tab==='accounts'){await loadAdmins();renderAdminAccounts();}
+  else if(tab==='alimtalk')renderAdminAlimtalk();
 }
 
 /* ── ADMIN: 컨설팅 ── */
@@ -1650,6 +1669,16 @@ async function saveAbsGradeCuts(){
 
 /* ── ADMIN: 일정 ── */
 function renderAdminSchedule(){
+  const bp=getBookPeriod();
+  const periodOpen=isBookingOpen();
+  const periodStatus=(!bp.start&&!bp.end)?'<span class="bx bgr">기간 미설정 (상시 열림)</span>':(periodOpen?'<span class="bx bg">예약 가능 기간</span>':'<span class="bx br">예약 기간 아님</span>');
+  const periodCard=`<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:15px;font-weight:700">예약 기간 설정</p>${periodStatus}</div>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:12px">학생이 예약/변경할 수 있는 기간을 지정합니다. 비워두면 항상 예약할 수 있습니다.</p>
+    <div class="frow"><div class="fg"><label class="fl">시작일</label><input class="fi" id="bkStart" type="date" value="${bp.start||''}"></div>
+    <div class="fg"><label class="fl">종료일</label><input class="fi" id="bkEnd" type="date" value="${bp.end||''}"></div></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn bp bsm" style="flex:1" onclick="saveBookPeriod()">저장</button><button class="btn bs bsm" style="flex:1" onclick="clearBookPeriod()">기간 해제</button></div>
+  </div>`;
   const datesHtml=S.schedule.dates.map(d=>{
     const slotHtml=d.slots.map(sl=>`<span style="display:inline-flex;align-items:center;gap:3px;background:#f3f4f6;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;margin:2px">${sl}<button onclick="rmSlot('${d.id}','${sl}')" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0;margin-left:2px">×</button></span>`).join('');
     return `<div class="card" style="margin-bottom:12px">
@@ -1664,7 +1693,20 @@ function renderAdminSchedule(){
         <button class="btn bp bsm" style="height:36px" onclick="openBulk('${d.id}')">일괄 추가 (30분)</button>
       </div>
     </div>`;}).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">예약 일정 관리</span><button class="btn bp bsm" onclick="openAddDate()">+ 날짜 추가</button></div>${datesHtml||'<div class="card empty">등록된 날짜가 없습니다.</div>'}`;}
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">예약 일정 관리</span><button class="btn bp bsm" onclick="openAddDate()">+ 날짜 추가</button></div>${periodCard}${datesHtml||'<div class="card empty">등록된 날짜가 없습니다.</div>'}`;}
+
+async function saveBookPeriod(){
+  const start=_('bkStart')?.value||'',end=_('bkEnd')?.value||'';
+  if(start&&end&&start>end){alert('종료일이 시작일보다 빠를 수 없습니다.');return;}
+  S.schedule.bookStart=start;S.schedule.bookEnd=end;
+  showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();alert('예약 기간이 저장되었습니다.');}
+  catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
+
+async function clearBookPeriod(){
+  if(!confirm('예약 기간 설정을 해제하시겠습니까? (항상 예약 가능 상태가 됩니다)'))return;
+  S.schedule.bookStart='';S.schedule.bookEnd='';
+  showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();}
+  catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
 
 function openAddDate(){_('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">날짜 추가</p>
   <div class="fg"><label class="fl">날짜 레이블</label><input class="fi" id="dl" placeholder="6월 9일 (화)"></div>
@@ -2189,6 +2231,122 @@ async function delAcct(id){
     renderAdminAccounts();
   }catch(e){alert('삭제 실패: '+e.message);}
   showLoad(false);}
+
+/* ── ADMIN: 알림톡 (뿌리오) ── */
+const ALIMTALK_EVENTS=[
+  ['bookingComplete','학생 예약 완료','${name} ${dateLabel} ${slot}'],
+  ['changeRequest','학생 예약 변경 요청','${name} ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
+  ['cancelRequest','학생 예약 취소 요청','${name} ${dateLabel} ${slot} (사유: ${reason})'],
+  ['changeApproved','변경 요청 승인','${name} ${newDateLabel} ${newSlot}'],
+  ['changeRejected','변경 요청 거절','${name} 사유: ${reason}'],
+  ['cancelApproved','취소 요청 승인','${name} ${dateLabel} ${slot}'],
+  ['cancelRejected','취소 요청 거절','${name} 사유: ${reason}'],
+  ['adminChangeRequest','관리자 예약시간 변경 요청','${name} ${offeredSlots}']
+];
+const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots}';
+async function ppurioCall(action,payload){
+  if(!PPURIO_ADMIN_URL||PPURIO_ADMIN_URL==='REPLACE_AFTER_DEPLOY')throw new Error('PPURIO_ADMIN_URL이 설정되지 않았습니다. 배포 후 index.html 상단의 상수를 교체하세요.');
+  const adminDoc=await db.collection('admins').doc(S.user.id).get();
+  if(!adminDoc.exists)throw new Error('관리자 계정을 찾을 수 없습니다.');
+  const adminPw=adminDoc.data().password;
+  const res=await fetch(PPURIO_ADMIN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,adminId:S.user.id,adminPw,payload})});
+  const body=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(body.error||`HTTP ${res.status}`);
+  return body;
+}
+async function renderAdminAlimtalk(){
+  if(S.user.type!=='admin'){_('adminC').innerHTML='<div class="card"><p>ADMIN 권한이 필요합니다.</p></div>';return;}
+  _('adminC').innerHTML='<div class="card"><p style="font-size:13px;color:#6b7280">설정 불러오는 중…</p></div>';
+  let cfg;
+  try{cfg=await ppurioCall('get',null);}
+  catch(e){_('adminC').innerHTML=`<div class="card"><p style="color:#dc2626;font-weight:700">설정 불러오기 실패</p><p style="font-size:12px;color:#6b7280;margin-top:6px;white-space:pre-wrap">${e.message}</p></div>`;return;}
+  const tmpls=cfg.templates||{};
+  const tmplHtml=ALIMTALK_EVENTS.map(([key,label,hint])=>{
+    const t=tmpls[key]||{};
+    const cw=t.changeWord?JSON.stringify(t.changeWord,null,2):'{}';
+    return `<div class="card np" style="padding:14px;margin-bottom:10px">
+      <p style="font-weight:700;font-size:14px;margin-bottom:8px">${label} <span style="font-size:11px;color:#9ca3af;font-weight:400">(${key})</span></p>
+      <p style="font-size:11px;color:#9ca3af;margin-bottom:10px">참고: ${hint}</p>
+      <div class="fg"><label class="fl">템플릿 코드</label><input class="fi" id="at_code_${key}" value="${(t.code||'').replace(/"/g,'&quot;')}" placeholder="뿌리오에 등록된 템플릿 코드"></div>
+      <div class="fg"><label class="fl">changeWord 매핑 (JSON)</label>
+      <textarea class="fi" id="at_cw_${key}" rows="5" style="height:auto;padding:10px 12px;resize:vertical;font-family:monospace;font-size:12px" placeholder='{"#{name}":"\${name}","#{date}":"\${dateLabel}"}'>${cw.replace(/</g,'&lt;')}</textarea></div>
+    </div>`;
+  }).join('');
+  _('adminC').innerHTML=`
+    <div class="sh np"><span class="shtitle">알림톡 설정 (뿌리오)</span></div>
+    <div class="card" style="margin-bottom:12px">
+      <p style="font-weight:700;font-size:14px;margin-bottom:10px">뿌리오 크리덴셜</p>
+      <div class="frow">
+        <div class="fg"><label class="fl">뿌리오 계정</label><input class="fi" id="at_acct" value="${(cfg.ppurioAccount||'').replace(/"/g,'&quot;')}" placeholder="뿌리오 계정 ID"></div>
+        <div class="fg"><label class="fl">발신프로필명</label><input class="fi" id="at_sender" value="${(cfg.senderProfile||'').replace(/"/g,'&quot;')}" placeholder="발신프로필명"></div>
+      </div>
+      <div class="fg"><label class="fl">API 키 ${cfg.hasApiKey?`<span style="font-size:11px;color:#9ca3af;font-weight:400">(저장됨: ${cfg.apiKeyMasked} — 비워두면 유지)</span>`:''}</label><input class="fi" id="at_apikey" type="password" value="" placeholder="${cfg.hasApiKey?'변경할 때만 입력':'연동 개발 인증키'}" autocomplete="new-password"></div>
+      <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="at_enabled" ${cfg.enabled!==false?'checked':''}> <span>알림톡 자동 발송 활성화</span></label></div>
+    </div>
+    <div class="card" style="background:#f9fafb;margin-bottom:12px">
+      <p style="font-weight:700;font-size:13px;margin-bottom:6px">사용 가능한 토큰</p>
+      <p style="font-size:12px;color:#4b5563;font-family:monospace;word-break:break-all">${ALIMTALK_TOKENS}</p>
+      <p style="font-size:11px;color:#6b7280;margin-top:6px;line-height:1.5">changeWord JSON 값에 위 토큰을 넣으면 발송 시 자동 치환됩니다. 예: <code>{"#{name}":"\${name}","#{date}":"\${dateLabel} \${slot}"}</code></p>
+    </div>
+    <div class="sh np" style="margin-top:20px"><span class="shtitle" style="font-size:15px">템플릿 (8종)</span></div>
+    ${tmplHtml}
+    <div class="card" style="margin-top:12px">
+      <p style="font-weight:700;font-size:13px;margin-bottom:8px">테스트 발송</p>
+      <div class="frow">
+        <div class="fg"><label class="fl">이벤트</label><select class="fi" id="at_test_event">${ALIMTALK_EVENTS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div>
+        <div class="fg"><label class="fl">수신 전화번호</label><input class="fi" id="at_test_phone" placeholder="01012345678"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn bs" style="flex:1" onclick="testAlimtalkSend()">테스트 발송</button>
+        <button class="btn bp" style="flex:1" onclick="saveAlimtalkSettings()">저장</button>
+      </div>
+      <p id="at_msg" style="font-size:12px;margin-top:10px;white-space:pre-wrap"></p>
+    </div>`;
+}
+function collectAlimtalkPayload(){
+  const templates={};
+  for(const [key] of ALIMTALK_EVENTS){
+    const code=_(`at_code_${key}`).value.trim();
+    const cwRaw=_(`at_cw_${key}`).value.trim();
+    let changeWord={};
+    if(cwRaw){
+      try{changeWord=JSON.parse(cwRaw);}
+      catch(e){throw new Error(`[${key}] changeWord JSON 파싱 실패: ${e.message}`);}
+      if(typeof changeWord!=='object'||Array.isArray(changeWord))throw new Error(`[${key}] changeWord는 객체여야 합니다.`);
+    }
+    templates[key]={code,changeWord};
+  }
+  return{
+    enabled:_('at_enabled').checked,
+    ppurioAccount:_('at_acct').value.trim(),
+    senderProfile:_('at_sender').value.trim(),
+    apiKey:_('at_apikey').value.trim(),
+    templates
+  };
+}
+async function saveAlimtalkSettings(){
+  const msg=_('at_msg');msg.style.color='';msg.textContent='저장 중…';
+  try{
+    const payload=collectAlimtalkPayload();
+    await ppurioCall('save',payload);
+    _('at_apikey').value='';
+    msg.style.color='#16a34a';msg.textContent='저장되었습니다.';
+    setTimeout(()=>{if(S.tab==='alimtalk')renderAdminAlimtalk();},800);
+  }catch(e){msg.style.color='#dc2626';msg.textContent='저장 실패: '+e.message;}
+}
+async function testAlimtalkSend(){
+  const msg=_('at_msg');msg.style.color='';msg.textContent='테스트 발송 중…';
+  try{
+    const payload=collectAlimtalkPayload();
+    await ppurioCall('save',payload);
+    _('at_apikey').value='';
+    const eventKey=_('at_test_event').value;
+    const phone=_('at_test_phone').value.trim();
+    if(!phone){msg.style.color='#dc2626';msg.textContent='테스트 수신 전화번호를 입력하세요.';return;}
+    const r=await ppurioCall('test',{eventKey,phone,name:S.user.name||'테스터'});
+    msg.style.color='#16a34a';msg.textContent='테스트 발송 응답:\n'+JSON.stringify(r.result,null,2);
+  }catch(e){msg.style.color='#dc2626';msg.textContent='테스트 실패: '+e.message;}
+}
 
 /* ── MODAL ── */
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}

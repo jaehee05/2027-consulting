@@ -1,0 +1,8 @@
+.claude/
+functions/node_modules/
+functions/.env
+functions/*.log
+firebase-debug.log
+firebase-debug.*.log
+.DS_Store
+Thumbs.db

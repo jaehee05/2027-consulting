@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 뿌리오 API 크리덴셜 (settings/ppurio, settings/ppurio_token) 은
+    // 클라이언트에서 절대 접근 금지. Cloud Functions는 Admin SDK로 우회한다.
+    // 관리자 UI 도 ppurioAdmin HTTP 엔드포인트를 통해서만 CRUD.
+    //
+    // Firestore 규칙은 매칭된 규칙들을 OR 결합하므로, 아래처럼 단일 규칙에서
+    // collection 변수를 조건으로 체크해야 settings가 확실히 차단된다.
+    match /{collection}/{docPath=**} {
+      allow read, write: if collection != 'settings';
+    }
+  }
+}
