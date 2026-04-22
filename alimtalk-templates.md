@@ -28,6 +28,9 @@
 | `${reason}` | 사유 (학생 사유 또는 관리자 반려 사유) |
 | `${accountId}` | 학생 로그인 아이디 |
 | `${accountPw}` | 학생 초기 비밀번호 |
+| `${examName}` | 시험명 (예: "6월 모의평가") |
+| `${scoreDeadline}` | 성적 입력 기한 (예: "2026-05-15") |
+| `${daysLeft}` | 입력 기한까지 남은 일수 (예: "3") |
 
 ---
 
@@ -280,7 +283,36 @@
 
 ---
 
-## 11. `accountCreated` — 초기 계정 안내
+## 11. `scoreInputReminder` — 성적 미입력 학생 대상 입력 안내
+
+**본문**
+```
+[2027 컨설팅] 성적 입력 안내
+
+#{학생명}님, #{시험명} 성적이 아직 입력되지 않았습니다.
+
+▶ 시험명: #{시험명}
+▶ 입력 기한: #{입력기한} (D-#{남은일수})
+
+기한 내에 마이페이지 → 성적 입력에서 점수를 등록해 주세요.
+기한을 초과하면 상담 자료 반영이 어려울 수 있습니다.
+```
+
+**changeWord 매핑**
+```json
+{
+  "#{학생명}": "${name}",
+  "#{시험명}": "${examName}",
+  "#{입력기한}": "${scoreDeadline}",
+  "#{남은일수}": "${daysLeft}"
+}
+```
+
+> 발송 컨텍스트: 특정 시험이 `scoreStart ≤ 오늘 ≤ scoreEnd` 구간에 있고, 해당 학생의 `scores[examId]` 가 비어있을 때 발송하도록 트리거하시면 됩니다. `${daysLeft}` 는 `scoreEnd - today` 기준으로 계산.
+
+---
+
+## 12. `accountCreated` — 초기 계정 안내
 
 **본문**
 ```
@@ -310,7 +342,7 @@
 
 관리자 알림은 `settings/ppurio.adminPhones` 배열에 등록된 모든 번호로 발송됩니다.
 
-## 12. `adminNotifyBooking` — 학생 예약 완료 알림
+## 13. `adminNotifyBooking` — 학생 예약 완료 알림
 
 **본문**
 ```
@@ -333,7 +365,7 @@
 
 ---
 
-## 13. `adminNotifyChangeRequest` — 학생 예약 변경 요청 알림
+## 14. `adminNotifyChangeRequest` — 학생 예약 변경 요청 알림
 
 **본문**
 ```
@@ -360,7 +392,7 @@
 
 ---
 
-## 14. `adminNotifyCancelRequest` — 학생 예약 취소 요청 알림
+## 15. `adminNotifyCancelRequest` — 학생 예약 취소 요청 알림
 
 **본문**
 ```
@@ -385,7 +417,7 @@
 
 ---
 
-## 15. `adminNotifyAdminChangeApproved` — 관리자 변경 요청 학생 승인 알림
+## 16. `adminNotifyAdminChangeApproved` — 관리자 변경 요청 학생 승인 알림
 
 **본문**
 ```
@@ -410,7 +442,7 @@
 
 ---
 
-## 16. `adminNotifyAdminChangeRejected` — 관리자 변경 요청 학생 거절 알림
+## 17. `adminNotifyAdminChangeRejected` — 관리자 변경 요청 학생 거절 알림
 
 **본문**
 ```
