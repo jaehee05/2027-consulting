@@ -3,7 +3,6 @@ admin.initializeApp();
 
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
-const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { sendAlimtalk, sendAlimtalkToAdmins } = require("./ppurio");
 
@@ -115,15 +114,11 @@ exports.onRequestUpdate = onDocumentUpdated("requests/{id}", async (e) => {
   }
 });
 
-// 신규 학생 계정 안내 (accountCreated) 는 자동 발송하지 않는다.
-// 관리자가 학생 관리 탭에서 선택하여 수동으로 발송한다.
-// → ppurioAdmin 의 action='sendAccountInfo' 참고.
-
-// 성적 미입력 리마인더: 매일 오전 9시(KST), 활성 시험 중 D-7/3/1/0 에 미입력 학생에게 발송
-const REMINDER_DAYS = [7, 3, 1, 0];
+// 신규 학생 계정 안내(accountCreated) 와 성적 미입력 안내(scoreInputReminder) 는 자동 발송하지 않고,
+// 관리자가 학생 관리 탭에서 수동으로 발송한다.
+// → ppurioAdmin 의 action='sendAccountInfo' / 'sendScoreReminder' 참고.
 
 function todayStrKST() {
-  // 서버 시간대와 무관하게 KST 기준 YYYY-MM-DD
   const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
   return kst.toISOString().slice(0, 10);
 }
@@ -133,58 +128,6 @@ function daysBetween(fromStr, toStr) {
   const b = new Date(toStr + "T00:00:00Z").getTime();
   return Math.round((b - a) / 86400000);
 }
-
-function hasExamScore(student, examId) {
-  const sc = student?.scores?.[examId];
-  return !!(sc && Object.values(sc).some((v) => v !== undefined && v !== null && v !== ""));
-}
-
-async function runScoreReminderPass() {
-  const cfgSnap = await admin.firestore().doc("config/main").get();
-  const exams = cfgSnap.exists ? (cfgSnap.data().exams || []) : [];
-  const today = todayStrKST();
-
-  const targets = exams.filter((ex) => {
-    if (!ex?.scoreStart || !ex?.scoreEnd || !ex?.id) return false;
-    if (today < ex.scoreStart || today > ex.scoreEnd) return false;
-    const d = daysBetween(today, ex.scoreEnd);
-    return REMINDER_DAYS.includes(d);
-  });
-  if (targets.length === 0) {
-    console.log("[scoreInputReminder] 해당 D-day 시험 없음 — 건너뜀");
-    return { sent: 0 };
-  }
-
-  const studentsSnap = await admin.firestore().collection("students").get();
-  let sent = 0;
-  for (const ex of targets) {
-    const daysLeft = daysBetween(today, ex.scoreEnd);
-    for (const d of studentsSnap.docs) {
-      const s = d.data();
-      if (s.isTest) continue;
-      if (!s.studentPhone || !/\d{9,}/.test(String(s.studentPhone))) continue;
-      if (hasExamScore(s, ex.id)) continue;
-      await safeSend("scoreInputReminder", {
-        phone: s.studentPhone,
-        name: s.name || "",
-        school: s.school || "",
-        grade: s.grade || "",
-        seat: s.seat ?? "",
-        examName: ex.name || "",
-        scoreDeadline: ex.scoreEnd,
-        daysLeft: String(daysLeft),
-      });
-      sent += 1;
-    }
-  }
-  console.log(`[scoreInputReminder] 발송 ${sent}건`);
-  return { sent };
-}
-
-exports.scoreReminderDaily = onSchedule(
-  { schedule: "0 9 * * *", timeZone: "Asia/Seoul", region: "asia-northeast3" },
-  async () => { await runScoreReminderPass(); }
-);
 
 // ───────────────────────────────────────────────
 // 관리자 페이지용 HTTP 엔드포인트 (설정 CRUD + 테스트 발송)
@@ -259,9 +202,44 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
       return res.json({ ok: true });
     }
 
-    if (action === "runScoreReminder") {
-      const r = await runScoreReminderPass();
-      return res.json({ ok: true, result: r });
+    if (action === "sendScoreReminder") {
+      const p = payload || {};
+      const ids = Array.isArray(p.studentIds) ? p.studentIds.filter(Boolean) : [];
+      const examName = String(p.examName || "").trim();
+      const scoreDeadline = String(p.scoreDeadline || "").trim();
+      if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });
+      if (!examName) return res.status(400).json({ error: "examName 이 필요합니다." });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(scoreDeadline)) return res.status(400).json({ error: "scoreDeadline 은 YYYY-MM-DD 형식이어야 합니다." });
+      const today = todayStrKST();
+      const daysLeft = Math.max(0, daysBetween(today, scoreDeadline));
+      const results = [];
+      for (const id of ids) {
+        const snap = await admin.firestore().doc(`students/${id}`).get();
+        if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
+        const s = snap.data();
+        if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        const phone = String(s.studentPhone || "").replace(/\D/g, "");
+        if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
+        try {
+          const r = await sendAlimtalk("scoreInputReminder", {
+            phone,
+            name: s.name || "",
+            school: s.school || "",
+            grade: s.grade || "",
+            seat: s.seat ?? "",
+            examName,
+            scoreDeadline,
+            daysLeft: String(daysLeft),
+          });
+          results.push({ id, name: s.name, ok: true, result: r });
+        } catch (err) {
+          console.error(`[scoreInputReminder] ${s.name}(${id}) 발송 실패:`, err);
+          results.push({ id, name: s.name, ok: false, error: String(err.message || err) });
+        }
+      }
+      const sent = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok).length;
+      return res.json({ ok: true, sent, failed, results });
     }
 
     if (action === "sendAccountInfo") {
