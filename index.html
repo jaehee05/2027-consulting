@@ -2269,7 +2269,7 @@ async function renderAdminAlimtalk(){
       <p style="font-size:11px;color:#9ca3af;margin-bottom:10px">참고: ${hint}</p>
       <div class="fg"><label class="fl">템플릿 코드</label><input class="fi" id="at_code_${key}" value="${(t.code||'').replace(/"/g,'&quot;')}" placeholder="뿌리오에 등록된 템플릿 코드"></div>
       <div class="fg"><label class="fl">changeWord 매핑 (JSON)</label>
-      <textarea class="fi" id="at_cw_${key}" rows="5" style="height:auto;padding:10px 12px;resize:vertical;font-family:monospace;font-size:12px" placeholder='{"[*이름*]":"\${name}","[*일시*]":"\${dateLabel} \${slot}"}'>${cw.replace(/</g,'&lt;')}</textarea></div>
+      <textarea class="fi" id="at_cw_${key}" rows="5" style="height:auto;padding:10px 12px;resize:vertical;font-family:monospace;font-size:12px" placeholder='{"var1":"\${dateLabel}","var2":"\${slot}"}  // 본문에 [*1*][*2*]가 있을 때'>${cw.replace(/</g,'&lt;')}</textarea></div>
     </div>`;
   }).join('');
   _('adminC').innerHTML=`
@@ -2286,7 +2286,7 @@ async function renderAdminAlimtalk(){
     <div class="card" style="background:#f9fafb;margin-bottom:12px">
       <p style="font-weight:700;font-size:13px;margin-bottom:6px">사용 가능한 토큰</p>
       <p style="font-size:12px;color:#4b5563;font-family:monospace;word-break:break-all">${ALIMTALK_TOKENS}</p>
-      <p style="font-size:11px;color:#6b7280;margin-top:6px;line-height:1.5">JSON 키는 뿌리오 템플릿에 등록된 변수 형식 그대로(예: <code>[*이름*]</code>), 값은 위 토큰 사용. 예: <code>{"[*이름*]":"\${name}","[*일시*]":"\${dateLabel} \${slot}"}</code></p>
+      <p style="font-size:11px;color:#6b7280;margin-top:6px;line-height:1.5">뿌리오 규칙: <code>[*이름*]</code>는 <b>자동</b> 치환(changeWord 불필요). 본문의 <code>[*1*]</code>~<code>[*8*]</code>는 <code>var1</code>~<code>var8</code> 키로 매핑. 예: 본문 "[*이름*]님 [*1*] [*2*]에 예약" → <code>{"var1":"\${dateLabel}","var2":"\${slot}"}</code></p>
     </div>
     <div class="sh np" style="margin-top:20px"><span class="shtitle" style="font-size:15px">템플릿 (8종)</span></div>
     ${tmplHtml}
