@@ -1,7 +1,8 @@
 const admin = require("firebase-admin");
 
-const URI = "https://message.ppurio.com";
 const TIMEOUT_MS = 10000;
+const PROXY_URL = process.env.PPURIO_PROXY_URL;
+const PROXY_SECRET = process.env.PPURIO_PROXY_SECRET;
 
 let memToken = { token: null, expiresAt: 0 };
 
@@ -13,6 +14,22 @@ async function getSettings() {
     throw new Error("뿌리오 계정/API키/발신프로필이 누락되었습니다.");
   }
   return d;
+}
+
+async function ppurioFetch(path, headers, body) {
+  if (!PROXY_URL || !PROXY_SECRET) {
+    throw new Error("PPURIO_PROXY_URL / PPURIO_PROXY_SECRET 환경변수가 설정되지 않았습니다. functions/.env 확인.");
+  }
+  const res = await fetch(PROXY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Proxy-Secret": PROXY_SECRET },
+    body: JSON.stringify({ path, method: "POST", headers: headers || {}, body: body || {} }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const text = await res.text();
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+  return { ok: res.ok, status: res.status, body: parsed };
 }
 
 async function getToken(settings) {
@@ -27,13 +44,8 @@ async function getToken(settings) {
   }
 
   const basic = Buffer.from(`${settings.ppurioAccount}:${settings.apiKey}`).toString("base64");
-  const res = await fetch(`${URI}/v1/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Basic ${basic}` },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || !body.token) throw new Error(`토큰 발급 실패 (${res.status}): ${JSON.stringify(body)}`);
+  const { ok, status, body } = await ppurioFetch("/v1/token", { Authorization: `Basic ${basic}` }, {});
+  if (!ok || !body.token) throw new Error(`토큰 발급 실패 (${status}): ${JSON.stringify(body)}`);
 
   const expiresAt = now + 23 * 60 * 60 * 1000;
   memToken = { token: body.token, expiresAt };
@@ -83,15 +95,9 @@ async function sendAlimtalk(eventKey, ctx) {
     refKey: randomRefKey(eventKey),
   };
 
-  const res = await fetch(`${URI}/v1/kakao`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(params),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  const body = await res.json().catch(() => ({}));
-  console.log(`[${eventKey}] 뿌리오 응답 (${res.status}):`, JSON.stringify(body));
-  if (!res.ok) throw new Error(`알림톡 발송 실패 (${res.status}): ${JSON.stringify(body)}`);
+  const { ok, status, body } = await ppurioFetch("/v1/kakao", { Authorization: `Bearer ${token}` }, params);
+  console.log(`[${eventKey}] 뿌리오 응답 (${status}):`, JSON.stringify(body));
+  if (!ok) throw new Error(`알림톡 발송 실패 (${status}): ${JSON.stringify(body)}`);
   return body;
 }
 
