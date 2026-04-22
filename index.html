@@ -282,7 +282,7 @@ const S = {
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[], requests:[], reqSlots:[],
   tab:null, selDate:null, adminSel:null,
-  editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(),
+  editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), stuSubView:'active',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
   consultStuId:null, consultScoreTab:0, consultGraphTab:0
 };
@@ -302,6 +302,30 @@ function isExamOpen(exam){if(!exam||!exam.scoreStart)return false;const t=new Da
 function getBookPeriod(){return {start:S.schedule?.bookStart||'',end:S.schedule?.bookEnd||''};}
 function isBookingOpen(){const p=getBookPeriod();if(!p.start&&!p.end)return true;const t=new Date().toISOString().slice(0,10);if(p.start&&t<p.start)return false;if(p.end&&t>p.end)return false;return true;}
 function bookPeriodLabel(){const p=getBookPeriod();if(!p.start&&!p.end)return '';return `${p.start||'무기한'} ~ ${p.end||'무기한'}`;}
+function bookPeriodStatus(){
+  const p=getBookPeriod();const t=new Date().toISOString().slice(0,10);
+  if(!p.start&&!p.end)return{kind:'unset'};
+  if(p.start&&t<p.start)return{kind:'before',startAt:p.start};
+  if(p.end&&t>p.end)return{kind:'after'};
+  return{kind:'open'};
+}
+let _bookCountdownTimer=null;
+function clearBookCountdown(){if(_bookCountdownTimer){clearInterval(_bookCountdownTimer);_bookCountdownTimer=null;}}
+function startBookCountdown(startDate){
+  clearBookCountdown();
+  const tick=()=>{
+    const el=_('bookCountdown');if(!el){clearBookCountdown();return;}
+    const target=new Date(startDate+'T00:00:00+09:00').getTime();
+    const diff=target-Date.now();
+    if(diff<=0){el.textContent='잠시 후 예약 가능합니다';clearBookCountdown();setTimeout(()=>{if(typeof renderStu==='function')renderStu();},1500);return;}
+    const d=Math.floor(diff/86400000);
+    const h=Math.floor((diff%86400000)/3600000);
+    const m=Math.floor((diff%3600000)/60000);
+    const s=Math.floor((diff%60000)/1000);
+    el.textContent=`${d}일 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  };
+  tick();_bookCountdownTimer=setInterval(tick,1000);
+}
 function getStuExamScore(stu,examId){return stu?.scores?.[examId]||null;}
 function hasStuExamScore(stu,examId){const sc=getStuExamScore(stu,examId);return sc&&Object.values(sc).some(v=>v);}
 
@@ -547,7 +571,8 @@ async function loadAdmins(){
   const snap=await db.collection('admins').get();
   S.admins=snap.docs.map(d=>({_docId:d.id,...d.data()}));
 }
-function realStu(){return S.students.filter(s=>!s.isTest);}
+function realStu(){return S.students.filter(s=>!s.isTest&&!s.withdrawn);}
+function withdrawnStu(){return S.students.filter(s=>!s.isTest&&s.withdrawn);}
 async function saveScheduleToDb(){await db.collection('schedule').doc('main').set(S.schedule);}
 
 /* ── AUTH ── */
@@ -654,15 +679,32 @@ function renderStu(){
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
   const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
   const warn=installWarnHtml();
-  if(myB){_('stuC').innerHTML=warn+bookCardHtml(myB)+examCards+qCardHtml(myB);}
+  if(myB){clearBookCountdown();_('stuC').innerHTML=warn+bookCardHtml(myB)+examCards+qCardHtml(myB);}
   else if(myStu){
     const bOpen=isBookingOpen();
     const pl=bookPeriodLabel();
-    const emptyCard=bOpen
-      ?`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`
-      :`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p><p style="color:#6b7280;font-size:13px">${pl?'예약 가능 기간: '+pl:'관리자가 예약 기간을 설정하면 예약할 수 있어요.'}</p></div>`;
-    _('stuC').innerHTML=warn+emptyCard+examCards;}
-  else showBookForm(false);
+    let emptyCard;
+    if(bOpen){
+      clearBookCountdown();
+      emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`;
+    }else{
+      const st=bookPeriodStatus();
+      let bodyHtml;
+      if(st.kind==='before'){
+        bodyHtml=`<p style="font-size:13px;color:#6b7280;margin-bottom:4px">예약 시작까지 남은 시간</p>
+          <p id="bookCountdown" style="font-size:22px;font-weight:700;color:#1d4ed8;letter-spacing:1px;margin-bottom:8px">계산 중...</p>
+          <p style="font-size:12px;color:#9ca3af">${pl?'예약 가능 기간: '+pl:''}</p>`;
+      }else if(st.kind==='after'){
+        bodyHtml=`<p style="color:#6b7280;font-size:13px">예약 기간이 종료되었습니다.</p>${pl?`<p style="color:#9ca3af;font-size:12px;margin-top:4px">종료: ${pl}</p>`:''}`;
+      }else{
+        bodyHtml=`<p style="color:#6b7280;font-size:13px">관리자가 예약 기간을 설정하면 예약할 수 있어요.</p>`;
+      }
+      emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간이라면 아래에서 성적은 입력 가능합니다.</p></div>`;
+    }
+    _('stuC').innerHTML=warn+emptyCard+examCards;
+    if(!bOpen){const st=bookPeriodStatus();if(st.kind==='before')startBookCountdown(st.startAt);}
+  }
+  else{clearBookCountdown();showBookForm(false);}
 }
 
 function bookCardHtml(b){
@@ -1374,6 +1416,7 @@ async function autoSaveConsultNote(){
 
 /* ── ADMIN: 학생 ── */
 function renderAdminStudents(){
+  if(S.stuSubView==='withdrawn')return renderWithdrawnStudents();
   const gradeOrder={'고3':0,'고2':1,'고1':2};
   const baseStu=realStu();
   const sorted=[...baseStu].sort((a,b)=>{
@@ -1396,11 +1439,12 @@ function renderAdminStudents(){
     <td style="font-weight:600">${s.name}</td><td>${s.school}</td><td>${s.studentPhone}</td><td>${s.guardianPhone}</td>
     <td style="color:#6b7280;font-size:12px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.memo||'—'}</td>
     <td><code>${s.accountId}</code></td>
-    <td style="white-space:nowrap"><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="delStu('${s._docId}')">삭제</button></div></td>
+    <td style="white-space:nowrap"><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
   </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
   const selCount=selectableIds.filter(id=>S.stuSelected.has(id)).length;
+  const wCount=withdrawnStu().length;
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
@@ -1410,7 +1454,52 @@ function renderAdminStudents(){
   <div class="card" style="padding:0"><div class="tw"><table>
     <thead><tr><th style="width:36px;text-align:center"><input type="checkbox" ${allSelected?'checked':''} ${selectableIds.length===0?'disabled':''} onchange="toggleStuSelectAll(this.checked)"></th><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>계정 ID</th><th>관리</th></tr></thead>
     <tbody>${rows||'<tr><td colspan="10" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
-  </table></div></div>`;}
+  </table></div></div>
+  <div style="text-align:right;margin-top:16px"><button class="btn bs" style="font-size:11px;padding:6px 10px" onclick="S.stuSubView='withdrawn';renderAdminStudents()">퇴원 학생 관리 (${wCount})</button></div>`;}
+
+function renderWithdrawnStudents(){
+  const list=withdrawnStu().sort((a,b)=>(b.withdrawnAt||0)-(a.withdrawnAt||0));
+  const fmtDate=(ts)=>ts?new Date(ts).toLocaleDateString('ko-KR'):'—';
+  const rows=list.map(s=>`<tr>
+    <td style="font-weight:600">${s.name}</td>
+    <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
+    <td>${s.school||''}</td>
+    <td>${s.studentPhone||''}</td>
+    <td style="color:#6b7280;font-size:12px">${fmtDate(s.withdrawnAt)}</td>
+    <td style="white-space:nowrap"><div style="display:flex;gap:6px"><button class="btn bp bsm" onclick="restoreStu('${s._docId}')">복구</button><button class="btn bd bsm" onclick="delStu('${s._docId}')">영구 삭제</button></div></td>
+  </tr>`).join('');
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">퇴원 학생 <span style="font-size:13px;font-weight:400;color:#6b7280">(${list.length}명)</span></span><button class="btn bs bsm" onclick="S.stuSubView='active';renderAdminStudents()">← 학생 목록으로</button></div>
+  <div class="card" style="padding:0"><div class="tw"><table>
+    <thead><tr><th>이름</th><th>학년</th><th>학교</th><th>연락처</th><th>퇴원일</th><th>관리</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="6" class="empty">퇴원 처리된 학생이 없습니다.</td></tr>'}</tbody>
+  </table></div></div>
+  <div style="margin-top:14px;padding:12px 14px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;font-size:12px;color:#92400e">💡 <b>복구</b> 는 학생을 활성 목록으로 되돌립니다. <b>영구 삭제</b> 는 학생 정보와 관련 기록 전부를 삭제하며 되돌릴 수 없습니다.</div>`;}
+
+async function withdrawStu(docId){
+  const s=S.students.find(x=>x._docId===docId);if(!s)return;
+  if(!confirm(`'${s.name}' 학생을 퇴원 처리하시겠습니까?\n\n진행 중인 예약은 자동으로 취소됩니다.\n학생 정보와 과거 성적은 '퇴원 학생 관리'에서 확인·복구 가능합니다.`))return;
+  showLoad(true);
+  try{
+    const now=Date.now();
+    await db.collection('students').doc(docId).update({withdrawn:true,withdrawnAt:now});
+    s.withdrawn=true;s.withdrawnAt=now;
+    const related=S.bookings.filter(b=>b.studentId===docId);
+    for(const b of related)await db.collection('bookings').doc(b._docId).delete();
+    S.bookings=S.bookings.filter(b=>b.studentId!==docId);
+    S.stuSelected.delete(docId);
+    renderAdminStudents();
+  }catch(e){alert('퇴원 처리 실패: '+e.message);}
+  showLoad(false);}
+
+async function restoreStu(docId){
+  const s=S.students.find(x=>x._docId===docId);if(!s||!confirm(`'${s.name}' 학생을 활성 목록으로 복구하시겠습니까?`))return;
+  showLoad(true);
+  try{
+    await db.collection('students').doc(docId).update({withdrawn:false,withdrawnAt:firebase.firestore.FieldValue.delete()});
+    s.withdrawn=false;delete s.withdrawnAt;
+    renderAdminStudents();
+  }catch(e){alert('복구 실패: '+e.message);}
+  showLoad(false);}
 function toggleStuSelect(id,checked){if(checked)S.stuSelected.add(id);else S.stuSelected.delete(id);renderAdminStudents();}
 function toggleStuSelectAll(checked){
   const ids=realStu().filter(s=>!s.isTest).map(s=>s._docId);
