@@ -90,6 +90,7 @@ async function sendAlimtalk(eventKey, ctx) {
     senderProfile: settings.senderProfile,
     templateCode: tmpl.code,
     duplicateFlag: "Y",
+    isResend: "N",
     targetCount: 1,
     targets: [{ to: phone, name: ctx.name || "", changeWord }],
     refKey: randomRefKey(eventKey),
