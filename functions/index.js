@@ -128,18 +128,20 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
 
     if (action === "save") {
       const p = payload || {};
+      const existingSnap = await admin.firestore().doc("settings/ppurio").get();
+      const existing = existingSnap.exists ? existingSnap.data() : {};
+      // 중첩 맵(templates/changeWord)의 잔여 키 누적을 막기 위해 merge 없이 통째로 덮어쓴다.
+      // apiKey는 새 값이 오지 않으면 기존 값을 유지.
       const update = {
         enabled: p.enabled !== false,
         ppurioAccount: p.ppurioAccount || "",
         senderProfile: p.senderProfile || "",
         templates: p.templates || {},
+        apiKey: p.apiKey || existing.apiKey || "",
         updatedAt: Date.now(),
         updatedBy: adminId,
       };
-      // apiKey는 값이 들어올 때만 갱신 (빈 문자열이면 유지)
-      if (p.apiKey) update.apiKey = p.apiKey;
-      await admin.firestore().doc("settings/ppurio").set(update, { merge: true });
-      // 크리덴셜이 바뀌면 캐시된 토큰은 폐기
+      await admin.firestore().doc("settings/ppurio").set(update);
       if (p.apiKey || p.ppurioAccount) {
         await admin.firestore().doc("settings/ppurio_token").delete().catch(() => {});
       }
