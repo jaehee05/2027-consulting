@@ -299,23 +299,55 @@ function fmtPhoneInput(el){let v=el.value.replace(/\D/g,'').slice(0,11);if(v.len
 function getExams(){return S.config.exams||[];}
 function getExam(id){return getExams().find(e=>e.id===id);}
 function isExamOpen(exam){if(!exam||!exam.scoreStart)return false;const t=new Date().toISOString().slice(0,10);if(exam.scoreEnd)return t>=exam.scoreStart&&t<=exam.scoreEnd;return t>=exam.scoreStart;}
-function getBookPeriod(){return {start:S.schedule?.bookStart||'',end:S.schedule?.bookEnd||''};}
-function isBookingOpen(){const p=getBookPeriod();if(!p.start&&!p.end)return true;const t=new Date().toISOString().slice(0,10);if(p.start&&t<p.start)return false;if(p.end&&t>p.end)return false;return true;}
-function bookPeriodLabel(){const p=getBookPeriod();if(!p.start&&!p.end)return '';return `${p.start||'무기한'} ~ ${p.end||'무기한'}`;}
+function getBookPeriod(){
+  return {
+    start:S.schedule?.bookStart||'',
+    startTime:S.schedule?.bookStartTime||'',
+    end:S.schedule?.bookEnd||'',
+    endTime:S.schedule?.bookEndTime||'',
+  };
+}
+function bookDatetimeISO(date,time,isEnd){
+  if(!date)return '';
+  const t=time||(isEnd?'23:59':'00:00');
+  return `${date}T${t.length===5?t+':00':t}+09:00`;
+}
+function isBookingOpen(){
+  const p=getBookPeriod();
+  if(!p.start&&!p.end)return true;
+  const now=Date.now();
+  if(p.start){const s=new Date(bookDatetimeISO(p.start,p.startTime,false)).getTime();if(now<s)return false;}
+  if(p.end){const e=new Date(bookDatetimeISO(p.end,p.endTime,true)).getTime();if(now>e)return false;}
+  return true;
+}
+function bookPeriodLabel(){
+  const p=getBookPeriod();if(!p.start&&!p.end)return '';
+  const s=p.start?`${p.start}${p.startTime?' '+p.startTime:''}`:'무기한';
+  const e=p.end?`${p.end}${p.endTime?' '+p.endTime:''}`:'무기한';
+  return `${s} ~ ${e}`;
+}
 function bookPeriodStatus(){
-  const p=getBookPeriod();const t=new Date().toISOString().slice(0,10);
+  const p=getBookPeriod();
   if(!p.start&&!p.end)return{kind:'unset'};
-  if(p.start&&t<p.start)return{kind:'before',startAt:p.start};
-  if(p.end&&t>p.end)return{kind:'after'};
+  const now=Date.now();
+  if(p.start){
+    const startIso=bookDatetimeISO(p.start,p.startTime,false);
+    const s=new Date(startIso).getTime();
+    if(now<s)return{kind:'before',startAt:startIso};
+  }
+  if(p.end){
+    const e=new Date(bookDatetimeISO(p.end,p.endTime,true)).getTime();
+    if(now>e)return{kind:'after'};
+  }
   return{kind:'open'};
 }
 let _bookCountdownTimer=null;
 function clearBookCountdown(){if(_bookCountdownTimer){clearInterval(_bookCountdownTimer);_bookCountdownTimer=null;}}
-function startBookCountdown(startDate){
+function startBookCountdown(startAt){
   clearBookCountdown();
   const tick=()=>{
     const el=_('bookCountdown');if(!el){clearBookCountdown();return;}
-    const target=new Date(startDate+'T00:00:00+09:00').getTime();
+    const target=new Date(startAt).getTime();
     const diff=target-Date.now();
     if(diff<=0){el.textContent='잠시 후 예약 가능합니다';clearBookCountdown();setTimeout(()=>{if(typeof renderStu==='function')renderStu();},1500);return;}
     const d=Math.floor(diff/86400000);
@@ -1802,9 +1834,15 @@ function renderAdminSchedule(){
   const periodStatus=(!bp.start&&!bp.end)?'<span class="bx bgr">기간 미설정 (상시 열림)</span>':(periodOpen?'<span class="bx bg">예약 가능 기간</span>':'<span class="bx br">예약 기간 아님</span>');
   const periodCard=`<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><p style="font-size:15px;font-weight:700">예약 기간 설정</p>${periodStatus}</div>
-    <p style="font-size:12px;color:#6b7280;margin-bottom:12px">학생이 예약/변경할 수 있는 기간을 지정합니다. 비워두면 항상 예약할 수 있습니다.</p>
-    <div class="frow"><div class="fg"><label class="fl">시작일</label><input class="fi" id="bkStart" type="date" value="${bp.start||''}"></div>
-    <div class="fg"><label class="fl">종료일</label><input class="fi" id="bkEnd" type="date" value="${bp.end||''}"></div></div>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:12px">학생이 예약/변경할 수 있는 기간을 지정합니다. 비워두면 항상 예약할 수 있습니다. 시각을 비우면 시작은 00:00, 종료는 23:59 로 처리됩니다.</p>
+    <div class="frow">
+      <div class="fg"><label class="fl">시작일</label><input class="fi" id="bkStart" type="date" value="${bp.start||''}"></div>
+      <div class="fg"><label class="fl">시작 시각</label><input class="fi" id="bkStartTime" type="time" value="${bp.startTime||''}"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">종료일</label><input class="fi" id="bkEnd" type="date" value="${bp.end||''}"></div>
+      <div class="fg"><label class="fl">종료 시각</label><input class="fi" id="bkEndTime" type="time" value="${bp.endTime||''}"></div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn bp bsm" style="flex:1" onclick="saveBookPeriod()">저장</button><button class="btn bs bsm" style="flex:1" onclick="clearBookPeriod()">기간 해제</button></div>
   </div>`;
   const datesHtml=S.schedule.dates.map(d=>{
@@ -1825,14 +1863,21 @@ function renderAdminSchedule(){
 
 async function saveBookPeriod(){
   const start=_('bkStart')?.value||'',end=_('bkEnd')?.value||'';
-  if(start&&end&&start>end){alert('종료일이 시작일보다 빠를 수 없습니다.');return;}
+  const startTime=_('bkStartTime')?.value||'',endTime=_('bkEndTime')?.value||'';
+  if(start&&end){
+    const sDt=start+'T'+(startTime||'00:00');
+    const eDt=end+'T'+(endTime||'23:59');
+    if(sDt>eDt){alert('종료 일시가 시작 일시보다 빠를 수 없습니다.');return;}
+  }
   S.schedule.bookStart=start;S.schedule.bookEnd=end;
+  S.schedule.bookStartTime=startTime;S.schedule.bookEndTime=endTime;
   showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();alert('예약 기간이 저장되었습니다.');}
   catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
 
 async function clearBookPeriod(){
   if(!confirm('예약 기간 설정을 해제하시겠습니까? (항상 예약 가능 상태가 됩니다)'))return;
   S.schedule.bookStart='';S.schedule.bookEnd='';
+  S.schedule.bookStartTime='';S.schedule.bookEndTime='';
   showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();}
   catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
 
