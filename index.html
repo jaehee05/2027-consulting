@@ -3,13 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="2027 컨설팅">
 <meta name="theme-color" content="#1C64F2">
-<link rel="apple-touch-icon" sizes="180x180" href="https://2027-consulting.vercel.app/apple-touch-icon.png">
-<link rel="manifest" href="/manifest.webmanifest">
 <title>2027 6월 모의평가 컨설팅</title>
 <style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.5/dist/web/static/pretendard-dynamic-subset.css');
@@ -215,31 +209,16 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 <div id="vStu" class="hidden">
   <div class="topbar">
     <div class="tl"><span class="chip">2027 6평</span><span class="tname">모의평가 컨설팅</span></div>
-    <div class="tr"><button class="btn bs bsm" id="stuNotifBtn" onclick="enableNotifications()" style="display:none">🔔 알림 켜기</button><span class="uname" id="stuUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+    <div class="tr"><span class="uname" id="stuUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page" style="max-width:660px"><div id="stuC"></div></div>
-</div>
-
-<!-- 앱 설치 안내 -->
-<div id="vInstall" class="hidden lwrap">
-  <div class="card" style="max-width:440px;width:100%">
-    <div style="text-align:center;margin-bottom:16px">
-      <div style="font-size:36px;margin-bottom:4px">📱</div>
-      <p style="font-size:19px;font-weight:800;margin-bottom:4px">홈 화면에 앱 추가하기</p>
-      <p style="font-size:13px;color:#6b7280">앱으로 설치하면 <b>예약 알림</b>을 받을 수 있어요.</p>
-    </div>
-    <div id="installSteps"></div>
-    <div style="margin-top:18px">
-      <button class="btn bp bfw" onclick="backFromInstall()">돌아가기</button>
-    </div>
-  </div>
 </div>
 
 <!-- 관리자/뷰어 뷰 -->
 <div id="vAdmin" class="hidden">
   <div class="topbar np">
     <div class="tl"><span class="chip">2027 6평</span><span class="tname">모의평가 컨설팅</span><span class="trole" id="adminRoleLabel"></span></div>
-    <div class="tr"><button class="btn bs bsm" id="adminNotifBtn" onclick="enableNotifications()" style="display:none">🔔 알림 켜기</button><span class="uname" id="adminUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+    <div class="tr"><span class="uname" id="adminUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page">
     <div class="tabs np" id="adminTabs"></div>
@@ -426,33 +405,8 @@ function absGradeCell(type,raw){
 
 function showLoad(v){_('vLoad').style.display=v?'flex':'none';}
 
-/* ── NOTIFICATIONS ── */
+/* ── REQUEST LISTENER ── */
 var _reqListener=null, _reqSeedDone=false;
-function notifSupported(){return 'Notification' in window;}
-function updateNotifButton(){
-  const sb=_('stuNotifBtn'),ab=_('adminNotifBtn');
-  if(!notifSupported()){if(sb)sb.style.display='none';if(ab)ab.style.display='none';return;}
-  const p=Notification.permission;
-  const label=p==='granted'?'🔔 알림 켜짐':(p==='denied'?'🔕 알림 차단됨':'🔔 알림 켜기');
-  [sb,ab].forEach(b=>{if(b){b.style.display='';b.textContent=label;}});
-}
-async function enableNotifications(){
-  if(!notifSupported()){alert('이 브라우저는 알림을 지원하지 않습니다.');return;}
-  if(Notification.permission==='denied'){alert('알림이 차단되어 있습니다.\n\n해결 방법:\n1) 주소창 왼쪽 자물쇠 🔒 클릭\n2) 사이트 설정 → 알림 → 허용\n3) 페이지 새로고침');return;}
-  if(Notification.permission==='granted'){try{new Notification('알림 테스트',{body:'알림이 정상 작동합니다.'});}catch(e){alert('알림 표시 실패: '+e.message);}return;}
-  try{
-    const res=await Notification.requestPermission();
-    if(res==='granted'){try{new Notification('알림이 켜졌습니다',{body:'새 예약 요청이 오면 알려드릴게요.'});}catch(e){}}
-    else if(res==='denied')alert('알림이 거부되었습니다. 주소창 왼쪽 자물쇠 🔒 에서 허용으로 바꿀 수 있어요.');
-  }catch(e){alert('권한 요청 실패: '+e.message);}
-  updateNotifButton();
-}
-var _notifiedReqIds=new Set();
-function showBrowserNotif(title,body,tagId){
-  if(!notifSupported()||Notification.permission!=='granted')return;
-  if(tagId){if(_notifiedReqIds.has(tagId))return;_notifiedReqIds.add(tagId);}
-  try{const n=new Notification(title,{body,tag:tagId?'req-'+tagId:'req-'+Date.now(),renotify:false});n.onclick=function(){window.focus();try{n.close();}catch(e){}};}catch(e){}
-}
 function pendingReqCountForAdmin(){return S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change').length;}
 function updateAdminTabs(){
   if(!S.user||(S.user.type!=='admin'&&S.user.type!=='operator'))return;
@@ -486,14 +440,8 @@ function startRequestsListener(){
         const idx=S.requests.findIndex(r=>r._docId===d._docId);
         if(idx<0)S.requests.push(d);else S.requests[idx]=d;
         if(_reqSeedDone&&ch.type==='added'){
-          if(isAdminUser&&d.type!=='admin_change'&&d.status==='pending'){
-            const label=d.type==='cancel'?'취소':'변경';
-            showBrowserNotif(`새 예약 ${label} 요청`,`${d.studentName||''} · ${d.currentDateLabel||''} ${d.currentSlot||''}`,d._docId);
-            needAdminRerender=true;
-          }else if(isStudent&&d.type==='admin_change'&&d.studentId===S.studentDocId&&d.status==='pending'){
-            showBrowserNotif('관리자 예약 변경 요청',`${d.currentDateLabel||''} ${d.currentSlot||''} 예약을 변경해주세요.`,d._docId);
-            needStuRerender=true;
-          }
+          if(isAdminUser&&d.type!=='admin_change'&&d.status==='pending')needAdminRerender=true;
+          else if(isStudent&&d.type==='admin_change'&&d.studentId===S.studentDocId&&d.status==='pending')needStuRerender=true;
         }
         if(_reqSeedDone&&ch.type==='modified'){
           if(isAdminUser)needAdminRerender=true;
@@ -516,54 +464,11 @@ function stopRequestsListener(){if(_reqListener){try{_reqListener();}catch(e){}_
 
 var _skipPush=false;
 function showView(id){
-  ['vSetup','vLogin','vCpw','vStu','vAdmin','vInstall'].forEach(v=>{
+  ['vSetup','vLogin','vCpw','vStu','vAdmin'].forEach(v=>{
     const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
-    if(['vSetup','vLogin','vInstall'].includes(v))el.style.display=v===id?'flex':'none';
+    if(['vSetup','vLogin'].includes(v))el.style.display=v===id?'flex':'none';
   });
 }
-
-/* ── PWA INSTALL GATE (학생 모바일 전용) ── */
-function isMobileDevice(){return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile|webOS/i.test(navigator.userAgent);}
-function isIOSDevice(){return /iPhone|iPad|iPod/i.test(navigator.userAgent)&&!window.MSStream;}
-function isStandalone(){return window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;}
-function needInstallGate(){
-  if(!S.user||S.user.type!=='student'||S.user.isTest)return false;
-  if(!isMobileDevice())return false;
-  if(isStandalone())return false;
-  return true;
-}
-function renderInstallGate(){
-  const iOS=isIOSDevice();
-  const steps=iOS?
-    `<ol style="padding-left:20px;font-size:13px;line-height:1.9;color:#374151">
-      <li>Safari 화면 <b>하단 가운데</b>의 <b>공유 버튼</b> <span style="display:inline-block;background:#f3f4f6;border-radius:4px;padding:1px 6px;font-size:11px">⬆️</span> 을 탭하세요.</li>
-      <li>메뉴를 아래로 스크롤해 <b>"홈 화면에 추가"</b>를 선택하세요.</li>
-      <li>오른쪽 위 <b>"추가"</b>를 탭하면 홈 화면에 아이콘이 생깁니다.</li>
-      <li>홈 화면에서 <b>아이콘을 탭해 앱으로 실행</b>해주세요.</li>
-    </ol>
-    <p style="margin-top:12px;font-size:12px;color:#dc2626">※ <b>반드시 Safari 브라우저</b>로 접속해야 설치할 수 있습니다. (Chrome, 인앱 브라우저 ❌)</p>`
-    :
-    `<p style="font-size:12px;font-weight:700;color:#1C64F2;margin-bottom:6px">🟦 Chrome 사용 시</p>
-    <ol style="padding-left:20px;font-size:13px;line-height:1.8;color:#374151;margin-bottom:12px">
-      <li>우측 상단 <b>⋮ (점 3개)</b> 메뉴 탭</li>
-      <li><b>"앱 설치"</b> 또는 <b>"홈 화면에 추가"</b> 선택 후 <b>"설치"</b></li>
-      <li>홈 화면에서 <b>아이콘을 탭해 실행</b></li>
-    </ol>
-    <p style="font-size:12px;font-weight:700;color:#1428A0;margin-bottom:6px">🟦 삼성 인터넷 (갤럭시 기본) 사용 시</p>
-    <ol style="padding-left:20px;font-size:13px;line-height:1.8;color:#374151">
-      <li>하단 <b>≡ (메뉴)</b> 버튼 탭</li>
-      <li><b>"현재 페이지 추가"</b> → <b>"홈 화면"</b> 선택 후 <b>"추가"</b><br><span style="font-size:11px;color:#6b7280">(또는 주소창 옆 설치 아이콘 <b>⬇</b> 탭)</span></li>
-      <li>홈 화면에서 <b>아이콘을 탭해 실행</b></li>
-    </ol>
-    <p style="margin-top:12px;font-size:12px;color:#dc2626">※ <b>Chrome</b> 또는 <b>삼성 인터넷</b>으로 접속해야 설치할 수 있습니다. (카카오톡·인스타 등 인앱 브라우저 ❌)</p>`;
-  _('installSteps').innerHTML=steps;
-}
-function backFromInstall(){
-  if(S.user&&(S.user.type==='admin'||S.user.type==='operator'))showView('vAdmin');
-  else if(S.user&&S.user.type==='student'){showView('vStu');renderStu();}
-  else showView('vLogin');
-}
-function showInstallGate(){renderInstallGate();showView('vInstall');}
 
 /* ── DATA ── */
 async function loadAll(){
@@ -597,7 +502,6 @@ async function loadAll(){
   }catch(e){alert('데이터 로딩 실패: '+e.message);}
   showLoad(false);
   startRequestsListener();
-  updateNotifButton();
 }
 async function loadAdmins(){
   const snap=await db.collection('admins').get();
@@ -695,23 +599,11 @@ async function createFirstAdmin(){
 }
 
 /* ── STUDENT ── */
-function installWarnHtml(){
-  if(!needInstallGate())return'';
-  if(sessionStorage.getItem('installWarnDismissed')==='1')return'';
-  return `<div id="installWarn" style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-bottom:12px;position:relative">
-    <button onclick="dismissInstallWarn()" aria-label="닫기" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:#92400e;line-height:1">&times;</button>
-    <p style="font-size:12px;color:#92400e;font-weight:700;margin-bottom:4px">📱 앱으로 설치하면 더 편해요</p>
-    <p style="font-size:11px;color:#92400e;line-height:1.5;margin-bottom:8px">브라우저에서는 <b>예약 알림을 받을 수 없어요.</b><br>홈 화면에 앱을 추가하면 알림을 받을 수 있습니다.</p>
-    <button class="btn bsm" style="background:#fff;color:#92400e;border:1px solid #fcd34d" onclick="showInstallGate()">설치 방법 보기</button>
-  </div>`;
-}
-function dismissInstallWarn(){sessionStorage.setItem('installWarnDismissed','1');const el=_('installWarn');if(el)el.remove();}
 function renderStu(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
   const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
-  const warn=installWarnHtml();
-  if(myB){clearBookCountdown();_('stuC').innerHTML=warn+bookCardHtml(myB)+examCards+qCardHtml(myB);}
+  if(myB){clearBookCountdown();_('stuC').innerHTML=bookCardHtml(myB)+examCards+qCardHtml(myB);}
   else if(myStu){
     const bOpen=isBookingOpen();
     const pl=bookPeriodLabel();
@@ -733,7 +625,7 @@ function renderStu(){
       }
       emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간일 경우, 아래에서 입력 가능합니다.</p></div>`;
     }
-    _('stuC').innerHTML=warn+emptyCard+examCards;
+    _('stuC').innerHTML=emptyCard+examCards;
     if(!bOpen){const st=bookPeriodStatus();if(st.kind==='before')startBookCountdown(st.startAt);}
   }
   else{clearBookCountdown();showBookForm(false);}
@@ -2724,7 +2616,8 @@ window.addEventListener('popstate',function(e){
   });
   document.addEventListener('contextmenu',function(e){e.preventDefault();});
 })();
-if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(e){console.warn('SW register failed',e);});});}
+// 기존에 등록된 Service Worker가 있으면 해제해서 캐시·푸시 잔재 제거
+if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister();});}).catch(function(){});}
 </script>
 </body>
 </html>
