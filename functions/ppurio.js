@@ -102,4 +102,31 @@ async function sendAlimtalk(eventKey, ctx) {
   return body;
 }
 
-module.exports = { sendAlimtalk };
+async function sendAlimtalkToAdmins(eventKey, ctx) {
+  let settings;
+  try { settings = await getSettings(); }
+  catch (e) {
+    console.log(`[${eventKey}] 관리자 알림 스킵 — 설정 없음: ${e.message}`);
+    return { skipped: "no-settings" };
+  }
+  const phones = Array.isArray(settings.adminPhones)
+    ? settings.adminPhones.map((p) => String(p || "").replace(/\D/g, "")).filter((p) => p.length >= 9)
+    : [];
+  if (phones.length === 0) {
+    console.log(`[${eventKey}] 관리자 수신번호 미설정 — 관리자 알림 생략`);
+    return { skipped: "no-admin-phones" };
+  }
+  const results = [];
+  for (const phone of phones) {
+    try {
+      const r = await sendAlimtalk(eventKey, { ...ctx, phone });
+      results.push({ phone, ok: true, result: r });
+    } catch (err) {
+      console.error(`[${eventKey}] 관리자(${phone}) 발송 실패:`, err);
+      results.push({ phone, ok: false, error: String(err.message || err) });
+    }
+  }
+  return { admins: results };
+}
+
+module.exports = { sendAlimtalk, sendAlimtalkToAdmins };

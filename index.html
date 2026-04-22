@@ -2299,6 +2299,7 @@ async function renderAdminAlimtalk(){
         <div class="fg"><label class="fl">발신프로필명</label><input class="fi" id="at_sender" value="${(cfg.senderProfile||'').replace(/"/g,'&quot;')}" placeholder="발신프로필명"></div>
       </div>
       <div class="fg"><label class="fl">API 키 ${cfg.hasApiKey?`<span style="font-size:11px;color:#9ca3af;font-weight:400">(저장됨: ${cfg.apiKeyMasked} — 비워두면 유지)</span>`:''}</label><input class="fi" id="at_apikey" type="password" value="" placeholder="${cfg.hasApiKey?'변경할 때만 입력':'연동 개발 인증키'}" autocomplete="new-password"></div>
+      <div class="fg"><label class="fl">관리자 수신번호 <span style="font-size:11px;color:#9ca3af;font-weight:400">(쉼표/공백 구분, 관리자용 알림톡이 모두에게 발송됨)</span></label><input class="fi" id="at_admin_phones" value="${((cfg.adminPhones||[]).join(', ')).replace(/"/g,'&quot;')}" placeholder="01012345678, 01098765432"></div>
       <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="at_enabled" ${cfg.enabled!==false?'checked':''}> <span>알림톡 자동 발송 활성화</span></label></div>
     </div>
     <div class="card" style="background:#f9fafb;margin-bottom:12px">
@@ -2319,6 +2320,12 @@ async function renderAdminAlimtalk(){
         <button class="btn bp" style="flex:1" onclick="saveAlimtalkSettings()">저장</button>
       </div>
       <p id="at_msg" style="font-size:12px;margin-top:10px;white-space:pre-wrap"></p>
+    </div>
+    <div class="card" style="margin-top:12px;background:#fefce8">
+      <p style="font-weight:700;font-size:13px;margin-bottom:6px">성적 미입력 리마인더 수동 실행</p>
+      <p style="font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.5">매일 오전 9시(KST)에 D-7/3/1/0 자동 실행. 아래 버튼은 테스트용으로 지금 즉시 한 번 실행합니다.</p>
+      <button class="btn bs" onclick="runScoreReminderNow()">지금 실행</button>
+      <p id="at_reminder_msg" style="font-size:12px;margin-top:10px;white-space:pre-wrap"></p>
     </div>`;
 }
 function collectAlimtalkPayload(){
@@ -2335,13 +2342,22 @@ function collectAlimtalkPayload(){
     }
     templates[key]={messageType,code,changeWord};
   }
+  const adminPhones=(_('at_admin_phones')?.value||'').split(/[\s,;]+/).map(s=>s.replace(/\D/g,'')).filter(s=>s.length>=9);
   return{
     enabled:_('at_enabled').checked,
     ppurioAccount:_('at_acct').value.trim(),
     senderProfile:_('at_sender').value.trim(),
     apiKey:_('at_apikey').value.trim(),
+    adminPhones,
     templates
   };
+}
+async function runScoreReminderNow(){
+  const msg=_('at_reminder_msg');msg.style.color='';msg.textContent='실행 중…';
+  try{
+    const r=await ppurioCall('runScoreReminder',null);
+    msg.style.color='#16a34a';msg.textContent='실행 완료: '+JSON.stringify(r.result);
+  }catch(e){msg.style.color='#dc2626';msg.textContent='실행 실패: '+e.message;}
 }
 async function saveAlimtalkSettings(){
   const msg=_('at_msg');msg.style.color='';msg.textContent='저장 중…';
