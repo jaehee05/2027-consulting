@@ -86,7 +86,7 @@ async function sendAlimtalk(eventKey, ctx) {
   const token = await getToken(settings);
   const params = {
     account: settings.ppurioAccount,
-    messageType: "ALT",
+    messageType: tmpl.messageType || "ALT",
     senderProfile: settings.senderProfile,
     templateCode: tmpl.code,
     duplicateFlag: "Y",
