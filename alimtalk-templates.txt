@@ -20,7 +20,7 @@
   ${reason} ${offeredSlots}
   ${accountId} ${accountPw}
   ${examName} ${scoreDeadline} ${daysLeft}
-  ${bookingPeriod} ${consultingName} ${bookingDeadline}
+  ${consultingName} ${bookingDeadline}
 
 
 ================================================================
@@ -259,16 +259,18 @@
  13) bookingStarted — 예약 시작 안내
 ----------------------------------------------------------------
 [본문]
-[*이름*]님, 상담 예약이 시작되었습니다.
+[*이름*]님, 컨설팅 예약이 시작되었습니다.
 
-▶ 예약 기간: [*1*]
+▶ 컨설팅명 : [*1*]
+▶ 마감일 : [*2*]
 
-홈페이지에 접속하여 원하는 시간에 예약해 주세요.
+홈페이지에 접속하여 예약을 진행해주세요.
 인기 시간대는 빠르게 마감될 수 있습니다.
 
 [변수 매핑]
 {
-  "var1": "${bookingPeriod}"
+  "var1": "${consultingName}",
+  "var2": "${bookingDeadline}"
 }
 
 
