@@ -2021,19 +2021,21 @@ function rejectRequest(reqId){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 ${typeLabel} 요청 거절</p>
     <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${req.studentName} 학생</p>
     <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px">현재 예약: <b>${req.currentDateLabel} ${req.currentSlot}</b></p>${req.type==='change'?`<p style="font-size:13px;margin-top:4px">변경 희망: <b style="color:#1C64F2">${req.newDateLabel} ${req.newSlot}</b></p>`:''}<p style="font-size:12px;color:#6b7280;margin-top:4px">학생 사유: ${req.reason}</p></div>
-    <div class="fg"><label class="fl">거절 사유</label><textarea class="fi ta" id="rejectReason" rows="3" placeholder="거절 사유를 입력해주세요. (선택)"></textarea></div>
+    <div class="fg"><label class="fl">거절 사유</label><textarea class="fi ta" id="rejectReason" rows="3" placeholder="거절 사유를 입력해주세요."></textarea></div>
+    <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bd" style="flex:1" onclick="confirmReject('${reqId}')">거절</button></div>`;
   openModal();}
 
 async function confirmReject(reqId){
   const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
   const rejectReason=_('rejectReason')?.value?.trim()||'';
+  if(!rejectReason){showErr('mErr','거절 사유를 입력해 주세요.');return;}
   showLoad(true);
   try{
     await db.collection('requests').doc(reqId).update({status:'rejected',rejectReason});
     req.status='rejected';req.rejectReason=rejectReason;
     closeModal();renderAdminBookings();
-  }catch(e){alert('거절 실패: '+e.message);}
+  }catch(e){showErr('mErr','거절 실패: '+e.message);}
   showLoad(false);}
 
 async function deleteRequest(reqId){
