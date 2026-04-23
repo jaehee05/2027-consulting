@@ -1489,22 +1489,34 @@ async function sendBookingStartedBulk(){
   }catch(e){alert('발송 실패: '+e.message);}
   showLoad(false);
 }
-async function sendBookingReminderBulk(){
+function sendBookingReminderBulk(){
   const ids=Array.from(S.stuSelected);
   if(ids.length===0){alert('발송할 학생을 선택해주세요.');return;}
-  const defaultPeriod=localStorage.getItem('bookingPeriod')||'';
-  const period=prompt('알림톡에 표시할 예약 기간을 입력하세요.\n예) 5월 15일 ~ 5월 30일',defaultPeriod);
-  if(period===null)return;
-  const bookingPeriod=period.trim();
-  if(!bookingPeriod){alert('예약 기간을 입력해주세요.');return;}
-  localStorage.setItem('bookingPeriod',bookingPeriod);
+  const defName=localStorage.getItem('consultingName')||'';
+  const defDeadline=localStorage.getItem('bookingDeadline')||'';
   const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
-  if(!confirm(`선택한 ${ids.length}명에게 예약 안내 알림톡을 발송하시겠습니까?\n(이미 예약한 학생은 자동 제외됨)\n\n예약 기간: ${bookingPeriod}\n\n${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`))return;
-  showLoad(true);
+  const preview=`${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 미완료 안내 발송</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">선택 ${ids.length}명 · 이미 예약한 학생은 서버에서 자동 제외됩니다.</p>
+    <div class="fg"><label class="fl">컨설팅명</label><input class="fi" id="brConsulting" value="${defName.replace(/"/g,'&quot;')}" placeholder="예) 6월 모의평가 컨설팅"></div>
+    <div class="fg"><label class="fl">예약 마감일</label><input class="fi" id="brDeadline" value="${defDeadline.replace(/"/g,'&quot;')}" placeholder="예) 5월 30일 (금)"></div>
+    <div class="fg" style="background:#f9fafb;border-radius:8px;padding:10px;margin-bottom:14px"><p style="font-size:11px;color:#6b7280;margin-bottom:4px">대상 학생 (${ids.length}명)</p><p style="font-size:12px;word-break:keep-all">${preview}</p></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitBookingReminderBulk()">발송</button></div>`;
+  openModal();
+}
+async function submitBookingReminderBulk(){
+  const consultingName=_('brConsulting').value.trim();
+  const bookingDeadline=_('brDeadline').value.trim();
+  if(!consultingName||!bookingDeadline){showErr('mErr','컨설팅명과 예약 마감일을 모두 입력해주세요.');return;}
+  localStorage.setItem('consultingName',consultingName);
+  localStorage.setItem('bookingDeadline',bookingDeadline);
+  const ids=Array.from(S.stuSelected);
+  closeModal();showLoad(true);
   try{
-    const r=await ppurioCall('sendBookingReminder',{studentIds:ids,bookingPeriod});
-    const fails=(r.results||[]).filter(x=>!x.ok);
-    let msg=`발송 완료: 성공 ${r.sent}건 / 제외(예약있음) ${r.alreadyBooked||0}건 / 실패 ${r.failed}건`;
+    const r=await ppurioCall('sendBookingReminder',{studentIds:ids,consultingName,bookingDeadline});
+    const fails=(r.results||[]).filter(x=>!x.ok&&x.skipped!=='already-booked');
+    let msg=`발송 완료: 성공 ${r.sent}건 / 제외(예약있음) ${r.alreadyBooked||0}건 / 실패 ${fails.length}건`;
     if(fails.length>0){
       const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
@@ -2444,7 +2456,7 @@ const ALIMTALK_EVENTS=[
   ['adminChangeApproved','[학생] 관리자 변경 요청 학생 승인(확인)','${name} ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
   ['adminChangeRejected','[학생] 관리자 변경 요청 학생 거절(확인)','${name} ${currentDateLabel} ${currentSlot}'],
   ['scoreInputReminder','[학생] 성적 미입력 안내','${name} ${examName} 기한 ${scoreDeadline} D-${daysLeft}'],
-  ['bookingReminder','[학생] 예약 미완료 안내','${name} 예약기간 ${bookingPeriod}'],
+  ['bookingReminder','[학생] 예약 미완료 안내','${name} 컨설팅:${consultingName} 마감:${bookingDeadline}'],
   ['bookingStarted','[학생] 예약 시작 안내','${name} 예약기간 ${bookingPeriod}'],
   ['accountCreated','[학생] 초기 계정 안내','${name} ID:${accountId} PW:${accountPw}'],
   ['adminNotifyBooking','[관리자] 학생 예약 완료','${name}(${grade}/${school}) ${dateLabel} ${slot}'],
@@ -2453,7 +2465,7 @@ const ALIMTALK_EVENTS=[
   ['adminNotifyAdminChangeApproved','[관리자] 관리자 변경 요청 학생 승인','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
   ['adminNotifyAdminChangeRejected','[관리자] 관리자 변경 요청 학생 거절','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot}']
 ];
-const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft} ${bookingPeriod}';
+const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft} ${bookingPeriod} ${consultingName} ${bookingDeadline}';
 async function ppurioCall(action,payload){
   if(!PPURIO_ADMIN_URL||PPURIO_ADMIN_URL==='REPLACE_AFTER_DEPLOY')throw new Error('PPURIO_ADMIN_URL이 설정되지 않았습니다. 배포 후 index.html 상단의 상수를 교체하세요.');
   const adminDoc=await db.collection('admins').doc(S.user.id).get();
