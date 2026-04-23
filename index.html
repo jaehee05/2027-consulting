@@ -1371,12 +1371,16 @@ function renderAdminStudents(){
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
   const selCount=selectableIds.filter(id=>S.stuSelected.has(id)).length;
   const wCount=withdrawnStu().length;
+  const unbookedIds=sorted.filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
     <span style="flex:1"></span>
+    <button class="btn bs bsm" onclick="selectUnbookedStudents()">미예약 학생 선택 (${unbookedIds.length})</button>
     <button class="btn bs bsm" onclick="openScoreReminderModal()">성적 미입력 안내</button>
-    <button class="btn ${selCount>0?'bp':'bs'} bsm" ${selCount===0?'disabled style="opacity:.5;cursor:not-allowed"':''} onclick="sendAccountInfoBulk()">계정 정보 발송 (${selCount}명)</button>
+    <button class="btn ${selCount>0?'bp':'bs'} bsm" ${selCount===0?'disabled style="opacity:.5;cursor:not-allowed"':''} onclick="sendAccountInfoBulk()">계정정보 (${selCount})</button>
+    <button class="btn ${selCount>0?'bp':'bs'} bsm" ${selCount===0?'disabled style="opacity:.5;cursor:not-allowed"':''} onclick="sendBookingStartedBulk()">예약시작 (${selCount})</button>
+    <button class="btn ${selCount>0?'bp':'bs'} bsm" ${selCount===0?'disabled style="opacity:.5;cursor:not-allowed"':''} onclick="sendBookingReminderBulk()">예약미완료 (${selCount})</button>
   </div>
   <div class="card" style="padding:0"><div class="tw"><table>
     <thead><tr><th style="width:36px;text-align:center"><input type="checkbox" ${allSelected?'checked':''} ${selectableIds.length===0?'disabled':''} onchange="toggleStuSelectAll(this.checked)"></th><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>메모</th><th>계정 ID</th><th>관리</th></tr></thead>
@@ -1444,6 +1448,63 @@ async function sendAccountInfoBulk(){
     const r=await ppurioCall('sendAccountInfo',{studentIds:ids});
     const fails=(r.results||[]).filter(x=>!x.ok);
     let msg=`발송 완료: 성공 ${r.sent}건 / 실패 ${r.failed}건`;
+    if(fails.length>0){
+      const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
+      msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
+    }
+    alert(msg);
+    S.stuSelected.clear();
+    renderAdminStudents();
+  }catch(e){alert('발송 실패: '+e.message);}
+  showLoad(false);
+}
+function selectUnbookedStudents(){
+  const ids=realStu().filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
+  S.stuSelected=new Set(ids);
+  renderAdminStudents();
+}
+async function sendBookingStartedBulk(){
+  const ids=Array.from(S.stuSelected);
+  if(ids.length===0){alert('발송할 학생을 선택해주세요.');return;}
+  const defaultPeriod=localStorage.getItem('bookingPeriod')||'';
+  const period=prompt('알림톡에 표시할 예약 기간을 입력하세요.\n예) 5월 15일 ~ 5월 30일',defaultPeriod);
+  if(period===null)return;
+  const bookingPeriod=period.trim();
+  if(!bookingPeriod){alert('예약 기간을 입력해주세요.');return;}
+  localStorage.setItem('bookingPeriod',bookingPeriod);
+  const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
+  if(!confirm(`선택한 ${ids.length}명에게 예약 시작 안내 알림톡을 발송하시겠습니까?\n\n예약 기간: ${bookingPeriod}\n\n${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`))return;
+  showLoad(true);
+  try{
+    const r=await ppurioCall('sendBookingStarted',{studentIds:ids,bookingPeriod});
+    const fails=(r.results||[]).filter(x=>!x.ok);
+    let msg=`발송 완료: 성공 ${r.sent}건 / 실패 ${r.failed}건`;
+    if(fails.length>0){
+      const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
+      msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
+    }
+    alert(msg);
+    S.stuSelected.clear();
+    renderAdminStudents();
+  }catch(e){alert('발송 실패: '+e.message);}
+  showLoad(false);
+}
+async function sendBookingReminderBulk(){
+  const ids=Array.from(S.stuSelected);
+  if(ids.length===0){alert('발송할 학생을 선택해주세요.');return;}
+  const defaultPeriod=localStorage.getItem('bookingPeriod')||'';
+  const period=prompt('알림톡에 표시할 예약 기간을 입력하세요.\n예) 5월 15일 ~ 5월 30일',defaultPeriod);
+  if(period===null)return;
+  const bookingPeriod=period.trim();
+  if(!bookingPeriod){alert('예약 기간을 입력해주세요.');return;}
+  localStorage.setItem('bookingPeriod',bookingPeriod);
+  const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
+  if(!confirm(`선택한 ${ids.length}명에게 예약 안내 알림톡을 발송하시겠습니까?\n(이미 예약한 학생은 자동 제외됨)\n\n예약 기간: ${bookingPeriod}\n\n${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`))return;
+  showLoad(true);
+  try{
+    const r=await ppurioCall('sendBookingReminder',{studentIds:ids,bookingPeriod});
+    const fails=(r.results||[]).filter(x=>!x.ok);
+    let msg=`발송 완료: 성공 ${r.sent}건 / 제외(예약있음) ${r.alreadyBooked||0}건 / 실패 ${r.failed}건`;
     if(fails.length>0){
       const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
@@ -2383,6 +2444,8 @@ const ALIMTALK_EVENTS=[
   ['adminChangeApproved','[학생] 관리자 변경 요청 학생 승인(확인)','${name} ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
   ['adminChangeRejected','[학생] 관리자 변경 요청 학생 거절(확인)','${name} ${currentDateLabel} ${currentSlot}'],
   ['scoreInputReminder','[학생] 성적 미입력 안내','${name} ${examName} 기한 ${scoreDeadline} D-${daysLeft}'],
+  ['bookingReminder','[학생] 예약 미완료 안내','${name} 예약기간 ${bookingPeriod}'],
+  ['bookingStarted','[학생] 예약 시작 안내','${name} 예약기간 ${bookingPeriod}'],
   ['accountCreated','[학생] 초기 계정 안내','${name} ID:${accountId} PW:${accountPw}'],
   ['adminNotifyBooking','[관리자] 학생 예약 완료','${name}(${grade}/${school}) ${dateLabel} ${slot}'],
   ['adminNotifyChangeRequest','[관리자] 학생 변경 요청','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot} (사유: ${reason})'],
@@ -2390,7 +2453,7 @@ const ALIMTALK_EVENTS=[
   ['adminNotifyAdminChangeApproved','[관리자] 관리자 변경 요청 학생 승인','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
   ['adminNotifyAdminChangeRejected','[관리자] 관리자 변경 요청 학생 거절','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot}']
 ];
-const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft}';
+const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft} ${bookingPeriod}';
 async function ppurioCall(action,payload){
   if(!PPURIO_ADMIN_URL||PPURIO_ADMIN_URL==='REPLACE_AFTER_DEPLOY')throw new Error('PPURIO_ADMIN_URL이 설정되지 않았습니다. 배포 후 index.html 상단의 상수를 교체하세요.');
   const adminDoc=await db.collection('admins').doc(S.user.id).get();

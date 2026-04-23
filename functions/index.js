@@ -242,6 +242,77 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
       return res.json({ ok: true, sent, failed, results });
     }
 
+    if (action === "sendBookingStarted") {
+      const ids = Array.isArray(payload?.studentIds) ? payload.studentIds.filter(Boolean) : [];
+      const bookingPeriod = String(payload?.bookingPeriod || "").trim();
+      if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });
+      if (!bookingPeriod) return res.status(400).json({ error: "bookingPeriod 가 비어있습니다." });
+      const results = [];
+      for (const id of ids) {
+        const snap = await admin.firestore().doc(`students/${id}`).get();
+        if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
+        const s = snap.data();
+        if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        const phone = String(s.studentPhone || "").replace(/\D/g, "");
+        if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
+        try {
+          const r = await sendAlimtalk("bookingStarted", {
+            phone,
+            name: s.name || "",
+            school: s.school || "",
+            grade: s.grade || "",
+            seat: s.seat ?? "",
+            bookingPeriod,
+          });
+          results.push({ id, name: s.name, ok: true, result: r });
+        } catch (err) {
+          console.error(`[bookingStarted] ${s.name}(${id}) 발송 실패:`, err);
+          results.push({ id, name: s.name, ok: false, error: String(err.message || err) });
+        }
+      }
+      const sent = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok).length;
+      return res.json({ ok: true, sent, failed, results });
+    }
+
+    if (action === "sendBookingReminder") {
+      const ids = Array.isArray(payload?.studentIds) ? payload.studentIds.filter(Boolean) : [];
+      const bookingPeriod = String(payload?.bookingPeriod || "").trim();
+      if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });
+      if (!bookingPeriod) return res.status(400).json({ error: "bookingPeriod 가 비어있습니다." });
+      const results = [];
+      let alreadyBooked = 0;
+      for (const id of ids) {
+        const snap = await admin.firestore().doc(`students/${id}`).get();
+        if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
+        const s = snap.data();
+        if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        const phone = String(s.studentPhone || "").replace(/\D/g, "");
+        if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
+        // 이미 예약한 학생은 제외
+        const bookingSnap = await admin.firestore().collection("bookings")
+          .where("studentId", "==", id).limit(1).get();
+        if (!bookingSnap.empty) { alreadyBooked += 1; results.push({ id, name: s.name, ok: false, skipped: "already-booked" }); continue; }
+        try {
+          const r = await sendAlimtalk("bookingReminder", {
+            phone,
+            name: s.name || "",
+            school: s.school || "",
+            grade: s.grade || "",
+            seat: s.seat ?? "",
+            bookingPeriod,
+          });
+          results.push({ id, name: s.name, ok: true, result: r });
+        } catch (err) {
+          console.error(`[bookingReminder] ${s.name}(${id}) 발송 실패:`, err);
+          results.push({ id, name: s.name, ok: false, error: String(err.message || err) });
+        }
+      }
+      const sent = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok && r.skipped !== "already-booked").length;
+      return res.json({ ok: true, sent, failed, alreadyBooked, results });
+    }
+
     if (action === "sendAccountInfo") {
       const ids = Array.isArray(payload?.studentIds) ? payload.studentIds.filter(Boolean) : [];
       if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });
@@ -290,6 +361,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         examName: "6월 모의평가",
         scoreDeadline: "2026-06-20",
         daysLeft: "3",
+        bookingPeriod: "5월 15일 ~ 5월 30일",
       });
       return res.json({ ok: true, result });
     }
