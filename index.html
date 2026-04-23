@@ -648,7 +648,7 @@ function bookCardHtml(b){
   }
   if(pendingReq){
     const typeLabel=pendingReq.type==='cancel'?'취소':'변경';
-    statusHtml+=`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">⏳ 예약 ${typeLabel} 요청이 승인 대기 중입니다.</p><p style="font-size:11px;color:#92400e;margin-top:4px">사유: ${pendingReq.reason}</p>${pendingReq.type==='change'?`<p style="font-size:11px;color:#92400e;margin-top:2px">변경 희망: ${pendingReq.newDateLabel} ${pendingReq.newSlot}</p>`:''}<p style="font-size:11px;color:#92400e;margin-top:6px">최종 승인 안내를 받으시기 전까지는 예약이 유지될 수 있는 점 양해 부탁드립니다.</p></div>`;
+    statusHtml+=`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">⏳ 예약 ${typeLabel} 요청이 승인 대기 중입니다.</p><p style="font-size:11px;color:#92400e;margin-top:4px">사유: ${pendingReq.reason}</p>${pendingReq.type==='change'?`<p style="font-size:11px;color:#92400e;margin-top:2px">변경 희망: ${pendingReq.newDateLabel} ${pendingReq.newSlot}</p>`:''}<p style="font-size:11px;color:#92400e;margin-top:6px">※ <b>최종 승인 안내</b>를 받으시기 전까지는 <b>예약이 유지될 수 있는 점</b> 양해 부탁드립니다.</p></div>`;
   }
   notifications.forEach(r=>{
     const typeLabel=r.type==='cancel'?'취소':'변경';
