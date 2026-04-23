@@ -317,6 +317,24 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
       return res.json({ ok: true, sent, failed, alreadyBooked, results });
     }
 
+    if (action === "sendAdminAccountInfo") {
+      const targetAdminId = String(payload?.adminAccountId || "").trim();
+      const phoneRaw = String(payload?.phone || "").replace(/\D/g, "");
+      if (!targetAdminId) return res.status(400).json({ error: "adminAccountId 가 필요합니다." });
+      if (phoneRaw.length < 9) return res.status(400).json({ error: "올바른 수신 번호가 필요합니다." });
+      const snap = await admin.firestore().doc(`admins/${targetAdminId}`).get();
+      if (!snap.exists) return res.status(404).json({ error: "관리자 계정을 찾을 수 없습니다." });
+      const a = snap.data();
+      if (a.role === "test") return res.status(400).json({ error: "TEST 계정은 발송 대상이 아닙니다." });
+      await sendAlimtalk("adminAccountCreated", {
+        phone: phoneRaw,
+        name: a.name || "",
+        accountId: a.id || targetAdminId,
+        accountPw: a.password || "",
+      });
+      return res.json({ ok: true, name: a.name || "", id: targetAdminId });
+    }
+
     if (action === "sendAccountInfo") {
       const ids = Array.isArray(payload?.studentIds) ? payload.studentIds.filter(Boolean) : [];
       if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });

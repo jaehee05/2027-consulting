@@ -2375,14 +2375,18 @@ function roleLabel(r){return r==='admin'?'ADMIN':r==='test'?'TEST':'OP';}
 function roleBadgeClass(r){return r==='admin'?'br':r==='test'?'bg':'bb';}
 
 function renderAdminAccounts(){
-  const rows=S.admins.map(a=>`<tr>
+  const rows=S.admins.map(a=>{
+    const canSend=a.role!=='test'&&a.phone&&a.phone.replace(/\D/g,'').length>=9;
+    const sendBtn=a.role==='test'?'':`<button class="btn bs bsm" ${canSend?'':'disabled style="opacity:.5;cursor:not-allowed" title="연락처를 먼저 등록하세요"'} onclick="openSendAdminAccountInfo('${a.id}')">계정 안내</button>`;
+    return `<tr>
     <td><code>${a.id}</code></td><td style="font-weight:600">${a.name}</td>
+    <td style="color:#6b7280;font-size:12px">${a.phone||'—'}</td>
     <td><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span></td>
-    <td style="white-space:nowrap"><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openAcctModal('${a.id}')">수정</button>${a.id!==S.user.id?`<button class="btn bd bsm" onclick="delAcct('${a.id}')">삭제</button>`:'<span style="font-size:11px;color:#9ca3af;padding:0 8px">본인</span>'}</div></td>
-  </tr>`).join('');
+    <td style="white-space:nowrap"><div style="display:flex;gap:6px">${sendBtn}<button class="btn bs bsm" onclick="openAcctModal('${a.id}')">수정</button>${a.id!==S.user.id?`<button class="btn bd bsm" onclick="delAcct('${a.id}')">삭제</button>`:'<span style="font-size:11px;color:#9ca3af;padding:0 8px">본인</span>'}</div></td>
+  </tr>`;}).join('');
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">ADMIN / OP / TEST 계정 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.admins.length}개)</span></span><button class="btn bp bsm" onclick="openAcctModal(null)">+ 계정 추가</button></div>
-  <div class="card" style="padding:0"><div class="tw"><table><thead><tr><th>ID</th><th>이름</th><th>권한</th><th>관리</th></tr></thead>
-  <tbody>${rows||'<tr><td colspan="4" class="empty">계정이 없습니다.</td></tr>'}</tbody></table></div></div>
+  <div class="card" style="padding:0"><div class="tw"><table><thead><tr><th>ID</th><th>이름</th><th>연락처</th><th>권한</th><th>관리</th></tr></thead>
+  <tbody>${rows||'<tr><td colspan="5" class="empty">계정이 없습니다.</td></tr>'}</tbody></table></div></div>
   <div style="margin-top:14px;padding:14px;background:#fff8e1;border:1px solid #fde68a;border-radius:10px"><p style="font-size:12px;color:#92400e;font-weight:500">💡 OP 권한: 예약 현황 조회·상세보기 및 예약 등록·변경·취소 가능. 학생 정보·일정·계정 관리 불가.<br>🧪 TEST 권한: 학생과 동일한 화면으로 로그인되며, 학생 목록에는 표시되지 않습니다.</p></div>`;}
 
 function openAcctModal(accId){
@@ -2391,6 +2395,7 @@ function openAcctModal(accId){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${a?'계정 수정':'계정 추가'}</p>
     ${a?`<div class="fg"><label class="fl">ID</label><input class="fi" value="${a.id}" disabled style="background:#f9fafb;color:#6b7280"></div>`:`<div class="fg"><label class="fl">ID</label><input class="fi" id="acid" placeholder="로그인 아이디"></div>`}
     <div class="fg"><label class="fl">이름</label><input class="fi" id="acname" value="${a?.name||''}" placeholder="김재희"></div>
+    <div class="fg"><label class="fl">연락처 <span style="font-size:11px;color:#9ca3af;font-weight:400">(알림톡 발송용, 선택)</span></label><input class="fi" id="acphone" value="${a?.phone||''}" placeholder="010-0000-0000" oninput="fmtPhoneInput(this)" maxlength="13"></div>
     <div class="fg"><label class="fl">권한</label><select class="fi fsel" id="acrole" ${roleDisabled?'disabled style="background:#f9fafb;color:#6b7280"':''}>
       <option value="admin" ${a?.role==='admin'?'selected':''}>ADMIN</option>
       <option value="viewer" ${a?.role==='viewer'?'selected':''}>OP</option>
@@ -2403,11 +2408,12 @@ function openAcctModal(accId){
 
 async function saveAcct(accId){
   const name=_('acname').value.trim(),pw=_('acpw')?.value;
+  const phone=fmtPhone(_('acphone')?.value||'');
   const existing=accId?S.admins.find(x=>x.id===accId):null;
   const role=existing&&existing.role==='test'?'test':_('acrole').value;
   if(!name){showErr('mErr','이름을 입력하세요.');return;}
   if(accId){
-    const update={name,role};if(pw){if(pw.length<6){showErr('mErr','비밀번호는 6자 이상이어야 합니다.');return;}update.password=pw;}
+    const update={name,role,phone};if(pw){if(pw.length<6){showErr('mErr','비밀번호는 6자 이상이어야 합니다.');return;}update.password=pw;}
     showLoad(true);
     try{
       await db.collection('admins').doc(accId).update(update);
@@ -2425,7 +2431,7 @@ async function saveAcct(accId){
     showLoad(true);
     try{
       const exists=await db.collection('admins').doc(id).get();if(exists.exists){showErr('mErr',`ID '${id}'가 이미 존재합니다.`);showLoad(false);return;}
-      const data={id,name,role,password:pw,createdAt:Date.now()};
+      const data={id,name,role,password:pw,phone,createdAt:Date.now()};
       if(role==='test'){
         const stuData={name:name+' (테스트)',grade:'고3',school:'-',studentPhone:'-',guardianPhone:'-',memo:'',seat:'',accountId:id,accountPw:pw,isFirstLogin:false,isTest:true,scores:{}};
         const stuRef=await db.collection('students').add(stuData);
@@ -2434,6 +2440,31 @@ async function saveAcct(accId){
       }
       await db.collection('admins').doc(id).set(data);S.admins.push({_docId:id,...data});closeModal();renderAdminAccounts();
     }catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);}
+}
+
+function openSendAdminAccountInfo(adminId){
+  const a=S.admins.find(x=>x.id===adminId);if(!a)return;
+  const defaultPhone=a.phone||'';
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">관리자 계정 안내 발송</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">${a.name} (${a.id}) · ${roleLabel(a.role)}</p>
+    <div class="fg"><label class="fl">수신 번호</label><input class="fi" id="aaiPhone" value="${defaultPhone.replace(/"/g,'&quot;')}" placeholder="010-0000-0000" oninput="fmtPhoneInput(this)" maxlength="13"></div>
+    <div class="fg" style="background:#f9fafb;border-radius:8px;padding:10px;margin-bottom:14px">
+      <p style="font-size:11px;color:#6b7280;margin-bottom:4px">발송 내용</p>
+      <p style="font-size:12px">아이디 <code>${a.id}</code> 와 현재 저장된 비밀번호로 안내됩니다.</p>
+    </div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitSendAdminAccountInfo('${adminId}')">발송</button></div>`;
+  openModal();
+}
+async function submitSendAdminAccountInfo(adminId){
+  const phone=_('aaiPhone').value.replace(/\D/g,'');
+  if(phone.length<9){showErr('mErr','올바른 수신 번호를 입력해주세요.');return;}
+  closeModal();showLoad(true);
+  try{
+    const r=await ppurioCall('sendAdminAccountInfo',{adminAccountId:adminId,phone});
+    alert(`발송 완료\n수신자: ${r.name} (${phone})`);
+  }catch(e){alert('발송 실패: '+e.message);}
+  showLoad(false);
 }
 
 async function delAcct(id){
@@ -2471,6 +2502,7 @@ const ALIMTALK_EVENTS=[
   ['bookingReminder','[학생] 예약 미완료 안내','${name} 컨설팅:${consultingName} 마감:${bookingDeadline}'],
   ['bookingStarted','[학생] 예약 시작 안내','${name} 컨설팅:${consultingName} 마감:${bookingDeadline}'],
   ['accountCreated','[학생] 초기 계정 안내','${name} ID:${accountId} PW:${accountPw}'],
+  ['adminAccountCreated','[관리자] 관리자 계정 안내 (수동)','${name} ID:${accountId} PW:${accountPw}'],
   ['adminNotifyBooking','[관리자] 학생 예약 완료','${name}(${grade}/${school}) ${dateLabel} ${slot}'],
   ['adminNotifyChangeRequest','[관리자] 학생 변경 요청','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot} (사유: ${reason})'],
   ['adminNotifyCancelRequest','[관리자] 학생 취소 요청','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} (사유: ${reason})'],
