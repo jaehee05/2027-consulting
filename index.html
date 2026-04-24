@@ -137,11 +137,6 @@ tr:last-child td{border-bottom:none}
 .po{display:none}
 code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace}
 .empty{text-align:center;padding:36px 20px;color:#9ca3af;font-size:13px}
-.home-logo{height:32px;width:auto;object-fit:contain;margin-right:4px;padding-bottom:4px}
-@media(min-width:768px){.home-logo{height:40px}}
-.login-logo{height:40px;width:auto;object-fit:contain;margin-right:4px;padding-bottom:4px}
-.home-title{align-self:center;font-size:20px;font-weight:700;color:#3f3f46;white-space:nowrap;padding-top:8px;padding-bottom:8px}
-@media(min-width:768px){.home-title{font-size:24px}}
 .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
 .home-card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:28px 24px;cursor:pointer;transition:.2s;text-align:left;display:flex;flex-direction:column;gap:12px;min-height:180px}
 .home-card:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.08);border-color:#1C64F2}
@@ -203,8 +198,8 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
   <button class="home-link" style="position:absolute;top:20px;left:20px" onclick="goHome()">← 홈</button>
   <div style="width:100%;max-width:380px">
     <div style="text-align:center;margin-bottom:28px">
-      <div style="display:inline-flex;align-items:center;gap:10px">
-        <img src="logo-login.png" class="login-logo" alt="KJHEDU" onerror="this.style.display='none'"><span style="font-size:20px;font-weight:800">KJHEDU</span>
+      <div style="display:inline-flex;align-items:center;gap:8px">
+        <span class="chip" id="loginChip" onclick="editChip('loginChip','LOGIN')" title="">LOGIN</span><span style="font-size:20px;font-weight:800">KJHEDU</span>
       </div>
     </div>
     <div class="card">
@@ -261,7 +256,7 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 <!-- 홈 -->
 <div id="vHome" class="hidden">
   <div class="topbar">
-    <div class="tl"><img src="logo.png" class="home-logo" alt="KJHEDU" onerror="this.style.display='none'"><span class="home-title">KJHEDU</span></div>
+    <div class="tl"><span class="chip" id="homeChip" onclick="editChip('homeChip','KJHEDU')" title="">KJHEDU</span><span class="tname">메인</span></div>
     <div class="tr" id="homeTr"></div>
   </div>
   <div class="page" style="max-width:780px">
@@ -2713,10 +2708,14 @@ function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.disp
 function applyChips(){
   const cc=S.config?.consultingChip||'2027 6평';
   const lc=S.config?.lectureChip||'LECTURE';
+  const hc=S.config?.homeChip||'KJHEDU';
+  const lgc=S.config?.loginChip||'LOGIN';
   ['stuChip','adminChip'].forEach(id=>{const el=_(id);if(el)el.textContent=cc;});
   const cl=_('classChip');if(cl)cl.textContent=lc;
+  const hm=_('homeChip');if(hm)hm.textContent=hc;
+  const lg=_('loginChip');if(lg)lg.textContent=lgc;
   const isAdmin=S.user?.type==='admin';
-  ['stuChip','adminChip','classChip'].forEach(id=>{
+  ['stuChip','adminChip','classChip','homeChip','loginChip'].forEach(id=>{
     const el=_(id);if(!el)return;
     el.style.cursor=isAdmin?'pointer':'default';
     el.title=isAdmin?'클릭하여 편집':'';
@@ -2743,7 +2742,7 @@ function enterHome(){
     if(tr)tr.innerHTML=`<span class="uname">${escapeHtml(unameTxt)}</span><button class="btn bs bsm" onclick="doLogout()" style="margin-left:10px">로그아웃</button>`;
     if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">안녕하세요, ${escapeHtml(greet)} 님</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
   }else{
-    if(tr)tr.innerHTML=`<button class="btn bp bsm" onclick="showView('vLogin')">로그인</button>`;
+    if(tr)tr.innerHTML=`<button class="btn bp bsm" onclick="goLoginView()">로그인</button>`;
     if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">KJHEDU</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
   }
   showView('vHome');
@@ -2751,8 +2750,9 @@ function enterHome(){
   if(!_skipPush)navPush({v:'vHome'});
 }
 function goHome(){enterHome();}
+function goLoginView(){showView('vLogin');applyChips();}
 function goConsulting(){
-  if(!S.user){showView('vLogin');return;}
+  if(!S.user){goLoginView();return;}
   if(S.user.type==='student'){
     _('stuUname').textContent=S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생';
     showView('vStu');applyChips();renderStu();
@@ -2764,7 +2764,7 @@ function goConsulting(){
   }
 }
 function goClassroom(){
-  if(!S.user){showView('vLogin');return;}
+  if(!S.user){goLoginView();return;}
   _('classUname').textContent=S.user.isTest?S.user.name+' (테스트)':(S.user.type==='student'?S.user.name+' 학생':S.user.name);
   _('classRoleLabel').textContent=S.user.type==='admin'?'ADMIN':(S.user.type==='operator'?'OP':'');
   showView('vClass');applyChips();
