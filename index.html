@@ -176,7 +176,6 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -316,8 +315,6 @@ const db = firebase.firestore();
 // `firebase deploy --only functions` 최초 배포 후 출력되는 URL로 교체하세요.
 // 예: https://ppurioadmin-xxxxxxxxxx-an.a.run.app
 const PPURIO_ADMIN_URL = 'https://ppurioadmin-tymdeyhn3q-du.a.run.app';
-// 로그인 토큰 발급 Cloud Function URL.
-const LOGIN_TOKEN_URL = 'https://asia-northeast3-consulting-dd53f.cloudfunctions.net/loginToken';
 
 const EXCL = ['12:00','12:30','18:00','18:30'];
 const DFLT_DATES = [
@@ -601,28 +598,39 @@ async function doLogin(){
   if(!id||!pw){showErr('lErr','아이디와 비밀번호를 입력하세요.');return;}
   showLoad(true);
   try{
-    const persistence=keep?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION;
-    await firebase.auth().setPersistence(persistence);
-    const resp=await fetch(LOGIN_TOKEN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,password:pw})});
-    const data=await resp.json().catch(()=>({}));
-    if(!resp.ok){showLoad(false);showErr('lErr',data.error||'아이디 또는 비밀번호가 올바르지 않습니다.');return;}
-    await firebase.auth().signInWithCustomToken(data.token);
-    if(data.type==='student'){
-      S.user={type:'student',id:data.id,name:data.name,isTest:!!data.isTest};
-      S.studentDocId=data.studentDocId||null;
-      saveSession({type:'student',id:data.id,name:data.name,studentDocId:data.studentDocId||null,isTest:!!data.isTest},keep);
+    const adminDoc=await db.collection('admins').doc(id).get();
+    if(adminDoc.exists){
+      const a=adminDoc.data();
+      if(a.password!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
+      if(a.role==='test'){
+        S.user={type:'student',isTest:true,id:a.id,name:a.name};
+        S.studentDocId=a.linkedStudentId;
+        saveSession({type:'student',isTest:true,id:a.id,name:a.name,studentDocId:a.linkedStudentId},keep);
+        await loadAll();
+        _('stuUname').textContent=a.name+' (테스트)';
+        enterHome();return;
+      }
+      S.user={type:a.role,id:a.id,name:a.name};
+      saveSession({type:a.role,id:a.id,name:a.name},keep);
       await loadAll();
-      if(data.isFirstLogin){showLoad(false);showView('vCpw');return;}
-      _('stuUname').textContent=data.isTest?data.name+' (테스트)':data.name+' 학생';
+      _('adminUname').textContent=a.name;
+      _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
       enterHome();return;
     }
-    S.user={type:data.type,id:data.id,name:data.name};
-    saveSession({type:data.type,id:data.id,name:data.name},keep);
-    await loadAll();
-    _('adminUname').textContent=data.name;
-    _('adminRoleLabel').textContent=data.type==='admin'?'ADMIN':'OP';
-    enterHome();
-  }catch(e){showErr('lErr','오류: '+(e.message||e));}
+    const stuQ=await db.collection('students').where('accountId','==',id).get();
+    if(!stuQ.empty){
+      const stuDoc=stuQ.docs[0],stu=stuDoc.data();
+      if(stu.accountPw!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
+      S.user={type:'student',id,name:stu.name};
+      S.studentDocId=stuDoc.id;
+      saveSession({type:'student',id,name:stu.name,studentDocId:stuDoc.id},keep);
+      await loadAll();
+      if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
+      _('stuUname').textContent=stu.name+' 학생';
+      enterHome();return;
+    }
+    showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');
+  }catch(e){showErr('lErr','오류: '+e.message);}
   showLoad(false);
 }
 
@@ -633,7 +641,6 @@ function doLogout(){
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   clearSession();
-  try{firebase.auth().signOut().catch(()=>{});}catch(_){}
   _('lId').value='';_('lPw').value='';_('lKeep').checked=false;hideErr('lErr');
   try{history.replaceState({v:'vHome'},'',location.pathname+location.search);}catch(_){}
   _skipPush=true;try{enterHome();}finally{_skipPush=false;}
@@ -2752,7 +2759,6 @@ function enterHome(){
   }
   if(cards){
     const items=[
-      {ico:'📺',color:'blue',title:'강의실',desc:'강의 영상을<br>시청할 수 있습니다.',onclick:'goClassroom()'},
       {ico:'🗓️',color:'green',title:'컨설팅',desc:'성적 기반 컨설팅을<br>진행합니다.',onclick:'goConsulting()'},
     ];
     if(S.user?.type==='student')items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
@@ -2820,13 +2826,6 @@ function renderMyPage(){
         <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">비밀번호</p>
         <p style="font-size:12px;color:#6b7280">보안을 위해 주기적으로 변경해주세요.</p></div>
         <button class="btn bs bsm" onclick="openMyPwChange()">변경</button>
-      </div>
-    </div>
-    <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">강의실</p>
-        <p style="font-size:13px;font-weight:600">${classStatusLabel(classSt)}</p></div>
-        <button class="btn bp bsm" onclick="goClassroom()">바로가기</button>
       </div>
     </div>
     <div class="card" style="margin-bottom:12px">
@@ -3181,51 +3180,42 @@ async function revokeClassAccess(studentId){
 async function init(){
   showLoad(true);
   try{
-    await new Promise(resolve=>{const unsub=firebase.auth().onAuthStateChanged(()=>{unsub();resolve();});});
-    if(!firebase.auth().currentUser){
-      clearSession();showLoad(false);enterHome();return;
-    }
+    const snap=await db.collection('admins').limit(1).get();
+    if(snap.empty){showLoad(false);showView('vSetup');return;}
     const saved=readSession();
-    if(!saved){
-      await firebase.auth().signOut().catch(()=>{});
-      showLoad(false);enterHome();return;
+    if(saved){
+      const sess=JSON.parse(saved);
+      if(sess.type==='student'){
+        const stuQ=await db.collection('students').where('accountId','==',sess.id).get();
+        if(!stuQ.empty){
+          S.user={type:'student',id:sess.id,name:sess.name,isTest:!!sess.isTest};
+          S.studentDocId=stuQ.docs[0].id;
+          await loadAll();
+          const stu=stuQ.docs[0].data();
+          if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
+          _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
+          showLoad(false);enterHome();return;
+        }
+      }else{
+        const adminDoc=await db.collection('admins').doc(sess.id).get();
+        if(adminDoc.exists){
+          const a=adminDoc.data();
+          S.user={type:a.role,id:a.id,name:a.name};
+          await loadAll();
+          _('adminUname').textContent=a.name;
+          _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
+          showLoad(false);enterHome();return;
+        }
+      }
+      clearSession();
     }
-    const sess=JSON.parse(saved);
-    if(sess.type==='student'){
-      let stuDoc=null;
-      if(sess.studentDocId){
-        const d=await db.collection('students').doc(sess.studentDocId).get();
-        if(d.exists)stuDoc=d;
-      }
-      if(!stuDoc){
-        const q=await db.collection('students').where('accountId','==',sess.id).get();
-        if(!q.empty)stuDoc=q.docs[0];
-      }
-      if(stuDoc){
-        S.user={type:'student',id:sess.id,name:sess.name,isTest:!!sess.isTest};
-        S.studentDocId=stuDoc.id;
-        await loadAll();
-        const stu=stuDoc.data();
-        if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
-        _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
-        showLoad(false);enterHome();return;
-      }
-    }else{
-      const adminDoc=await db.collection('admins').doc(sess.id).get();
-      if(adminDoc.exists){
-        const a=adminDoc.data();
-        S.user={type:a.role,id:a.id,name:a.name};
-        await loadAll();
-        _('adminUname').textContent=a.name;
-        _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
-        showLoad(false);enterHome();return;
-      }
-    }
-    await firebase.auth().signOut().catch(()=>{});
-    clearSession();
+    try{
+      const cfgSnap=await db.collection('config').doc('main').get();
+      if(cfgSnap.exists)S.config={...S.config,...cfgSnap.data()};
+    }catch(_){}
     showLoad(false);enterHome();
   }catch(e){
-    _('vLoad').innerHTML=`<div style="text-align:center;padding:40px"><p style="font-size:16px;font-weight:700;color:#dc2626;margin-bottom:8px">로딩 실패</p><p style="font-size:13px;color:#6b7280">${e.message}</p></div>`;
+    _('vLoad').innerHTML=`<div style="text-align:center;padding:40px"><p style="font-size:16px;font-weight:700;color:#dc2626;margin-bottom:8px">Firestore 연결 실패</p><p style="font-size:13px;color:#6b7280">${e.message}</p></div>`;
     _('vLoad').style.display='flex';}
 }
 init();
