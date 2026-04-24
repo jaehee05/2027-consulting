@@ -2900,6 +2900,21 @@ function ytEmbedUrl(url){
   if(!id&&/^[\w-]{11}$/.test(s))id=s;
   return id?`https://www.youtube.com/embed/${id}`:'';
 }
+function kollusEmbedUrl(urlOrCode){
+  const s=String(urlOrCode||'').trim().replace(/\?+$/,'');
+  if(!s)return '';
+  let vcode='';
+  const m=s.match(/kollus\.com\/([A-Za-z0-9_-]+)/i);
+  if(m)vcode=m[1];
+  else if(/^[A-Za-z0-9_-]{4,32}$/.test(s))vcode=s;
+  return vcode?`https://v.kr.kollus.com/${vcode}`:'';
+}
+function lectureEmbedUrl(l){
+  if(!l)return '';
+  if(l.provider==='kollus')return kollusEmbedUrl(l.videoUrl);
+  return ytEmbedUrl(l.videoUrl);
+}
+function providerLabel(p){return p==='kollus'?'Kollus':'YouTube';}
 function classroomStatusOf(stu){return stu?.classroomStatus||'none';}
 function openClassLecture(id){S.classLectureId=id||null;renderClass();}
 async function toggleClassroomMaintenance(){
@@ -2928,7 +2943,7 @@ function renderClass(){
     }
     const sel=S.classLectureId?S.lectures.find(l=>l._docId===S.classLectureId):null;
     if(sel){
-      const emb=ytEmbedUrl(sel.videoUrl);
+      const emb=lectureEmbedUrl(sel);
       box.innerHTML=`<button class="home-link" style="margin-bottom:12px" onclick="openClassLecture(null)">← 강의 목록</button>
         <div class="lec-card">
           <p class="lec-title" style="font-size:18px;margin-bottom:8px">${escapeHtml(sel.title||'제목 없음')}</p>
@@ -3018,7 +3033,7 @@ function renderClassAdminList(){
   if(S.lectures.length===0)return mntBanner+addBtn+`<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">등록된 강의가 없습니다. 추가 버튼으로 시작하세요.</div>`;
   return mntBanner+addBtn+S.lectures.map(l=>`<div class="lec-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px">
-      <div style="flex:1"><p class="lec-title">${escapeHtml(l.title||'제목 없음')}</p>
+      <div style="flex:1"><p class="lec-title">${escapeHtml(l.title||'제목 없음')} <span class="app-badge" style="background:#eef2ff;color:#4338ca;margin-left:4px">${providerLabel(l.provider)}</span></p>
       ${l.description?`<p class="lec-desc" style="margin-bottom:6px">${escapeHtml(l.description)}</p>`:''}
       <p style="font-size:11px;color:#9ca3af;word-break:break-all">${escapeHtml(l.videoUrl||'')}</p></div>
       <div style="display:flex;gap:6px;flex-shrink:0"><button class="btn bs bsm" onclick="openLectureForm('${l._docId}')">수정</button><button class="btn bd bsm" onclick="deleteLecture('${l._docId}')">삭제</button></div>
@@ -3027,31 +3042,59 @@ function renderClassAdminList(){
 }
 function openLectureForm(id){
   const editing=id?S.lectures.find(l=>l._docId===id):null;
+  const prov=editing?.provider||'youtube';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">${editing?'강의 수정':'강의 추가'}</p>
     <div class="fg"><label class="fl">제목</label><input class="fi" id="lfTitle" value="${escapeHtml(editing?.title||'')}" placeholder="예) 고3 수학 - 미적분 1강"></div>
-    <div class="fg"><label class="fl">YouTube 링크 또는 ID</label><input class="fi" id="lfUrl" value="${escapeHtml(editing?.videoUrl||'')}" placeholder="https://www.youtube.com/watch?v=..."></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">제공자</label>
+        <select class="fi fsel" id="lfProvider" onchange="updateLectureFormHint()">
+          <option value="youtube" ${prov==='youtube'?'selected':''}>YouTube</option>
+          <option value="kollus" ${prov==='kollus'?'selected':''}>Kollus</option>
+        </select></div>
+      <div class="fg"><label class="fl">정렬 순서 (작을수록 위)</label><input class="fi" id="lfOrder" type="number" value="${editing?.order??S.lectures.length}"></div>
+    </div>
+    <div class="fg"><label class="fl" id="lfUrlLabel">영상 링크</label><input class="fi" id="lfUrl" value="${escapeHtml(editing?.videoUrl||'')}" placeholder=""><p id="lfUrlHint" style="font-size:11px;color:#9ca3af;margin-top:4px"></p></div>
     <div class="fg"><label class="fl">설명 (선택)</label><textarea class="fi ta" id="lfDesc" placeholder="강의 소개">${escapeHtml(editing?.description||'')}</textarea></div>
-    <div class="fg"><label class="fl">정렬 순서 (숫자, 작을수록 위)</label><input class="fi" id="lfOrder" type="number" value="${editing?.order??S.lectures.length}"></div>
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitLecture(${editing?`'${id}'`:'null'})">${editing?'저장':'추가'}</button></div>`;
   openModal();
+  updateLectureFormHint();
+}
+function updateLectureFormHint(){
+  const p=_('lfProvider')?.value||'youtube';
+  const lbl=_('lfUrlLabel'),inp=_('lfUrl'),hint=_('lfUrlHint');
+  if(p==='kollus'){
+    if(lbl)lbl.textContent='Kollus 공유 URL 또는 vcode';
+    if(inp)inp.placeholder='https://v.kr.kollus.com/S0Tigaoz 또는 S0Tigaoz';
+    if(hint)hint.textContent='Kollus 대시보드의 공유 URL 또는 vcode(마지막 경로) 를 붙여 넣으세요.';
+  }else{
+    if(lbl)lbl.textContent='YouTube 링크 또는 11자 ID';
+    if(inp)inp.placeholder='https://www.youtube.com/watch?v=...';
+    if(hint)hint.textContent='';
+  }
 }
 async function submitLecture(id){
   const title=_('lfTitle').value.trim();
+  const provider=_('lfProvider').value||'youtube';
   const url=_('lfUrl').value.trim();
   const desc=_('lfDesc').value.trim();
   const order=Number(_('lfOrder').value||0);
   if(!title){showErr('mErr','제목을 입력해주세요.');return;}
-  if(!url){showErr('mErr','YouTube 링크를 입력해주세요.');return;}
-  if(!ytEmbedUrl(url)){showErr('mErr','올바른 YouTube 링크가 아닙니다.');return;}
+  if(!url){showErr('mErr','영상 링크를 입력해주세요.');return;}
+  if(provider==='kollus'){
+    if(!kollusEmbedUrl(url)){showErr('mErr','올바른 Kollus 공유 URL/vcode 가 아닙니다.');return;}
+  }else{
+    if(!ytEmbedUrl(url)){showErr('mErr','올바른 YouTube 링크가 아닙니다.');return;}
+  }
   showLoad(true);
   try{
+    const payload={title,provider,videoUrl:url,description:desc,order};
     if(id){
-      await db.collection('lectures').doc(id).update({title,videoUrl:url,description:desc,order,updatedAt:Date.now()});
-      const l=S.lectures.find(x=>x._docId===id);if(l){l.title=title;l.videoUrl=url;l.description=desc;l.order=order;}
+      await db.collection('lectures').doc(id).update({...payload,updatedAt:Date.now()});
+      const l=S.lectures.find(x=>x._docId===id);if(l)Object.assign(l,payload);
     }else{
-      const ref=await db.collection('lectures').add({title,videoUrl:url,description:desc,order,createdAt:Date.now()});
-      S.lectures.push({_docId:ref.id,title,videoUrl:url,description:desc,order,createdAt:Date.now()});
+      const ref=await db.collection('lectures').add({...payload,createdAt:Date.now()});
+      S.lectures.push({_docId:ref.id,...payload,createdAt:Date.now()});
     }
     S.lectures.sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0));
     closeModal();renderClass();
