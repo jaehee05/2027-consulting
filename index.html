@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1C64F2">
-<title>2027 6월 모의평가 컨설팅</title>
+<title>KJHEDU</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
 <style>
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.5/dist/web/static/pretendard-dynamic-subset.css');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -479,7 +481,7 @@ function showLoad(v){_('vLoad').style.display=v?'flex':'none';}
 var _reqListener=null, _reqSeedDone=false;
 function pendingReqCountForAdmin(){return S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change').length;}
 function updateAdminTabs(){
-  if(!S.user||(S.user.type!=='admin'&&S.user.type!=='operator'))return;
+  if(!S.user||S.user.type==='student')return;
   const el=_('adminTabs');if(!el)return;
   const isAdmin=S.user.type==='admin';
   const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','컨설팅'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['bookings','예약 현황']];
@@ -501,7 +503,7 @@ function startRequestsListener(){
   if(_reqListener){try{_reqListener();}catch(e){}_reqListener=null;}
   _reqSeedDone=false;
   _reqListener=db.collection('requests').onSnapshot(snap=>{
-    const isAdminUser=S.user&&(S.user.type==='admin'||S.user.type==='operator');
+    const isAdminUser=S.user&&S.user.type!=='student';
     const isStudent=S.user&&S.user.type==='student';
     let needAdminRerender=false,needStuRerender=false;
     snap.docChanges().forEach(ch=>{
@@ -2780,7 +2782,7 @@ function goConsulting(){
   if(S.user.type==='student'){
     _('stuUname').textContent=S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생';
     showView('vStu');applyChips();renderStu();
-  }else if(S.user.type==='admin'||S.user.type==='operator'){
+  }else{
     _('adminUname').textContent=S.user.name;
     _('adminRoleLabel').textContent=S.user.type==='admin'?'ADMIN':'OP';
     showView('vAdmin');applyChips();
@@ -3231,7 +3233,7 @@ function navGetState(){
     if(stuC&&stuC.innerHTML.indexOf('변경 요청')>-1&&stuC.innerHTML.indexOf('변경 사유')>-1)return{v:'vStu',p:'change'};
     return{v:'vStu',p:'main'};
   }
-  if(S.user&&(S.user.type==='admin'||S.user.type==='operator')){
+  if(S.user&&S.user.type!=='student'){
     if(S.tab==='consult'&&S.consultStuId)return{v:'vAdmin',tab:S.tab,consultStuId:S.consultStuId};
     return{v:'vAdmin',tab:S.tab};
   }
@@ -3267,7 +3269,7 @@ window.addEventListener('popstate',function(e){
       else if(st.p==='book'){S.scoreWizardExamId=null;showView('vStu');var myB=S.bookings.find(function(b){return b.studentId===S.studentDocId;});_origShowBookForm(!!myB);}
       else if(st.p==='wizard'){showView('vStu');S.scoreWizardExamId=st.examId;S.scoreStep=st.step;_origRenderScoreWizard();}
     }else if(st.v==='vAdmin'){
-      if(S.user.type!=='admin'&&S.user.type!=='operator'){enterHome();return;}
+      if(S.user.type==='student'){enterHome();return;}
       showView('vAdmin');
       if(S.consultStuId&&(!st.consultStuId||st.tab!=='consult')){var cId=S.consultStuId;var cNote=_('consultInput')?.value||'';var cStu=S.students.find(function(x){return x._docId===cId;});if(cStu&&cNote!==(cStu.consultNote||'')){db.collection('students').doc(cId).update({consultNote:cNote}).catch(function(){});cStu.consultNote=cNote;}}
       if(st.consultStuId){S.consultStuId=st.consultStuId;S.tab='consult';_origSetTab('consult');}
