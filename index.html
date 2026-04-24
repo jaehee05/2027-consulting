@@ -2124,7 +2124,7 @@ function renderRequestsSection(){
       ${isAdmin?`<td><button class="btn bd bsm" onclick="deleteRequest('${r._docId}')">삭제</button></td>`:''}</tr>`;}).join('');
   const reqEnabled=S.config.requestEnabled!==false;
   const toggleLabel=reqEnabled?'요청 기능 OFF':'요청 기능 ON';
-  const toggleBtn=`<button class="btn ${reqEnabled?'bd':'bp'} bsm" onclick="toggleRequestEnabled()">${toggleLabel}</button>`;
+  const toggleBtn=isAdmin?`<button class="btn ${reqEnabled?'bd':'bp'} bsm" onclick="toggleRequestEnabled()">${toggleLabel}</button>`:'';
   const acPendingRows=adminChangePending.map(r=>{
     const offered=r.offeredSlots.map(s=>`${s.dateLabel} ${s.slot}`).join(', ');
     return `<tr><td style="font-weight:600">${r.studentName}</td>
@@ -2214,6 +2214,7 @@ async function deleteRequest(reqId){
   showLoad(false);}
 
 async function toggleRequestEnabled(){
+  if(S.user?.type!=='admin'){alert('ADMIN 권한이 필요합니다.');return;}
   const cur=S.config.requestEnabled!==false;
   S.config.requestEnabled=!cur;
   showLoad(true);
