@@ -150,6 +150,11 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 .home-link:hover{color:#1C64F2;background:#f3f4f6}
 .lec-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-bottom:14px}
 .lec-card .lec-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.lec-item{width:100%;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:12px;font-family:inherit;text-align:left;transition:.15s}
+.lec-item:hover{border-color:#1C64F2;background:#f9fafb;transform:translateY(-1px)}
+.lec-item .lec-item-no{flex-shrink:0;width:28px;height:28px;border-radius:8px;background:#eff6ff;color:#1C64F2;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.lec-item .lec-item-title{flex:1;font-size:14px;font-weight:600;color:#111827}
+.lec-item .lec-item-chev{color:#9ca3af;font-size:18px;font-weight:400}
 .lec-card .lec-desc{font-size:12px;color:#6b7280;margin-bottom:10px;white-space:pre-wrap;word-break:keep-all}
 .lec-embed{position:relative;padding-top:56.25%;background:#000;border-radius:10px;overflow:hidden}
 .lec-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
@@ -321,7 +326,7 @@ const S = {
   students:[], schedule:{dates:JSON.parse(JSON.stringify(DFLT_DATES))},
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[], requests:[], reqSlots:[],
-  lectures:[], classSub:'list',
+  lectures:[], classSub:'list', classLectureId:null,
   tab:null, selDate:null, adminSel:null,
   editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), stuSubView:'active',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
@@ -2765,6 +2770,7 @@ function goConsulting(){
 }
 function goClassroom(){
   if(!S.user){goLoginView();return;}
+  S.classLectureId=null;
   _('classUname').textContent=S.user.isTest?S.user.name+' (테스트)':(S.user.type==='student'?S.user.name+' 학생':S.user.name);
   _('classRoleLabel').textContent=S.user.type==='admin'?'ADMIN':(S.user.type==='operator'?'OP':'');
   showView('vClass');applyChips();
@@ -2781,6 +2787,7 @@ function ytEmbedUrl(url){
   return id?`https://www.youtube.com/embed/${id}`:'';
 }
 function classroomStatusOf(stu){return stu?.classroomStatus||'none';}
+function openClassLecture(id){S.classLectureId=id||null;renderClass();}
 function renderClass(){
   const box=_('classC');if(!box)return;
   if(S.user?.type==='admin'||S.user?.type==='operator')return renderClassAdmin();
@@ -2790,14 +2797,23 @@ function renderClass(){
     if(S.lectures.length===0){
       box.innerHTML=`<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">아직 등록된 강의가 없습니다.</div>`;return;
     }
-    box.innerHTML=S.lectures.map(l=>{
-      const emb=ytEmbedUrl(l.videoUrl);
-      return `<div class="lec-card">
-        <p class="lec-title">${escapeHtml(l.title||'제목 없음')}</p>
-        ${l.description?`<p class="lec-desc">${escapeHtml(l.description)}</p>`:''}
-        ${emb?`<div class="lec-embed"><iframe src="${emb}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`:`<div class="empty" style="background:#f9fafb;border-radius:10px">영상 링크가 없습니다.</div>`}
-      </div>`;
-    }).join('');
+    const sel=S.classLectureId?S.lectures.find(l=>l._docId===S.classLectureId):null;
+    if(sel){
+      const emb=ytEmbedUrl(sel.videoUrl);
+      box.innerHTML=`<button class="home-link" style="margin-bottom:12px" onclick="openClassLecture(null)">← 강의 목록</button>
+        <div class="lec-card">
+          <p class="lec-title" style="font-size:18px;margin-bottom:8px">${escapeHtml(sel.title||'제목 없음')}</p>
+          ${sel.description?`<p class="lec-desc">${escapeHtml(sel.description)}</p>`:''}
+          ${emb?`<div class="lec-embed"><iframe src="${emb}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`:`<div class="empty" style="background:#f9fafb;border-radius:10px">영상 링크가 없습니다.</div>`}
+        </div>`;
+      return;
+    }
+    box.innerHTML=`<p style="font-size:13px;color:#6b7280;margin-bottom:12px">강의를 선택하면 영상이 재생됩니다.</p>`+
+      S.lectures.map((l,i)=>`<button class="lec-item" onclick="openClassLecture('${l._docId}')">
+        <span class="lec-item-no">${i+1}</span>
+        <span class="lec-item-title">${escapeHtml(l.title||'제목 없음')}</span>
+        <span class="lec-item-chev">›</span>
+      </button>`).join('');
     return;
   }
   if(status==='pending'){
