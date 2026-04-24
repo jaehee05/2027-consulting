@@ -195,12 +195,12 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 
 <!-- 로그인 -->
 <div id="vLogin" class="lwrap hidden" style="position:relative">
+  <button class="home-link" style="position:absolute;top:20px;left:20px" onclick="goHome()">← 홈</button>
   <div style="width:100%;max-width:380px">
     <div style="text-align:center;margin-bottom:28px">
-      <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span class="chip">2027 6평</span><span style="font-size:20px;font-weight:800">모의평가 컨설팅</span>
+      <div style="display:inline-flex;align-items:center;gap:8px">
+        <span class="chip">LOGIN</span><span style="font-size:20px;font-weight:800">KJHEDU</span>
       </div>
-      <p style="font-size:13px;color:#6b7280">로그인 후 상담 예약을 진행하세요</p>
     </div>
     <div class="card">
       <div class="fg"><label class="fl">아이디</label><input class="fi" id="lId" placeholder="아이디 입력" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
@@ -235,7 +235,7 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 <!-- 학생 뷰 -->
 <div id="vStu" class="hidden">
   <div class="topbar">
-    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip">케이제이치에듀</span><span class="tname">컨설팅</span></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="stuChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">컨설팅</span></div>
     <div class="tr"><span class="uname" id="stuUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page" style="max-width:660px"><div id="stuC"></div></div>
@@ -244,7 +244,7 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 <!-- 관리자/뷰어 뷰 -->
 <div id="vAdmin" class="hidden">
   <div class="topbar np">
-    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip">케이제이치에듀</span><span class="tname">컨설팅 관리</span><span class="trole" id="adminRoleLabel"></span></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="adminChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">컨설팅 관리</span><span class="trole" id="adminRoleLabel"></span></div>
     <div class="tr"><span class="uname" id="adminUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page">
@@ -256,11 +256,11 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 <!-- 홈 -->
 <div id="vHome" class="hidden">
   <div class="topbar">
-    <div class="tl"><span class="chip">케이제이치에듀</span><span class="tname">메인</span></div>
-    <div class="tr"><span class="uname" id="homeUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+    <div class="tl"><span class="chip">KJHEDU</span><span class="tname">메인</span></div>
+    <div class="tr" id="homeTr"></div>
   </div>
   <div class="page" style="max-width:780px">
-    <div style="padding:8px 4px 0"><p style="font-size:22px;font-weight:800">안녕하세요, <span id="homeGreet"></span> 님</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p></div>
+    <div style="padding:8px 4px 0" id="homeHeader"></div>
     <div class="home-grid">
       <button class="home-card" onclick="goClassroom()">
         <div class="hc-ico blue">📺</div>
@@ -281,7 +281,7 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 <!-- 강의실 -->
 <div id="vClass" class="hidden">
   <div class="topbar">
-    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip">케이제이치에듀</span><span class="tname">강의실</span><span class="trole" id="classRoleLabel"></span></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="classChip" onclick="editChip('lectureChip','LECTURE')" title="">LECTURE</span><span class="tname">강의실</span><span class="trole" id="classRoleLabel"></span></div>
     <div class="tr"><span class="uname" id="classUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page" style="max-width:780px"><div id="classC"></div></div>
@@ -630,7 +630,8 @@ function doLogout(){
   stopRequestsListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
   clearSession();
-  _('lId').value='';_('lPw').value='';_('lKeep').checked=false;hideErr('lErr');showView('vLogin');
+  _('lId').value='';_('lPw').value='';_('lKeep').checked=false;hideErr('lErr');
+  enterHome();
 }
 
 async function doChangePw(){
@@ -2704,30 +2705,64 @@ function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.di
 function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';}
 
 /* ── HOME / CLASSROOM ── */
+function applyChips(){
+  const cc=S.config?.consultingChip||'2027 6평';
+  const lc=S.config?.lectureChip||'LECTURE';
+  ['stuChip','adminChip'].forEach(id=>{const el=_(id);if(el)el.textContent=cc;});
+  const cl=_('classChip');if(cl)cl.textContent=lc;
+  const isAdmin=S.user?.type==='admin';
+  ['stuChip','adminChip','classChip'].forEach(id=>{
+    const el=_(id);if(!el)return;
+    el.style.cursor=isAdmin?'pointer':'default';
+    el.title=isAdmin?'클릭하여 편집':'';
+  });
+}
+async function editChip(key,defaultValue){
+  if(S.user?.type!=='admin')return;
+  const current=S.config?.[key]||defaultValue;
+  const nv=prompt('칩 텍스트를 입력하세요 (최대 12자)',current);
+  if(nv===null)return;
+  const val=nv.trim().slice(0,12);
+  if(!val)return;
+  try{
+    await db.collection('config').doc('main').set({[key]:val},{merge:true});
+    S.config=S.config||{};S.config[key]=val;
+    applyChips();
+  }catch(e){alert('저장 실패: '+e.message);}
+}
 function enterHome(){
-  const greet=S.user?.name||'';
-  if(_('homeGreet'))_('homeGreet').textContent=greet;
-  if(_('homeUname'))_('homeUname').textContent=S.user?.isTest?greet+' (테스트)':(S.user?.type==='student'?greet+' 학생':greet);
+  const tr=_('homeTr'),hdr=_('homeHeader');
+  if(S.user){
+    const greet=S.user.name||'';
+    const unameTxt=S.user.isTest?greet+' (테스트)':(S.user.type==='student'?greet+' 학생':greet);
+    if(tr)tr.innerHTML=`<span class="uname">${escapeHtml(unameTxt)}</span><button class="btn bs bsm" onclick="doLogout()" style="margin-left:10px">로그아웃</button>`;
+    if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">안녕하세요, ${escapeHtml(greet)} 님</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
+  }else{
+    if(tr)tr.innerHTML=`<button class="btn bp bsm" onclick="showView('vLogin')">로그인</button>`;
+    if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">KJHEDU</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
+  }
   showView('vHome');
+  applyChips();
   if(!_skipPush)navPush({v:'vHome'});
 }
 function goHome(){enterHome();}
 function goConsulting(){
-  if(S.user?.type==='student'){
+  if(!S.user){showView('vLogin');return;}
+  if(S.user.type==='student'){
     _('stuUname').textContent=S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생';
-    showView('vStu');renderStu();
-  }else if(S.user?.type==='admin'||S.user?.type==='operator'){
+    showView('vStu');applyChips();renderStu();
+  }else if(S.user.type==='admin'||S.user.type==='operator'){
     _('adminUname').textContent=S.user.name;
     _('adminRoleLabel').textContent=S.user.type==='admin'?'ADMIN':'OP';
-    showView('vAdmin');
+    showView('vAdmin');applyChips();
     setTab(S.user.type==='admin'?'students':'bookings');
   }
 }
 function goClassroom(){
-  if(!S.user)return;
+  if(!S.user){showView('vLogin');return;}
   _('classUname').textContent=S.user.isTest?S.user.name+' (테스트)':(S.user.type==='student'?S.user.name+' 학생':S.user.name);
   _('classRoleLabel').textContent=S.user.type==='admin'?'ADMIN':(S.user.type==='operator'?'OP':'');
-  showView('vClass');
+  showView('vClass');applyChips();
   renderClass();
   if(!_skipPush)navPush({v:'vClass'});
 }
@@ -2976,7 +3011,11 @@ async function init(){
       }
       clearSession();
     }
-    showLoad(false);showView('vLogin');
+    try{
+      const cfgSnap=await db.collection('config').doc('main').get();
+      if(cfgSnap.exists)S.config={...S.config,...cfgSnap.data()};
+    }catch(_){}
+    showLoad(false);enterHome();
   }catch(e){
     _('vLoad').innerHTML=`<div style="text-align:center;padding:40px"><p style="font-size:16px;font-weight:700;color:#dc2626;margin-bottom:8px">Firestore 연결 실패</p><p style="font-size:13px;color:#6b7280">${e.message}</p><p style="font-size:12px;color:#9ca3af;margin-top:8px">Firebase 콘솔에서 Firestore 규칙을 확인해주세요.</p></div>`;
     _('vLoad').style.display='flex';}
