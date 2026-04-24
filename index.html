@@ -598,7 +598,7 @@ async function doLogin(){
     const adminDoc=await db.collection('admins').doc(id).get();
     if(adminDoc.exists){
       const a=adminDoc.data();
-      if(a.password!==pw){showLoad(false);showErr('lErr','비밀번호가 올바르지 않습니다.');return;}
+      if(a.password!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
       if(a.role==='test'){
         S.user={type:'student',isTest:true,id:a.id,name:a.name};
         S.studentDocId=a.linkedStudentId;
@@ -617,7 +617,7 @@ async function doLogin(){
     const stuQ=await db.collection('students').where('accountId','==',id).get();
     if(!stuQ.empty){
       const stuDoc=stuQ.docs[0],stu=stuDoc.data();
-      if(stu.accountPw!==pw){showLoad(false);showErr('lErr','비밀번호가 올바르지 않습니다.');return;}
+      if(stu.accountPw!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
       S.user={type:'student',id,name:stu.name};
       S.studentDocId=stuDoc.id;
       saveSession({type:'student',id,name:stu.name,studentDocId:stuDoc.id},keep);
