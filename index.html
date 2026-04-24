@@ -2753,7 +2753,7 @@ function enterHome(){
   if(cards){
     const items=[
       {ico:'📺',color:'blue',title:'강의실',desc:'인터넷 강의 영상을 시청하고<br>학습을 진행합니다.',onclick:'goClassroom()'},
-      {ico:'🗓️',color:'green',title:'컨설팅',desc:'모의평가 성적 기반 1:1<br>상담 예약을 진행합니다.',onclick:'goConsulting()'},
+      {ico:'🗓️',color:'green',title:'컨설팅',desc:'성적 기반 컨설팅을<br>진행합니다.',onclick:'goConsulting()'},
     ];
     if(S.user?.type==='student')items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
