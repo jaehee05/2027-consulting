@@ -137,6 +137,32 @@ tr:last-child td{border-bottom:none}
 .po{display:none}
 code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace}
 .empty{text-align:center;padding:36px 20px;color:#9ca3af;font-size:13px}
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
+.home-card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:28px 24px;cursor:pointer;transition:.2s;text-align:left;display:flex;flex-direction:column;gap:12px;min-height:180px}
+.home-card:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.08);border-color:#1C64F2}
+.home-card .hc-ico{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
+.home-card .hc-ico.blue{background:#eff6ff;color:#1C64F2}
+.home-card .hc-ico.green{background:#ecfdf5;color:#059669}
+.home-card .hc-title{font-size:18px;font-weight:800;color:#111827}
+.home-card .hc-desc{font-size:12px;color:#6b7280;line-height:1.5;margin-top:-4px}
+.home-card .hc-cta{margin-top:auto;font-size:12px;font-weight:600;color:#1C64F2;display:flex;align-items:center;gap:4px}
+.home-link{background:none;border:none;padding:4px 8px;font-family:inherit;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border-radius:6px;transition:.15s}
+.home-link:hover{color:#1C64F2;background:#f3f4f6}
+.lec-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-bottom:14px}
+.lec-card .lec-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.lec-card .lec-desc{font-size:12px;color:#6b7280;margin-bottom:10px;white-space:pre-wrap;word-break:keep-all}
+.lec-embed{position:relative;padding-top:56.25%;background:#000;border-radius:10px;overflow:hidden}
+.lec-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.apply-hero{text-align:center;padding:40px 20px;background:#fff;border:1px solid #e5e7eb;border-radius:16px}
+.apply-hero .ah-ico{width:60px;height:60px;border-radius:16px;background:#eff6ff;color:#1C64F2;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px}
+.apply-hero h2{font-size:18px;font-weight:800;margin-bottom:6px}
+.apply-hero p{font-size:13px;color:#6b7280;margin-bottom:18px;line-height:1.6}
+.apply-hero .btn{min-width:160px}
+.app-badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.app-badge.pending{background:#fef3c7;color:#b45309}
+.app-badge.approved{background:#dcfce7;color:#15803d}
+.app-badge.rejected{background:#fee2e2;color:#dc2626}
+@media(max-width:640px){.home-grid{grid-template-columns:1fr}.home-card{padding:20px;min-height:auto}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -209,7 +235,7 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 <!-- 학생 뷰 -->
 <div id="vStu" class="hidden">
   <div class="topbar">
-    <div class="tl"><span class="chip">2027 6평</span><span class="tname">모의평가 컨설팅</span></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip">케이제이치에듀</span><span class="tname">컨설팅</span></div>
     <div class="tr"><span class="uname" id="stuUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page" style="max-width:660px"><div id="stuC"></div></div>
@@ -218,13 +244,47 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 <!-- 관리자/뷰어 뷰 -->
 <div id="vAdmin" class="hidden">
   <div class="topbar np">
-    <div class="tl"><span class="chip">2027 6평</span><span class="tname">모의평가 컨설팅</span><span class="trole" id="adminRoleLabel"></span></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip">케이제이치에듀</span><span class="tname">컨설팅 관리</span><span class="trole" id="adminRoleLabel"></span></div>
     <div class="tr"><span class="uname" id="adminUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page">
     <div class="tabs np" id="adminTabs"></div>
     <div id="adminC"></div>
   </div>
+</div>
+
+<!-- 홈 -->
+<div id="vHome" class="hidden">
+  <div class="topbar">
+    <div class="tl"><span class="chip">케이제이치에듀</span><span class="tname">메인</span></div>
+    <div class="tr"><span class="uname" id="homeUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+  </div>
+  <div class="page" style="max-width:780px">
+    <div style="padding:8px 4px 0"><p style="font-size:22px;font-weight:800">안녕하세요, <span id="homeGreet"></span> 님</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p></div>
+    <div class="home-grid">
+      <button class="home-card" onclick="goClassroom()">
+        <div class="hc-ico blue">📺</div>
+        <div class="hc-title">강의실</div>
+        <div class="hc-desc">인터넷 강의 영상을 시청하고<br>학습을 진행합니다.</div>
+        <div class="hc-cta">입장하기 →</div>
+      </button>
+      <button class="home-card" onclick="goConsulting()">
+        <div class="hc-ico green">🗓️</div>
+        <div class="hc-title">컨설팅</div>
+        <div class="hc-desc">모의평가 성적 기반 1:1<br>상담 예약을 진행합니다.</div>
+        <div class="hc-cta">입장하기 →</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 강의실 -->
+<div id="vClass" class="hidden">
+  <div class="topbar">
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip">케이제이치에듀</span><span class="tname">강의실</span><span class="trole" id="classRoleLabel"></span></div>
+    <div class="tr"><span class="uname" id="classUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+  </div>
+  <div class="page" style="max-width:780px"><div id="classC"></div></div>
 </div>
 
 <!-- 모달 -->
@@ -261,6 +321,7 @@ const S = {
   students:[], schedule:{dates:JSON.parse(JSON.stringify(DFLT_DATES))},
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[], requests:[], reqSlots:[],
+  lectures:[], classSub:'list',
   tab:null, selDate:null, adminSel:null,
   editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), stuSubView:'active',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
@@ -465,7 +526,7 @@ function stopRequestsListener(){if(_reqListener){try{_reqListener();}catch(e){}_
 
 var _skipPush=false;
 function showView(id){
-  ['vSetup','vLogin','vCpw','vStu','vAdmin'].forEach(v=>{
+  ['vSetup','vLogin','vCpw','vStu','vAdmin','vHome','vClass'].forEach(v=>{
     const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
     if(['vSetup','vLogin'].includes(v))el.style.display=v===id?'flex':'none';
   });
@@ -475,13 +536,15 @@ function showView(id){
 async function loadAll(){
   showLoad(true);
   try{
-    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap]=await Promise.all([
+    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap]=await Promise.all([
       db.collection('students').get(),
       db.collection('schedule').doc('main').get(),
       db.collection('config').doc('main').get(),
       db.collection('bookings').get(),
-      db.collection('requests').get()
+      db.collection('requests').get(),
+      db.collection('lectures').get()
     ]);
+    S.lectures=lecSnap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0));
     S.students=stuSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.schedule=scSnap.exists?scSnap.data():{dates:JSON.parse(JSON.stringify(DFLT_DATES))};
     if(!S.schedule.dates)S.schedule.dates=JSON.parse(JSON.stringify(DFLT_DATES));
@@ -537,16 +600,14 @@ async function doLogin(){
         saveSession({type:'student',isTest:true,id:a.id,name:a.name,studentDocId:a.linkedStudentId},keep);
         await loadAll();
         _('stuUname').textContent=a.name+' (테스트)';
-        showView('vStu');renderStu();return;
+        enterHome();return;
       }
       S.user={type:a.role,id:a.id,name:a.name};
       saveSession({type:a.role,id:a.id,name:a.name},keep);
       await loadAll();
       _('adminUname').textContent=a.name;
       _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
-      showView('vAdmin');
-      setTab(a.role==='admin'?'students':'bookings');
-      return;
+      enterHome();return;
     }
     const stuQ=await db.collection('students').where('accountId','==',id).get();
     if(!stuQ.empty){
@@ -558,7 +619,7 @@ async function doLogin(){
       await loadAll();
       if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
       _('stuUname').textContent=stu.name+' 학생';
-      showView('vStu');renderStu();return;
+      enterHome();return;
     }
     showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');
   }catch(e){showErr('lErr','오류: '+e.message);}
@@ -581,7 +642,7 @@ async function doChangePw(){
     await db.collection('students').doc(S.studentDocId).update({accountPw:p1,isFirstLogin:false});
     const s=S.students.find(x=>x._docId===S.studentDocId);if(s){s.accountPw=p1;s.isFirstLogin=false;}
     _('stuUname').textContent=S.user.name+' 학생';
-    showView('vStu');renderStu();
+    enterHome();
   }catch(e){showErr('pwErr','저장 실패: '+e.message);}
   showLoad(false);
 }
@@ -2642,6 +2703,246 @@ async function testAlimtalkSend(){
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
 function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';}
 
+/* ── HOME / CLASSROOM ── */
+function enterHome(){
+  const greet=S.user?.name||'';
+  if(_('homeGreet'))_('homeGreet').textContent=greet;
+  if(_('homeUname'))_('homeUname').textContent=S.user?.isTest?greet+' (테스트)':(S.user?.type==='student'?greet+' 학생':greet);
+  showView('vHome');
+  if(!_skipPush)navPush({v:'vHome'});
+}
+function goHome(){enterHome();}
+function goConsulting(){
+  if(S.user?.type==='student'){
+    _('stuUname').textContent=S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생';
+    showView('vStu');renderStu();
+  }else if(S.user?.type==='admin'||S.user?.type==='operator'){
+    _('adminUname').textContent=S.user.name;
+    _('adminRoleLabel').textContent=S.user.type==='admin'?'ADMIN':'OP';
+    showView('vAdmin');
+    setTab(S.user.type==='admin'?'students':'bookings');
+  }
+}
+function goClassroom(){
+  if(!S.user)return;
+  _('classUname').textContent=S.user.isTest?S.user.name+' (테스트)':(S.user.type==='student'?S.user.name+' 학생':S.user.name);
+  _('classRoleLabel').textContent=S.user.type==='admin'?'ADMIN':(S.user.type==='operator'?'OP':'');
+  showView('vClass');
+  renderClass();
+  if(!_skipPush)navPush({v:'vClass'});
+}
+function ytEmbedUrl(url){
+  const s=String(url||'').trim();if(!s)return '';
+  let id='';
+  const m1=s.match(/[?&]v=([^&]+)/);if(m1)id=m1[1];
+  else{const m2=s.match(/youtu\.be\/([^?&/]+)/);if(m2)id=m2[1];}
+  if(!id){const m3=s.match(/youtube\.com\/embed\/([^?&/]+)/);if(m3)id=m3[1];}
+  if(!id&&/^[\w-]{11}$/.test(s))id=s;
+  return id?`https://www.youtube.com/embed/${id}`:'';
+}
+function classroomStatusOf(stu){return stu?.classroomStatus||'none';}
+function renderClass(){
+  const box=_('classC');if(!box)return;
+  if(S.user?.type==='admin'||S.user?.type==='operator')return renderClassAdmin();
+  const stu=S.students.find(x=>x._docId===S.studentDocId);
+  const status=classroomStatusOf(stu);
+  if(status==='approved'){
+    if(S.lectures.length===0){
+      box.innerHTML=`<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">아직 등록된 강의가 없습니다.</div>`;return;
+    }
+    box.innerHTML=S.lectures.map(l=>{
+      const emb=ytEmbedUrl(l.videoUrl);
+      return `<div class="lec-card">
+        <p class="lec-title">${escapeHtml(l.title||'제목 없음')}</p>
+        ${l.description?`<p class="lec-desc">${escapeHtml(l.description)}</p>`:''}
+        ${emb?`<div class="lec-embed"><iframe src="${emb}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`:`<div class="empty" style="background:#f9fafb;border-radius:10px">영상 링크가 없습니다.</div>`}
+      </div>`;
+    }).join('');
+    return;
+  }
+  if(status==='pending'){
+    box.innerHTML=`<div class="apply-hero">
+      <div class="ah-ico">⏳</div>
+      <h2>강의 신청이 접수되었습니다</h2>
+      <p>관리자 승인 후 이용하실 수 있습니다.<br>승인 완료 시 알림을 드립니다.</p>
+      <span class="app-badge pending">승인 대기 중</span>
+    </div>`;return;
+  }
+  const rejected=status==='rejected';
+  box.innerHTML=`<div class="apply-hero">
+    <div class="ah-ico">📺</div>
+    <h2>${rejected?'강의 재신청이 필요합니다':'강의 신청이 필요합니다'}</h2>
+    <p>${rejected?'이전 신청이 반려되었습니다. 아래 사유를 확인하고 다시 신청해주세요.':'강의실 이용을 위해 먼저 수강 신청을 해주세요.<br>관리자 승인 후 영상 시청이 가능합니다.'}</p>
+    ${rejected&&stu?.classroomRejectReason?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;margin:0 auto 18px;max-width:360px;text-align:left"><p style="font-size:11px;color:#b91c1c;font-weight:700;margin-bottom:4px">반려 사유</p><p style="font-size:12px;color:#991b1b;white-space:pre-wrap">${escapeHtml(stu.classroomRejectReason)}</p></div>`:''}
+    <button class="btn bp" onclick="openClassApplyForm()">${rejected?'재신청하기':'강의 신청하기'}</button>
+  </div>`;
+}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function openClassApplyForm(){
+  const stu=S.students.find(x=>x._docId===S.studentDocId);if(!stu){alert('학생 정보를 찾을 수 없습니다.');return;}
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">강의 신청</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">${escapeHtml(stu.name||'')} · ${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}</p>
+    <div class="fg"><label class="fl">연락처</label><input class="fi" id="caPhone" value="${escapeHtml(fmtPhone(stu.studentPhone||''))}" oninput="fmtPhoneInput(this)" maxlength="13"></div>
+    <div class="fg"><label class="fl">신청 사유 / 학습 목표</label><textarea class="fi ta" id="caReason" placeholder="예) 수학 기초부터 다시 잡고 싶습니다. / 영어 1등급을 목표로 하고 있습니다." maxlength="500"></textarea></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitClassApply()">신청하기</button></div>`;
+  openModal();
+}
+async function submitClassApply(){
+  const phone=_('caPhone').value.replace(/\D/g,'');
+  const reason=_('caReason').value.trim();
+  if(phone.length<9){showErr('mErr','올바른 연락처를 입력해주세요.');return;}
+  if(!reason){showErr('mErr','신청 사유를 입력해주세요.');return;}
+  showLoad(true);
+  try{
+    const patch={
+      classroomStatus:'pending',
+      classroomApplication:{phone,reason,at:Date.now()},
+      classroomAppliedAt:Date.now(),
+      classroomRejectReason:firebase.firestore.FieldValue.delete()
+    };
+    await db.collection('students').doc(S.studentDocId).update(patch);
+    const s=S.students.find(x=>x._docId===S.studentDocId);
+    if(s){s.classroomStatus='pending';s.classroomApplication={phone,reason,at:Date.now()};s.classroomAppliedAt=Date.now();delete s.classroomRejectReason;}
+    closeModal();renderClass();
+  }catch(e){showErr('mErr','신청 실패: '+e.message);}
+  showLoad(false);
+}
+function renderClassAdmin(){
+  const box=_('classC');if(!box)return;
+  const sub=S.classSub||'list';
+  const pendingCount=realStu().filter(s=>s.classroomStatus==='pending').length;
+  const tabsHtml=`<div class="tabs" style="margin-bottom:16px">
+    <button class="tab ${sub==='list'?'on':''}" onclick="setClassSub('list')">강의 목록 (${S.lectures.length})</button>
+    <button class="tab ${sub==='apps'?'on':''}" onclick="setClassSub('apps')">신청 관리${pendingCount>0?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${pendingCount}</span>`:''}</button>
+    <button class="tab ${sub==='members'?'on':''}" onclick="setClassSub('members')">수강생</button>
+  </div>`;
+  if(sub==='list')box.innerHTML=tabsHtml+renderClassAdminList();
+  else if(sub==='apps')box.innerHTML=tabsHtml+renderClassAdminApps();
+  else box.innerHTML=tabsHtml+renderClassAdminMembers();
+}
+function setClassSub(s){S.classSub=s;renderClass();}
+function renderClassAdminList(){
+  const addBtn=`<div style="margin-bottom:12px;text-align:right"><button class="btn bp bsm" onclick="openLectureForm()">+ 강의 추가</button></div>`;
+  if(S.lectures.length===0)return addBtn+`<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">등록된 강의가 없습니다. 추가 버튼으로 시작하세요.</div>`;
+  return addBtn+S.lectures.map(l=>`<div class="lec-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px">
+      <div style="flex:1"><p class="lec-title">${escapeHtml(l.title||'제목 없음')}</p>
+      ${l.description?`<p class="lec-desc" style="margin-bottom:6px">${escapeHtml(l.description)}</p>`:''}
+      <p style="font-size:11px;color:#9ca3af;word-break:break-all">${escapeHtml(l.videoUrl||'')}</p></div>
+      <div style="display:flex;gap:6px;flex-shrink:0"><button class="btn bs bsm" onclick="openLectureForm('${l._docId}')">수정</button><button class="btn bd bsm" onclick="deleteLecture('${l._docId}')">삭제</button></div>
+    </div>
+  </div>`).join('');
+}
+function openLectureForm(id){
+  const editing=id?S.lectures.find(l=>l._docId===id):null;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">${editing?'강의 수정':'강의 추가'}</p>
+    <div class="fg"><label class="fl">제목</label><input class="fi" id="lfTitle" value="${escapeHtml(editing?.title||'')}" placeholder="예) 고3 수학 - 미적분 1강"></div>
+    <div class="fg"><label class="fl">YouTube 링크 또는 ID</label><input class="fi" id="lfUrl" value="${escapeHtml(editing?.videoUrl||'')}" placeholder="https://www.youtube.com/watch?v=..."></div>
+    <div class="fg"><label class="fl">설명 (선택)</label><textarea class="fi ta" id="lfDesc" placeholder="강의 소개">${escapeHtml(editing?.description||'')}</textarea></div>
+    <div class="fg"><label class="fl">정렬 순서 (숫자, 작을수록 위)</label><input class="fi" id="lfOrder" type="number" value="${editing?.order??S.lectures.length}"></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitLecture(${editing?`'${id}'`:'null'})">${editing?'저장':'추가'}</button></div>`;
+  openModal();
+}
+async function submitLecture(id){
+  const title=_('lfTitle').value.trim();
+  const url=_('lfUrl').value.trim();
+  const desc=_('lfDesc').value.trim();
+  const order=Number(_('lfOrder').value||0);
+  if(!title){showErr('mErr','제목을 입력해주세요.');return;}
+  if(!url){showErr('mErr','YouTube 링크를 입력해주세요.');return;}
+  if(!ytEmbedUrl(url)){showErr('mErr','올바른 YouTube 링크가 아닙니다.');return;}
+  showLoad(true);
+  try{
+    if(id){
+      await db.collection('lectures').doc(id).update({title,videoUrl:url,description:desc,order,updatedAt:Date.now()});
+      const l=S.lectures.find(x=>x._docId===id);if(l){l.title=title;l.videoUrl=url;l.description=desc;l.order=order;}
+    }else{
+      const ref=await db.collection('lectures').add({title,videoUrl:url,description:desc,order,createdAt:Date.now()});
+      S.lectures.push({_docId:ref.id,title,videoUrl:url,description:desc,order,createdAt:Date.now()});
+    }
+    S.lectures.sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0));
+    closeModal();renderClass();
+  }catch(e){showErr('mErr','저장 실패: '+e.message);}
+  showLoad(false);
+}
+async function deleteLecture(id){
+  if(!confirm('이 강의를 삭제하시겠습니까?'))return;
+  showLoad(true);
+  try{
+    await db.collection('lectures').doc(id).delete();
+    S.lectures=S.lectures.filter(l=>l._docId!==id);
+    renderClass();
+  }catch(e){alert('삭제 실패: '+e.message);}
+  showLoad(false);
+}
+function renderClassAdminApps(){
+  const pend=realStu().filter(s=>s.classroomStatus==='pending').sort((a,b)=>(a.classroomAppliedAt||0)-(b.classroomAppliedAt||0));
+  if(pend.length===0)return `<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">대기 중인 신청이 없습니다.</div>`;
+  return pend.map(s=>{
+    const app=s.classroomApplication||{};
+    const d=app.at?new Date(app.at):null;
+    const dateStr=d?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:'';
+    return `<div class="lec-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">
+        <div><p style="font-size:15px;font-weight:700">${escapeHtml(s.name||'')} <span class="app-badge pending" style="margin-left:4px">대기</span></p>
+        <p style="font-size:12px;color:#6b7280;margin-top:2px">${escapeHtml(s.school||'')} ${escapeHtml(s.grade||'')}${app.phone?' · '+fmtPhone(app.phone):''}${dateStr?' · '+dateStr+' 신청':''}</p></div>
+      </div>
+      ${app.reason?`<div style="background:#f9fafb;border-radius:8px;padding:10px 12px;margin-bottom:10px"><p style="font-size:11px;color:#6b7280;font-weight:600;margin-bottom:4px">신청 사유</p><p style="font-size:12px;white-space:pre-wrap;word-break:keep-all">${escapeHtml(app.reason)}</p></div>`:''}
+      <div style="display:flex;gap:8px"><button class="btn bp bsm" style="flex:1" onclick="approveClassApp('${s._docId}')">승인</button><button class="btn bd bsm" style="flex:1" onclick="openRejectClassApp('${s._docId}')">반려</button></div>
+    </div>`;
+  }).join('');
+}
+async function approveClassApp(studentId){
+  if(!confirm('이 학생의 강의 신청을 승인하시겠습니까?'))return;
+  showLoad(true);
+  try{
+    await db.collection('students').doc(studentId).update({classroomStatus:'approved',classroomProcessedAt:Date.now()});
+    const s=S.students.find(x=>x._docId===studentId);if(s){s.classroomStatus='approved';s.classroomProcessedAt=Date.now();}
+    renderClass();
+  }catch(e){alert('승인 실패: '+e.message);}
+  showLoad(false);
+}
+function openRejectClassApp(studentId){
+  const s=S.students.find(x=>x._docId===studentId);if(!s)return;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">강의 신청 반려</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:12px">${escapeHtml(s.name||'')} 학생의 신청을 반려합니다.</p>
+    <div class="fg"><label class="fl">반려 사유 (학생에게 표시됨)</label><textarea class="fi ta" id="rjReason" placeholder="예) 수강 정원이 마감되었습니다."></textarea></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bd" style="flex:1" onclick="submitRejectClassApp('${studentId}')">반려</button></div>`;
+  openModal();
+}
+async function submitRejectClassApp(studentId){
+  const reason=_('rjReason').value.trim();
+  if(!reason){showErr('mErr','반려 사유를 입력해주세요.');return;}
+  showLoad(true);
+  try{
+    await db.collection('students').doc(studentId).update({classroomStatus:'rejected',classroomRejectReason:reason,classroomProcessedAt:Date.now()});
+    const s=S.students.find(x=>x._docId===studentId);if(s){s.classroomStatus='rejected';s.classroomRejectReason=reason;s.classroomProcessedAt=Date.now();}
+    closeModal();renderClass();
+  }catch(e){showErr('mErr','반려 실패: '+e.message);}
+  showLoad(false);
+}
+function renderClassAdminMembers(){
+  const members=realStu().filter(s=>s.classroomStatus==='approved').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(members.length===0)return `<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">승인된 수강생이 없습니다.</div>`;
+  return `<div class="tw"><table><thead><tr><th>이름</th><th>학교</th><th>학년</th><th>연락처</th><th>관리</th></tr></thead><tbody>`+
+    members.map(s=>`<tr><td style="font-weight:600">${escapeHtml(s.name||'')}</td><td>${escapeHtml(s.school||'')}</td><td>${escapeHtml(s.grade||'')}</td><td>${fmtPhone(s.studentPhone||'')}</td><td><button class="btn bs bsm" onclick="revokeClassAccess('${s._docId}')">접근 해제</button></td></tr>`).join('')+
+    `</tbody></table></div>`;
+}
+async function revokeClassAccess(studentId){
+  const s=S.students.find(x=>x._docId===studentId);if(!s)return;
+  if(!confirm(`${s.name||''} 학생의 강의실 접근을 해제하시겠습니까?`))return;
+  showLoad(true);
+  try{
+    await db.collection('students').doc(studentId).update({classroomStatus:firebase.firestore.FieldValue.delete(),classroomProcessedAt:Date.now()});
+    const st=S.students.find(x=>x._docId===studentId);if(st)delete st.classroomStatus;
+    renderClass();
+  }catch(e){alert('실패: '+e.message);}
+  showLoad(false);
+}
+
 /* ── INIT ── */
 async function init(){
   showLoad(true);
@@ -2660,7 +2961,7 @@ async function init(){
           const stu=stuQ.docs[0].data();
           if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
           _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
-              showLoad(false);showView('vStu');renderStu();return;
+          showLoad(false);enterHome();return;
         }
       }else{
         const adminDoc=await db.collection('admins').doc(sess.id).get();
@@ -2670,8 +2971,7 @@ async function init(){
           await loadAll();
           _('adminUname').textContent=a.name;
           _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
-          showLoad(false);showView('vAdmin');
-          setTab(a.role==='admin'?'students':'bookings');return;
+          showLoad(false);enterHome();return;
         }
       }
       clearSession();
@@ -2720,7 +3020,9 @@ window.addEventListener('popstate',function(e){
   var st=e.state;if(!st)return;
   _skipPush=true;
   try{
-    if(st.v==='vStu'){
+    if(st.v==='vHome'){enterHome();}
+    else if(st.v==='vClass'){goClassroom();}
+    else if(st.v==='vStu'){
       if(st.p==='main'){S.scoreWizardExamId=null;showView('vStu');_origRenderStu();}
       else if(st.p==='book'){S.scoreWizardExamId=null;showView('vStu');var myB=S.bookings.find(function(b){return b.studentId===S.studentDocId;});_origShowBookForm(!!myB);}
       else if(st.p==='wizard'){showView('vStu');S.scoreWizardExamId=st.examId;S.scoreStep=st.step;_origRenderScoreWizard();}
