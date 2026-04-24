@@ -1463,6 +1463,11 @@ function selectUnbookedStudents(){
   S.stuSelected=new Set(ids);
   renderAdminStudents();
 }
+function fmtDeadlineKR(ymd){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||''));if(!m)return '';
+  const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+  return `${d.getMonth()+1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]})`;
+}
 function sendBookingStartedBulk(){
   const ids=Array.from(S.stuSelected);
   if(ids.length===0){alert('발송할 학생을 선택해주세요.');return;}
@@ -1473,7 +1478,7 @@ function sendBookingStartedBulk(){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 시작 안내 발송</p>
     <p style="font-size:12px;color:#6b7280;margin-bottom:14px">선택 ${ids.length}명 · 예약 여부와 무관하게 전원 발송됩니다.</p>
     <div class="fg"><label class="fl">컨설팅명</label><input class="fi" id="bsConsulting" value="${defName.replace(/"/g,'&quot;')}" placeholder="예) 6월 모의평가 컨설팅"></div>
-    <div class="fg"><label class="fl">마감일</label><input class="fi" id="bsDeadline" value="${defDeadline.replace(/"/g,'&quot;')}" placeholder="예) 5월 30일 (금)"></div>
+    <div class="fg"><label class="fl">마감일</label><input class="fi" id="bsDeadline" type="date" value="${defDeadline.replace(/"/g,'&quot;')}"></div>
     <div class="fg" style="background:#f9fafb;border-radius:8px;padding:10px;margin-bottom:14px"><p style="font-size:11px;color:#6b7280;margin-bottom:4px">대상 학생 (${ids.length}명)</p><p style="font-size:12px;word-break:keep-all">${preview}</p></div>
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitBookingStartedBulk()">발송</button></div>`;
@@ -1481,10 +1486,11 @@ function sendBookingStartedBulk(){
 }
 async function submitBookingStartedBulk(){
   const consultingName=_('bsConsulting').value.trim();
-  const bookingDeadline=_('bsDeadline').value.trim();
+  const deadlineYmd=_('bsDeadline').value;
+  const bookingDeadline=fmtDeadlineKR(deadlineYmd);
   if(!consultingName||!bookingDeadline){showErr('mErr','컨설팅명과 마감일을 모두 입력해주세요.');return;}
   localStorage.setItem('consultingName',consultingName);
-  localStorage.setItem('bookingDeadline',bookingDeadline);
+  localStorage.setItem('bookingDeadline',deadlineYmd);
   const ids=Array.from(S.stuSelected);
   closeModal();showLoad(true);
   try{
@@ -1511,7 +1517,7 @@ function sendBookingReminderBulk(){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 미완료 안내 발송</p>
     <p style="font-size:12px;color:#6b7280;margin-bottom:14px">선택 ${ids.length}명 · 이미 예약한 학생은 서버에서 자동 제외됩니다.</p>
     <div class="fg"><label class="fl">컨설팅명</label><input class="fi" id="brConsulting" value="${defName.replace(/"/g,'&quot;')}" placeholder="예) 6월 모의평가 컨설팅"></div>
-    <div class="fg"><label class="fl">예약 마감일</label><input class="fi" id="brDeadline" value="${defDeadline.replace(/"/g,'&quot;')}" placeholder="예) 5월 30일 (금)"></div>
+    <div class="fg"><label class="fl">예약 마감일</label><input class="fi" id="brDeadline" type="date" value="${defDeadline.replace(/"/g,'&quot;')}"></div>
     <div class="fg" style="background:#f9fafb;border-radius:8px;padding:10px;margin-bottom:14px"><p style="font-size:11px;color:#6b7280;margin-bottom:4px">대상 학생 (${ids.length}명)</p><p style="font-size:12px;word-break:keep-all">${preview}</p></div>
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitBookingReminderBulk()">발송</button></div>`;
@@ -1519,10 +1525,11 @@ function sendBookingReminderBulk(){
 }
 async function submitBookingReminderBulk(){
   const consultingName=_('brConsulting').value.trim();
-  const bookingDeadline=_('brDeadline').value.trim();
+  const deadlineYmd=_('brDeadline').value;
+  const bookingDeadline=fmtDeadlineKR(deadlineYmd);
   if(!consultingName||!bookingDeadline){showErr('mErr','컨설팅명과 예약 마감일을 모두 입력해주세요.');return;}
   localStorage.setItem('consultingName',consultingName);
-  localStorage.setItem('bookingDeadline',bookingDeadline);
+  localStorage.setItem('bookingDeadline',deadlineYmd);
   const ids=Array.from(S.stuSelected);
   closeModal();showLoad(true);
   try{
