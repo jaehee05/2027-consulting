@@ -640,9 +640,13 @@ async function doLogin(){
 function doLogout(){
   stopRequestsListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
+  S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];
+  S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
+  S.stuSelected=new Set();S.consultStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   clearSession();
   _('lId').value='';_('lPw').value='';_('lKeep').checked=false;hideErr('lErr');
-  enterHome();
+  try{history.replaceState({v:'vHome'},'',location.pathname+location.search);}catch(_){}
+  _skipPush=true;try{enterHome();}finally{_skipPush=false;}
 }
 
 async function doChangePw(){
@@ -3087,12 +3091,15 @@ window.addEventListener('popstate',function(e){
   _skipPush=true;
   try{
     if(st.v==='vHome'){enterHome();}
+    else if(!S.user){enterHome();}
     else if(st.v==='vClass'){goClassroom();}
     else if(st.v==='vStu'){
+      if(S.user.type!=='student'){enterHome();return;}
       if(st.p==='main'){S.scoreWizardExamId=null;showView('vStu');_origRenderStu();}
       else if(st.p==='book'){S.scoreWizardExamId=null;showView('vStu');var myB=S.bookings.find(function(b){return b.studentId===S.studentDocId;});_origShowBookForm(!!myB);}
       else if(st.p==='wizard'){showView('vStu');S.scoreWizardExamId=st.examId;S.scoreStep=st.step;_origRenderScoreWizard();}
     }else if(st.v==='vAdmin'){
+      if(S.user.type!=='admin'&&S.user.type!=='operator'){enterHome();return;}
       showView('vAdmin');
       if(S.consultStuId&&(!st.consultStuId||st.tab!=='consult')){var cId=S.consultStuId;var cNote=_('consultInput')?.value||'';var cStu=S.students.find(function(x){return x._docId===cId;});if(cStu&&cNote!==(cStu.consultNote||'')){db.collection('students').doc(cId).update({consultNote:cNote}).catch(function(){});cStu.consultNote=cNote;}}
       if(st.consultStuId){S.consultStuId=st.consultStuId;S.tab='consult';_origSetTab('consult');}
