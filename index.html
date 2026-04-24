@@ -1031,9 +1031,15 @@ function showBookForm(isChange){
   const dtabs=avail.map(d=>`<button class="dt ${d.id===S.selDate?'on':''}" onclick="selDate('${d.id}')">${d.label}</button>`).join('');
   const slots=sel.slots.map(slot=>{const isTaken=taken.includes(slot),isMine=myB&&myB.date===sel.date&&myB.slot===slot;return `<button class="sb ${isTaken?(isMine?'mn':'bk'):''}" ${isTaken&&!isMine?'disabled':''} onclick="${isTaken&&!isMine?'':'bookSlot(\''+sel.id+'\',\''+slot+'\')'}">${slot}</button>`;}).join('');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bb">${isChange?'예약 변경':'신규 예약'}</span><p style="font-size:15px;font-weight:700">상담 예약</p></div>
-  <p style="font-size:13px;color:#6b7280;margin-bottom:4px">날짜를 선택하고 원하는 시간을 클릭하세요.</p>
-  <p style="font-size:12px;color:#9ca3af;margin-bottom:4px">※ 예약된 시간은 관리자와의 조율에 따라 변경될 수 있습니다.</p>
-  <p style="font-size:12px;color:#9ca3af;margin-bottom:12px">※ 컨설팅 이전에 퇴원할 경우, 예약은 자동으로 취소됩니다.</p>
+  <p style="font-size:13px;color:#6b7280;margin-bottom:6px">날짜를 선택하고 원하는 시간을 클릭하세요.</p>
+  <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:3px">
+    <svg viewBox="0 0 512 512" fill="#f87171" style="width:12px;height:12px;flex-shrink:0;margin-top:3px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
+    <p style="font-size:12px;color:#9ca3af;line-height:1.45">예약된 시간은 관리자와의 조율에 따라 변경될 수 있습니다.</p>
+  </div>
+  <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:12px">
+    <svg viewBox="0 0 512 512" fill="#f87171" style="width:12px;height:12px;flex-shrink:0;margin-top:3px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
+    <p style="font-size:12px;color:#9ca3af;line-height:1.45">컨설팅 이전에 퇴원할 경우, 예약은 자동으로 취소됩니다.</p>
+  </div>
   <div class="dtabs">${dtabs}</div>
   <div style="background:#f9fafb;border-radius:10px;padding:14px"><p style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">${sel.label} 예약 가능 시간</p><div class="sg">${slots||'<p style="font-size:13px;color:#9ca3af">예약 가능한 시간이 없습니다.</p>'}</div></div>
   ${isChange?'<div style="margin-top:12px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}
@@ -2053,8 +2059,11 @@ async function rmSlot(dateId,slot){
   catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
 
 function openBulk(dateId){_('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">시간대 일괄 추가</p>
-  <p style="font-size:12px;color:#6b7280;margin-bottom:4px">30분 단위로 자동 생성합니다.</p>
-  <p style="font-size:11px;color:#9ca3af;margin-bottom:16px">⚠ 12:00, 12:30, 18:00, 18:30은 자동으로 제외됩니다.</p>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:6px">30분 단위로 자동 생성합니다.</p>
+  <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:16px">
+    <svg viewBox="0 0 512 512" fill="#f87171" style="width:11px;height:11px;flex-shrink:0;margin-top:3px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
+    <p style="font-size:11px;color:#9ca3af;line-height:1.45">12:00, 12:30, 18:00, 18:30은 자동으로 제외됩니다.</p>
+  </div>
   <input type="hidden" id="bid" value="${dateId}">
   <div class="frow"><div class="fg"><label class="fl">시작 시간</label><input class="fi" id="bs" type="time" value="09:00"></div><div class="fg"><label class="fl">종료 시간 (미포함)</label><input class="fi" id="be" type="time" value="19:00"></div></div>
   <div class="ferr" id="mErr"></div>
@@ -2815,13 +2824,14 @@ function renderMyPage(){
       </div>
     </div>
     <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <p style="font-size:11px;font-weight:700;color:#6b7280">연락처</p>
-        <button class="btn bs bsm" onclick="openMyContactEdit()">수정</button>
-      </div>
+      <p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:10px">연락처</p>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px">
         <span style="color:#6b7280">학생 연락처</span><span style="font-weight:600">${fmtPhone(stu.studentPhone||'')||'—'}</span>
         <span style="color:#6b7280">보호자 연락처</span><span style="font-weight:600">${fmtPhone(stu.guardianPhone||'')||'—'}</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:flex-start;margin-top:10px">
+        <svg viewBox="0 0 512 512" fill="#f87171" style="width:12px;height:12px;flex-shrink:0;margin-top:2px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
+        <p style="font-size:11px;color:#9ca3af;line-height:1.45">연락처 변경은 관리자에게 문의해주세요.</p>
       </div>
     </div>
     <div class="card" style="margin-bottom:12px">
@@ -2838,27 +2848,6 @@ function renderMyPage(){
         <button class="btn bp bsm" onclick="goConsulting()">바로가기</button>
       </div>
     </div>`;
-}
-function openMyContactEdit(){
-  const stu=S.students.find(x=>x._docId===S.studentDocId);if(!stu)return;
-  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">연락처 수정</p>
-    <div class="fg"><label class="fl">학생 연락처</label><input class="fi" id="mcStu" value="${fmtPhone(stu.studentPhone||'')}" oninput="fmtPhoneInput(this)" maxlength="13"></div>
-    <div class="fg"><label class="fl">보호자 연락처</label><input class="fi" id="mcGd" value="${fmtPhone(stu.guardianPhone||'')}" oninput="fmtPhoneInput(this)" maxlength="13"></div>
-    <div class="ferr" id="mErr"></div>
-    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitMyContact()">저장</button></div>`;
-  openModal();
-}
-async function submitMyContact(){
-  const stuPhone=_('mcStu').value.replace(/\D/g,'');
-  const gdPhone=_('mcGd').value.replace(/\D/g,'');
-  if(stuPhone.length<9){showErr('mErr','학생 연락처를 올바르게 입력해주세요.');return;}
-  showLoad(true);
-  try{
-    await db.collection('students').doc(S.studentDocId).update({studentPhone:stuPhone,guardianPhone:gdPhone});
-    const s=S.students.find(x=>x._docId===S.studentDocId);if(s){s.studentPhone=stuPhone;s.guardianPhone=gdPhone;}
-    closeModal();renderMyPage();
-  }catch(e){showErr('mErr','저장 실패: '+e.message);}
-  showLoad(false);
 }
 function openMyPwChange(){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">비밀번호 변경</p>
