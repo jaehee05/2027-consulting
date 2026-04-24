@@ -137,7 +137,8 @@ tr:last-child td{border-bottom:none}
 .po{display:none}
 code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace}
 .empty{text-align:center;padding:36px 20px;color:#9ca3af;font-size:13px}
-.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
+.home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:24px}
+.hc-ico.purple{background:#f5f3ff;color:#7c3aed}
 #vHome{display:flex;flex-direction:column;min-height:100vh}
 #vHome .page{flex:1;width:100%}
 .home-footer{padding:20px 16px 16px;font-size:11px;color:#9ca3af;line-height:1.7;word-break:keep-all}
@@ -175,6 +176,7 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -265,20 +267,7 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
   </div>
   <div class="page" style="max-width:780px">
     <div style="padding:8px 4px 0" id="homeHeader"></div>
-    <div class="home-grid">
-      <button class="home-card" onclick="goClassroom()">
-        <div class="hc-ico blue">📺</div>
-        <div class="hc-title">강의실</div>
-        <div class="hc-desc">인터넷 강의 영상을 시청하고<br>학습을 진행합니다.</div>
-        <div class="hc-cta">입장하기 →</div>
-      </button>
-      <button class="home-card" onclick="goConsulting()">
-        <div class="hc-ico green">🗓️</div>
-        <div class="hc-title">컨설팅</div>
-        <div class="hc-desc">모의평가 성적 기반 1:1<br>상담 예약을 진행합니다.</div>
-        <div class="hc-cta">입장하기 →</div>
-      </button>
-    </div>
+    <div class="home-grid" id="homeCards"></div>
   </div>
   <footer class="home-footer">
     <div class="home-footer-inner">
@@ -287,6 +276,15 @@ code{font-size:11px;background:#f3f4f6;padding:2px 6px;border-radius:4px;font-fa
       개인정보보호 책임자 김재희 | 호스팅서비스 Google Firebase
     </div>
   </footer>
+</div>
+
+<!-- 마이페이지 -->
+<div id="vMy" class="hidden">
+  <div class="topbar">
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip">MY</span><span class="tname">KJHEDU</span></div>
+    <div class="tr"><span class="uname" id="myUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+  </div>
+  <div class="page" style="max-width:660px"><div id="myC"></div></div>
 </div>
 
 <!-- 강의실 -->
@@ -318,6 +316,8 @@ const db = firebase.firestore();
 // `firebase deploy --only functions` 최초 배포 후 출력되는 URL로 교체하세요.
 // 예: https://ppurioadmin-xxxxxxxxxx-an.a.run.app
 const PPURIO_ADMIN_URL = 'https://ppurioadmin-tymdeyhn3q-du.a.run.app';
+// 로그인 토큰 발급 Cloud Function URL.
+const LOGIN_TOKEN_URL = 'https://asia-northeast3-consulting-dd53f.cloudfunctions.net/loginToken';
 
 const EXCL = ['12:00','12:30','18:00','18:30'];
 const DFLT_DATES = [
@@ -537,7 +537,7 @@ function stopRequestsListener(){if(_reqListener){try{_reqListener();}catch(e){}_
 
 var _skipPush=false;
 function showView(id){
-  ['vSetup','vLogin','vCpw','vStu','vAdmin','vHome','vClass'].forEach(v=>{
+  ['vSetup','vLogin','vCpw','vStu','vAdmin','vHome','vClass','vMy'].forEach(v=>{
     const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
     if(['vSetup','vLogin'].includes(v))el.style.display=v===id?'flex':'none';
   });
@@ -601,39 +601,28 @@ async function doLogin(){
   if(!id||!pw){showErr('lErr','아이디와 비밀번호를 입력하세요.');return;}
   showLoad(true);
   try{
-    const adminDoc=await db.collection('admins').doc(id).get();
-    if(adminDoc.exists){
-      const a=adminDoc.data();
-      if(a.password!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
-      if(a.role==='test'){
-        S.user={type:'student',isTest:true,id:a.id,name:a.name};
-        S.studentDocId=a.linkedStudentId;
-        saveSession({type:'student',isTest:true,id:a.id,name:a.name,studentDocId:a.linkedStudentId},keep);
-        await loadAll();
-        _('stuUname').textContent=a.name+' (테스트)';
-        enterHome();return;
-      }
-      S.user={type:a.role,id:a.id,name:a.name};
-      saveSession({type:a.role,id:a.id,name:a.name},keep);
+    const persistence=keep?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION;
+    await firebase.auth().setPersistence(persistence);
+    const resp=await fetch(LOGIN_TOKEN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,password:pw})});
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok){showLoad(false);showErr('lErr',data.error||'아이디 또는 비밀번호가 올바르지 않습니다.');return;}
+    await firebase.auth().signInWithCustomToken(data.token);
+    if(data.type==='student'){
+      S.user={type:'student',id:data.id,name:data.name,isTest:!!data.isTest};
+      S.studentDocId=data.studentDocId||null;
+      saveSession({type:'student',id:data.id,name:data.name,studentDocId:data.studentDocId||null,isTest:!!data.isTest},keep);
       await loadAll();
-      _('adminUname').textContent=a.name;
-      _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
+      if(data.isFirstLogin){showLoad(false);showView('vCpw');return;}
+      _('stuUname').textContent=data.isTest?data.name+' (테스트)':data.name+' 학생';
       enterHome();return;
     }
-    const stuQ=await db.collection('students').where('accountId','==',id).get();
-    if(!stuQ.empty){
-      const stuDoc=stuQ.docs[0],stu=stuDoc.data();
-      if(stu.accountPw!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
-      S.user={type:'student',id,name:stu.name};
-      S.studentDocId=stuDoc.id;
-      saveSession({type:'student',id,name:stu.name,studentDocId:stuDoc.id},keep);
-      await loadAll();
-      if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
-      _('stuUname').textContent=stu.name+' 학생';
-      enterHome();return;
-    }
-    showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');
-  }catch(e){showErr('lErr','오류: '+e.message);}
+    S.user={type:data.type,id:data.id,name:data.name};
+    saveSession({type:data.type,id:data.id,name:data.name},keep);
+    await loadAll();
+    _('adminUname').textContent=data.name;
+    _('adminRoleLabel').textContent=data.type==='admin'?'ADMIN':'OP';
+    enterHome();
+  }catch(e){showErr('lErr','오류: '+(e.message||e));}
   showLoad(false);
 }
 
@@ -644,6 +633,7 @@ function doLogout(){
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   clearSession();
+  try{firebase.auth().signOut().catch(()=>{});}catch(_){}
   _('lId').value='';_('lPw').value='';_('lKeep').checked=false;hideErr('lErr');
   try{history.replaceState({v:'vHome'},'',location.pathname+location.search);}catch(_){}
   _skipPush=true;try{enterHome();}finally{_skipPush=false;}
@@ -2750,7 +2740,7 @@ async function editChip(key,defaultValue){
   }catch(e){alert('저장 실패: '+e.message);}
 }
 function enterHome(){
-  const tr=_('homeTr'),hdr=_('homeHeader');
+  const tr=_('homeTr'),hdr=_('homeHeader'),cards=_('homeCards');
   if(S.user){
     const greet=S.user.name||'';
     const unameTxt=S.user.isTest?greet+' (테스트)':(S.user.type==='student'?greet+' 학생':greet);
@@ -2759,6 +2749,19 @@ function enterHome(){
   }else{
     if(tr)tr.innerHTML=`<button class="btn bp bsm" onclick="goLoginView()">로그인</button>`;
     if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">KJHEDU</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
+  }
+  if(cards){
+    const items=[
+      {ico:'📺',color:'blue',title:'강의실',desc:'인터넷 강의 영상을 시청하고<br>학습을 진행합니다.',onclick:'goClassroom()'},
+      {ico:'🗓️',color:'green',title:'컨설팅',desc:'모의평가 성적 기반 1:1<br>상담 예약을 진행합니다.',onclick:'goConsulting()'},
+    ];
+    if(S.user?.type==='student')items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
+    cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
+      <div class="hc-ico ${it.color}">${it.ico}</div>
+      <div class="hc-title">${it.title}</div>
+      <div class="hc-desc">${it.desc}</div>
+      <div class="hc-cta">입장하기 →</div>
+    </button>`).join('');
   }
   showView('vHome');
   applyChips();
@@ -2777,6 +2780,107 @@ function goConsulting(){
     showView('vAdmin');applyChips();
     setTab(S.user.type==='admin'?'students':'bookings');
   }
+}
+function goMyPage(){
+  if(S.user?.type!=='student'){goHome();return;}
+  _('myUname').textContent=S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생';
+  showView('vMy');renderMyPage();
+  if(!_skipPush)navPush({v:'vMy'});
+}
+function classStatusLabel(status){
+  return {pending:'승인 대기 중',approved:'수강 중',rejected:'반려됨'}[status]||'미신청';
+}
+function renderMyPage(){
+  const stu=S.students.find(x=>x._docId===S.studentDocId);
+  if(!stu){_('myC').innerHTML='<div class="card"><p>학생 정보를 찾을 수 없습니다.</p></div>';return;}
+  const myBooking=S.bookings.find(b=>b.studentId===S.studentDocId);
+  const classSt=classroomStatusOf(stu);
+  _('myC').innerHTML=`
+    <div class="card" style="margin-bottom:12px">
+      <p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:10px">기본 정보</p>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px">
+        <span style="color:#6b7280">이름</span><span style="font-weight:600">${escapeHtml(stu.name||'')}</span>
+        <span style="color:#6b7280">학교</span><span style="font-weight:600">${escapeHtml(stu.school||'—')}</span>
+        <span style="color:#6b7280">학년</span><span style="font-weight:600">${escapeHtml(stu.grade||'—')}</span>
+        <span style="color:#6b7280">아이디</span><span style="font-weight:600">${escapeHtml(stu.accountId||'')}</span>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <p style="font-size:11px;font-weight:700;color:#6b7280">연락처</p>
+        <button class="btn bs bsm" onclick="openMyContactEdit()">수정</button>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px">
+        <span style="color:#6b7280">학생 연락처</span><span style="font-weight:600">${fmtPhone(stu.studentPhone||'')||'—'}</span>
+        <span style="color:#6b7280">보호자 연락처</span><span style="font-weight:600">${fmtPhone(stu.guardianPhone||'')||'—'}</span>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">비밀번호</p>
+        <p style="font-size:12px;color:#6b7280">보안을 위해 주기적으로 변경해주세요.</p></div>
+        <button class="btn bs bsm" onclick="openMyPwChange()">변경</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">강의실</p>
+        <p style="font-size:13px;font-weight:600">${classStatusLabel(classSt)}</p></div>
+        <button class="btn bp bsm" onclick="goClassroom()">바로가기</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">컨설팅 예약</p>
+        <p style="font-size:13px;font-weight:600">${myBooking?escapeHtml(myBooking.dateLabel||'')+' '+escapeHtml(myBooking.slot||''):'예약 없음'}</p></div>
+        <button class="btn bp bsm" onclick="goConsulting()">바로가기</button>
+      </div>
+    </div>`;
+}
+function openMyContactEdit(){
+  const stu=S.students.find(x=>x._docId===S.studentDocId);if(!stu)return;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">연락처 수정</p>
+    <div class="fg"><label class="fl">학생 연락처</label><input class="fi" id="mcStu" value="${fmtPhone(stu.studentPhone||'')}" oninput="fmtPhoneInput(this)" maxlength="13"></div>
+    <div class="fg"><label class="fl">보호자 연락처</label><input class="fi" id="mcGd" value="${fmtPhone(stu.guardianPhone||'')}" oninput="fmtPhoneInput(this)" maxlength="13"></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitMyContact()">저장</button></div>`;
+  openModal();
+}
+async function submitMyContact(){
+  const stuPhone=_('mcStu').value.replace(/\D/g,'');
+  const gdPhone=_('mcGd').value.replace(/\D/g,'');
+  if(stuPhone.length<9){showErr('mErr','학생 연락처를 올바르게 입력해주세요.');return;}
+  showLoad(true);
+  try{
+    await db.collection('students').doc(S.studentDocId).update({studentPhone:stuPhone,guardianPhone:gdPhone});
+    const s=S.students.find(x=>x._docId===S.studentDocId);if(s){s.studentPhone=stuPhone;s.guardianPhone=gdPhone;}
+    closeModal();renderMyPage();
+  }catch(e){showErr('mErr','저장 실패: '+e.message);}
+  showLoad(false);
+}
+function openMyPwChange(){
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">비밀번호 변경</p>
+    <div class="fg"><label class="fl">현재 비밀번호</label><input class="fi" id="mpOld" type="password" autocomplete="current-password"></div>
+    <div class="fg"><label class="fl">새 비밀번호 (6자 이상)</label><input class="fi" id="mpNew" type="password" autocomplete="new-password"></div>
+    <div class="fg"><label class="fl">새 비밀번호 확인</label><input class="fi" id="mpNew2" type="password" autocomplete="new-password"></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitMyPwChange()">변경</button></div>`;
+  openModal();
+}
+async function submitMyPwChange(){
+  const oldPw=_('mpOld').value,newPw=_('mpNew').value,newPw2=_('mpNew2').value;
+  const stu=S.students.find(x=>x._docId===S.studentDocId);
+  if(!stu){showErr('mErr','학생 정보를 찾을 수 없습니다.');return;}
+  if(oldPw!==stu.accountPw){showErr('mErr','현재 비밀번호가 올바르지 않습니다.');return;}
+  if(newPw.length<6){showErr('mErr','새 비밀번호는 6자 이상이어야 합니다.');return;}
+  if(newPw!==newPw2){showErr('mErr','새 비밀번호가 일치하지 않습니다.');return;}
+  showLoad(true);
+  try{
+    await db.collection('students').doc(S.studentDocId).update({accountPw:newPw});
+    stu.accountPw=newPw;
+    closeModal();alert('비밀번호가 변경되었습니다.');
+  }catch(e){showErr('mErr','저장 실패: '+e.message);}
+  showLoad(false);
 }
 function goClassroom(){
   if(!S.user){goLoginView();return;}
@@ -2798,9 +2902,24 @@ function ytEmbedUrl(url){
 }
 function classroomStatusOf(stu){return stu?.classroomStatus||'none';}
 function openClassLecture(id){S.classLectureId=id||null;renderClass();}
+async function toggleClassroomMaintenance(){
+  const next=!S.config?.classroomMaintenance;
+  try{
+    await db.collection('config').doc('main').set({classroomMaintenance:next},{merge:true});
+    S.config=S.config||{};S.config.classroomMaintenance=next;
+    renderClass();
+  }catch(e){alert('실패: '+e.message);}
+}
 function renderClass(){
   const box=_('classC');if(!box)return;
   if(S.user?.type==='admin'||S.user?.type==='operator')return renderClassAdmin();
+  if(S.config?.classroomMaintenance){
+    box.innerHTML=`<div class="apply-hero">
+      <div class="ah-ico">🛠️</div>
+      <h2>강의실 준비중입니다</h2>
+      <p>현재 강의실은 점검 중입니다.<br>잠시 후 다시 이용해주세요.</p>
+    </div>`;return;
+  }
   const stu=S.students.find(x=>x._docId===S.studentDocId);
   const status=classroomStatusOf(stu);
   if(status==='approved'){
@@ -2889,9 +3008,15 @@ function renderClassAdmin(){
 }
 function setClassSub(s){S.classSub=s;renderClass();}
 function renderClassAdminList(){
+  const mnt=!!S.config?.classroomMaintenance;
+  const mntBanner=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${mnt?'#fef3c7':'#f9fafb'};border:1px solid ${mnt?'#fcd34d':'#e5e7eb'};border-radius:10px;padding:12px 14px;margin-bottom:14px">
+    <div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:700">준비중 모드 ${mnt?'<span class="app-badge pending" style="margin-left:4px">ON</span>':''}</p>
+    <p style="font-size:11px;color:#6b7280;margin-top:2px;word-break:keep-all">활성화 시 학생에게 강의 대신 준비중 안내가 표시됩니다.</p></div>
+    <button class="btn ${mnt?'bd':'bp'} bsm" onclick="toggleClassroomMaintenance()">${mnt?'OFF로':'ON으로'}</button>
+  </div>`;
   const addBtn=`<div style="margin-bottom:12px;text-align:right"><button class="btn bp bsm" onclick="openLectureForm()">+ 강의 추가</button></div>`;
-  if(S.lectures.length===0)return addBtn+`<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">등록된 강의가 없습니다. 추가 버튼으로 시작하세요.</div>`;
-  return addBtn+S.lectures.map(l=>`<div class="lec-card">
+  if(S.lectures.length===0)return mntBanner+addBtn+`<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">등록된 강의가 없습니다. 추가 버튼으로 시작하세요.</div>`;
+  return mntBanner+addBtn+S.lectures.map(l=>`<div class="lec-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px">
       <div style="flex:1"><p class="lec-title">${escapeHtml(l.title||'제목 없음')}</p>
       ${l.description?`<p class="lec-desc" style="margin-bottom:6px">${escapeHtml(l.description)}</p>`:''}
@@ -3013,42 +3138,51 @@ async function revokeClassAccess(studentId){
 async function init(){
   showLoad(true);
   try{
-    const snap=await db.collection('admins').limit(1).get();
-    if(snap.empty){showLoad(false);showView('vSetup');return;}
-    const saved=readSession();
-    if(saved){
-      const sess=JSON.parse(saved);
-      if(sess.type==='student'){
-        const stuQ=await db.collection('students').where('accountId','==',sess.id).get();
-        if(!stuQ.empty){
-          S.user={type:'student',id:sess.id,name:sess.name,isTest:!!sess.isTest};
-          S.studentDocId=stuQ.docs[0].id;
-          await loadAll();
-          const stu=stuQ.docs[0].data();
-          if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
-          _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
-          showLoad(false);enterHome();return;
-        }
-      }else{
-        const adminDoc=await db.collection('admins').doc(sess.id).get();
-        if(adminDoc.exists){
-          const a=adminDoc.data();
-          S.user={type:a.role,id:a.id,name:a.name};
-          await loadAll();
-          _('adminUname').textContent=a.name;
-          _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
-          showLoad(false);enterHome();return;
-        }
-      }
-      clearSession();
+    await new Promise(resolve=>{const unsub=firebase.auth().onAuthStateChanged(()=>{unsub();resolve();});});
+    if(!firebase.auth().currentUser){
+      clearSession();showLoad(false);enterHome();return;
     }
-    try{
-      const cfgSnap=await db.collection('config').doc('main').get();
-      if(cfgSnap.exists)S.config={...S.config,...cfgSnap.data()};
-    }catch(_){}
+    const saved=readSession();
+    if(!saved){
+      await firebase.auth().signOut().catch(()=>{});
+      showLoad(false);enterHome();return;
+    }
+    const sess=JSON.parse(saved);
+    if(sess.type==='student'){
+      let stuDoc=null;
+      if(sess.studentDocId){
+        const d=await db.collection('students').doc(sess.studentDocId).get();
+        if(d.exists)stuDoc=d;
+      }
+      if(!stuDoc){
+        const q=await db.collection('students').where('accountId','==',sess.id).get();
+        if(!q.empty)stuDoc=q.docs[0];
+      }
+      if(stuDoc){
+        S.user={type:'student',id:sess.id,name:sess.name,isTest:!!sess.isTest};
+        S.studentDocId=stuDoc.id;
+        await loadAll();
+        const stu=stuDoc.data();
+        if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
+        _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
+        showLoad(false);enterHome();return;
+      }
+    }else{
+      const adminDoc=await db.collection('admins').doc(sess.id).get();
+      if(adminDoc.exists){
+        const a=adminDoc.data();
+        S.user={type:a.role,id:a.id,name:a.name};
+        await loadAll();
+        _('adminUname').textContent=a.name;
+        _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
+        showLoad(false);enterHome();return;
+      }
+    }
+    await firebase.auth().signOut().catch(()=>{});
+    clearSession();
     showLoad(false);enterHome();
   }catch(e){
-    _('vLoad').innerHTML=`<div style="text-align:center;padding:40px"><p style="font-size:16px;font-weight:700;color:#dc2626;margin-bottom:8px">Firestore 연결 실패</p><p style="font-size:13px;color:#6b7280">${e.message}</p><p style="font-size:12px;color:#9ca3af;margin-top:8px">Firebase 콘솔에서 Firestore 규칙을 확인해주세요.</p></div>`;
+    _('vLoad').innerHTML=`<div style="text-align:center;padding:40px"><p style="font-size:16px;font-weight:700;color:#dc2626;margin-bottom:8px">로딩 실패</p><p style="font-size:13px;color:#6b7280">${e.message}</p></div>`;
     _('vLoad').style.display='flex';}
 }
 init();
@@ -3092,6 +3226,7 @@ window.addEventListener('popstate',function(e){
   try{
     if(st.v==='vHome'){enterHome();}
     else if(!S.user){enterHome();}
+    else if(st.v==='vMy'){goMyPage();}
     else if(st.v==='vClass'){goClassroom();}
     else if(st.v==='vStu'){
       if(S.user.type!=='student'){enterHome();return;}

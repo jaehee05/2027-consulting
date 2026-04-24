@@ -149,6 +149,53 @@ function setCors(res) {
   res.set("Access-Control-Allow-Headers", "Content-Type");
 }
 
+// 로그인 ID/PW 검증 후 Firebase Custom Token 발급.
+// 클라이언트는 이 토큰으로 signInWithCustomToken 하여 Firestore 에 접근한다.
+exports.loginToken = onRequest(async (req, res) => {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  try {
+    const { id, password } = req.body || {};
+    if (!id || !password) return res.status(400).json({ error: "id/password required" });
+    const fs = admin.firestore();
+
+    const adminDoc = await fs.doc(`admins/${id}`).get();
+    if (adminDoc.exists) {
+      const a = adminDoc.data();
+      if (a.password === password) {
+        if (a.role === "test") {
+          const uid = `test_${id}`;
+          const claims = { role: "student", isTest: true, name: a.name || "", loginId: id, studentId: a.linkedStudentId || "" };
+          const token = await admin.auth().createCustomToken(uid, claims);
+          return res.json({ token, type: "student", isTest: true, id, name: a.name || "", studentDocId: a.linkedStudentId || null });
+        }
+        const uid = `admin_${id}`;
+        const claims = { role: a.role, name: a.name || "", loginId: id };
+        const token = await admin.auth().createCustomToken(uid, claims);
+        return res.json({ token, type: a.role, id, name: a.name || "" });
+      }
+    }
+
+    const stuQ = await fs.collection("students").where("accountId", "==", id).get();
+    if (!stuQ.empty) {
+      const stuDoc = stuQ.docs[0];
+      const stu = stuDoc.data();
+      if (stu.accountPw === password) {
+        const uid = `stu_${stuDoc.id}`;
+        const claims = { role: "student", name: stu.name || "", loginId: id, studentId: stuDoc.id };
+        const token = await admin.auth().createCustomToken(uid, claims);
+        return res.json({ token, type: "student", id, name: stu.name || "", studentDocId: stuDoc.id, isFirstLogin: !!stu.isFirstLogin });
+      }
+    }
+
+    return res.status(401).json({ error: "아이디 또는 비밀번호가 올바르지 않습니다." });
+  } catch (err) {
+    console.error("loginToken 오류:", err);
+    return res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
 exports.ppurioAdmin = onRequest(async (req, res) => {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(204).send("");
