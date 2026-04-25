@@ -680,7 +680,8 @@ function renderStu(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
   const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
-  if(myB){clearBookCountdown();_('stuC').innerHTML=bookCardHtml(myB)+examCards+qCardHtml(myB);}
+  const consultCard=myStu?stuConsultNotesCardHtml(myStu):'';
+  if(myB){clearBookCountdown();_('stuC').innerHTML=bookCardHtml(myB)+consultCard+examCards+qCardHtml(myB);}
   else if(myStu){
     const bOpen=isBookingOpen();
     const pl=bookPeriodLabel();
@@ -702,7 +703,7 @@ function renderStu(){
       }
       emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간일 경우, 아래에서 입력 가능합니다.</p></div>`;
     }
-    _('stuC').innerHTML=emptyCard+examCards;
+    _('stuC').innerHTML=emptyCard+consultCard+examCards;
     if(!bOpen){const st=bookPeriodStatus();if(st.kind==='before')startBookCountdown(st.startAt);}
   }
   else{clearBookCountdown();showBookForm(false);}
@@ -986,6 +987,22 @@ function examScoreCardHtml(exam,stu){
   else if(!open)body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${exam.scoreStart?`<br><span style="font-size:12px">기간: ${exam.scoreStart} ~ ${exam.scoreEnd||'무기한'}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
   return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">${exam.name} 성적</p></div>${editBtn||startBtn}</div>${pNote}${body}</div>`;}
 
+function stuConsultNotesCardHtml(stu){
+  if(!stu||!stu.consultNotes)return '';
+  const cExams=getExams();
+  const visibleExams=cExams.filter(ex=>{const n=stu.consultNotes[ex.id];return n&&n.visible&&n.note&&n.note.trim();});
+  if(!visibleExams.length)return '';
+  const tabIdx=Math.min(S.stuConsultTab||0, visibleExams.length-1);
+  const selEx=visibleExams[tabIdx];
+  const tabsHtml=visibleExams.length>1?'<div class="dtabs" style="margin-bottom:10px">'+visibleExams.map((ex,i)=>`<button class="dt ${i===tabIdx?'on':''}" onclick="S.stuConsultTab=${i};renderStu()">${escapeHtml(ex.name)}</button>`).join('')+'</div>':`<p style="font-size:12px;color:#6b7280;margin-bottom:8px">${escapeHtml(selEx.name)}</p>`;
+  const note=stu.consultNotes[selEx.id].note;
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bg">컨설팅</span><p style="font-size:15px;font-weight:700">컨설팅 내용</p></div>
+    ${tabsHtml}
+    <div style="font-size:13px;line-height:1.6;color:#374151;background:#f9fafb;border-radius:8px;padding:12px;white-space:pre-wrap">${escapeHtml(note)}</div>
+  </div>`;
+}
+
 function qCardHtml(booking){return `<div class="card" style="margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx ${booking.question?'bg':'bb'}">질문 & 고민</span><p style="font-size:15px;font-weight:700">상담 전 질문 & 고민</p></div>
   <div class="fg" style="margin-bottom:12px"><label class="fl">상담에서 다루고 싶은 내용을 자유롭게 적어주세요</label><textarea class="fi ta" id="sk-q" rows="5">${booking.question||''}</textarea></div>
@@ -1205,9 +1222,9 @@ function renderAdminConsult(){
   const cExams=getExams();
   const rows=sorted.map(s=>{
     const booked=S.bookings.some(b=>b.studentId===s._docId);
-    const hasNote=s.consultNote&&s.consultNote.trim();
+    const hasNote=(s.consultNote&&s.consultNote.trim())||(s.consultNotes&&Object.values(s.consultNotes).some(n=>n&&n.note&&n.note.trim()));
     const scoreCells=cExams.map(ex=>`<td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(s,ex.id)?'#22c55e':'#d1d5db'}"></span></td>`).join('');
-    return `<tr style="cursor:pointer" onclick="S.consultStuId='${s._docId}';S.consultScoreTab=0;S.consultGraphTab=0;renderAdminConsult()">
+    return `<tr style="cursor:pointer" onclick="S.consultStuId='${s._docId}';S.consultScoreTab=0;S.consultGraphTab=0;S.consultNoteTab=0;renderAdminConsult()">
       <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
@@ -1395,31 +1412,90 @@ function renderConsultDetail(){
       <div class="dtabs" style="margin-bottom:10px">${graphTabs}</div>
       ${graphBody}
     </div>
-    <div class="card">
-      <p style="font-size:13px;font-weight:700;margin-bottom:8px">컨설팅 내용</p>
-      <textarea class="fi ta" id="consultInput" rows="8" placeholder="컨설팅 내용을 기록하세요...">${stu.consultNote||''}</textarea>
-      <button class="btn bp bsm" style="margin-top:10px" onclick="saveConsultNote('${S.consultStuId}')">저장</button>
-    </div>`;
+    ${consultNotesEditorHtml(stu)}`;
 }
 
-async function saveConsultNote(stuDocId){
-  const note=_('consultInput')?.value||'';
+function consultNotesEditorHtml(stu){
+  const cExams=getExams();
+  if(!cExams.length){
+    const legacy=stu.consultNote||'';
+    return `<div class="card"><p style="font-size:13px;font-weight:700;margin-bottom:8px">컨설팅 내용</p>
+      <p style="font-size:12px;color:#9ca3af">시험을 먼저 등록해주세요.</p>
+      ${legacy?`<div style="margin-top:10px;padding:10px;background:#f9fafb;border-radius:8px;font-size:12px;color:#6b7280;white-space:pre-wrap">이전 기록: ${escapeHtml(legacy)}</div>`:''}
+    </div>`;
+  }
+  const tabIdx=Math.min(S.consultNoteTab||0, cExams.length-1);
+  const selExam=cExams[tabIdx];
+  const cur=(stu.consultNotes&&stu.consultNotes[selExam.id])||{note:'',visible:false};
+  const tabs=cExams.map((ex,i)=>{
+    const n=stu.consultNotes&&stu.consultNotes[ex.id];
+    const has=n&&n.note&&n.note.trim();
+    const vis=n&&n.visible;
+    const dot=has?`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${vis?'#22c55e':'#9ca3af'};margin-left:4px;vertical-align:middle"></span>`:'';
+    return `<button class="dt ${i===tabIdx?'on':''}" onclick="switchConsultNoteTab(${i})">${escapeHtml(ex.name)}${dot}</button>`;
+  }).join('');
+  const legacy=stu.consultNote||'';
+  const legacyBlock=legacy?`<div style="margin-top:12px;padding:10px 12px;background:#f9fafb;border:1px dashed #e5e7eb;border-radius:8px"><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">이전 기록 (시험 미지정)</p><p style="font-size:12px;color:#6b7280;white-space:pre-wrap;line-height:1.5">${escapeHtml(legacy)}</p></div>`:'';
+  return `<div class="card">
+    <p style="font-size:13px;font-weight:700;margin-bottom:10px">컨설팅 내용</p>
+    <div class="dtabs" style="margin-bottom:10px">${tabs}</div>
+    <textarea class="fi ta" id="consultInput" rows="8" placeholder="${escapeHtml(selExam.name)} 컨설팅 내용을 기록하세요...">${escapeHtml(cur.note||'')}</textarea>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:10px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;user-select:none">
+        <input type="checkbox" id="consultVisible" ${cur.visible?'checked':''} onchange="toggleConsultVisible('${stu._docId}','${selExam.id}',this.checked)" style="width:16px;height:16px;cursor:pointer">
+        <span>학생에게 공개</span>
+      </label>
+      <button class="btn bp bsm" onclick="saveConsultNote('${stu._docId}','${selExam.id}')">저장</button>
+    </div>
+    ${legacyBlock}
+  </div>`;
+}
+
+function _readConsultEditor(){
+  return {note:_('consultInput')?.value||'',visible:_('consultVisible')?.checked||false};
+}
+async function _persistConsultNote(stuDocId,examId,data){
+  const stu=S.students.find(x=>x._docId===stuDocId);
+  if(stu){if(!stu.consultNotes)stu.consultNotes={};stu.consultNotes[examId]={note:data.note,visible:data.visible};}
+  await db.collection('students').doc(stuDocId).update({['consultNotes.'+examId]:{note:data.note,visible:data.visible}});
+}
+function _currentConsultExamId(){
+  const cExams=getExams();if(!cExams.length)return null;
+  const idx=Math.min(S.consultNoteTab||0, cExams.length-1);
+  return cExams[idx]?.id||null;
+}
+async function _autoSaveCurrentConsultTab(){
+  const stuDocId=S.consultStuId;const examId=_currentConsultExamId();
+  if(!stuDocId||!examId)return;
+  const data=_readConsultEditor();
+  const stu=S.students.find(x=>x._docId===stuDocId);
+  const prev=stu?.consultNotes?.[examId]||{note:'',visible:false};
+  if(data.note===(prev.note||'')&&data.visible===!!prev.visible)return;
+  try{await _persistConsultNote(stuDocId,examId,data);}catch(e){}
+}
+
+async function saveConsultNote(stuDocId,examId){
+  const data=_readConsultEditor();
   showLoad(true);
-  try{
-    await db.collection('students').doc(stuDocId).update({consultNote:note});
-    const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.consultNote=note;
-    renderConsultDetail();
-  }catch(e){alert('저장 실패: '+e.message);}
+  try{await _persistConsultNote(stuDocId,examId,data);renderConsultDetail();}
+  catch(e){alert('저장 실패: '+e.message);}
   showLoad(false);
 }
-async function autoSaveConsultNote(){
-  const stuDocId=S.consultStuId;if(!stuDocId)return;
+async function toggleConsultVisible(stuDocId,examId,visible){
   const note=_('consultInput')?.value||'';
-  const stu=S.students.find(x=>x._docId===stuDocId);
-  if(stu&&note!==( stu.consultNote||'')){
-    try{await db.collection('students').doc(stuDocId).update({consultNote:note});stu.consultNote=note;}catch(e){}
-  }
-  S.consultStuId=null;renderAdminConsult();
+  showLoad(true);
+  try{await _persistConsultNote(stuDocId,examId,{note,visible});}
+  catch(e){alert('저장 실패: '+e.message);_('consultVisible').checked=!visible;}
+  showLoad(false);
+}
+async function switchConsultNoteTab(newIdx){
+  await _autoSaveCurrentConsultTab();
+  S.consultNoteTab=newIdx;
+  renderConsultDetail();
+}
+async function autoSaveConsultNote(){
+  await _autoSaveCurrentConsultTab();
+  S.consultStuId=null;S.consultNoteTab=0;renderAdminConsult();
 }
 
 /* ── ADMIN: 학생 ── */
@@ -2773,7 +2849,11 @@ function enterHome(){
     const items=[
       {ico:'🗓️',color:'green',title:'컨설팅',desc:'성적 기반 컨설팅을<br>진행합니다.',onclick:'goConsulting()'},
     ];
-    if(S.user?.type==='student')items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
+    const isStu=S.user?.type==='student';
+    const isAdmin=S.user?.type==='admin';
+    const classPublic=S.config?.classroomPublic===true;
+    if(isAdmin||(isStu&&classPublic))items.push({ico:'📺',color:'blue',title:'강의실',desc:'온라인 강의를<br>시청합니다.',onclick:'goClassroom()'});
+    if(isStu)items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
       <div class="hc-ico ${it.color}">${it.ico}</div>
       <div class="hc-title">${it.title}</div>
@@ -2875,9 +2955,10 @@ async function submitMyPwChange(){
 }
 function goClassroom(){
   if(!S.user){goLoginView();return;}
+  if(S.user.type==='operator'){enterHome();return;}
   S.classLectureId=null;
   _('classUname').textContent=S.user.isTest?S.user.name+' (테스트)':(S.user.type==='student'?S.user.name+' 학생':S.user.name);
-  _('classRoleLabel').textContent=S.user.type==='admin'?'ADMIN':(S.user.type==='operator'?'OP':'');
+  _('classRoleLabel').textContent=S.user.type==='admin'?'ADMIN':'';
   showView('vClass');applyChips();
   renderClass();
   if(!_skipPush)navPush({v:'vClass'});
@@ -2900,12 +2981,25 @@ function kollusEmbedUrl(urlOrCode){
   else if(/^[A-Za-z0-9_-]{4,32}$/.test(s))vcode=s;
   return vcode?`https://v.kr.kollus.com/${vcode}`:'';
 }
+function vimeoEmbedUrl(urlOrId){
+  const s=String(urlOrId||'').trim();
+  if(!s)return '';
+  if(/^\d+$/.test(s))return `https://player.vimeo.com/video/${s}`;
+  let m=s.match(/^(\d+)\/([A-Za-z0-9]+)$/);
+  if(m)return `https://player.vimeo.com/video/${m[1]}?h=${m[2]}`;
+  m=s.match(/player\.vimeo\.com\/video\/(\d+)(?:\?[^#]*\bh=([A-Za-z0-9]+))?/);
+  if(m)return m[2]?`https://player.vimeo.com/video/${m[1]}?h=${m[2]}`:`https://player.vimeo.com/video/${m[1]}`;
+  m=s.match(/vimeo\.com\/(\d+)(?:\/([A-Za-z0-9]+))?/);
+  if(m)return m[2]?`https://player.vimeo.com/video/${m[1]}?h=${m[2]}`:`https://player.vimeo.com/video/${m[1]}`;
+  return '';
+}
 function lectureEmbedUrl(l){
   if(!l)return '';
   if(l.provider==='kollus')return kollusEmbedUrl(l.videoUrl);
+  if(l.provider==='vimeo')return vimeoEmbedUrl(l.videoUrl);
   return ytEmbedUrl(l.videoUrl);
 }
-function providerLabel(p){return p==='kollus'?'Kollus':'YouTube';}
+function providerLabel(p){return p==='kollus'?'Kollus':p==='vimeo'?'Vimeo':'YouTube';}
 function classroomStatusOf(stu){return stu?.classroomStatus||'none';}
 function openClassLecture(id){S.classLectureId=id||null;renderClass();}
 async function toggleClassroomMaintenance(){
@@ -2916,9 +3010,18 @@ async function toggleClassroomMaintenance(){
     renderClass();
   }catch(e){alert('실패: '+e.message);}
 }
+async function toggleClassroomPublic(){
+  const next=!(S.config?.classroomPublic===true);
+  try{
+    await db.collection('config').doc('main').set({classroomPublic:next},{merge:true});
+    S.config=S.config||{};S.config.classroomPublic=next;
+    renderClass();
+  }catch(e){alert('실패: '+e.message);}
+}
 function renderClass(){
   const box=_('classC');if(!box)return;
-  if(S.user?.type==='admin'||S.user?.type==='operator')return renderClassAdmin();
+  if(S.user?.type==='operator'){enterHome();return;}
+  if(S.user?.type==='admin')return renderClassAdmin();
   if(S.config?.classroomMaintenance){
     box.innerHTML=`<div class="apply-hero">
       <div class="ah-ico">🛠️</div>
@@ -3015,14 +3118,20 @@ function renderClassAdmin(){
 function setClassSub(s){S.classSub=s;renderClass();}
 function renderClassAdminList(){
   const mnt=!!S.config?.classroomMaintenance;
+  const pub=S.config?.classroomPublic===true;
+  const pubBanner=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${pub?'#ecfdf5':'#f9fafb'};border:1px solid ${pub?'#86efac':'#e5e7eb'};border-radius:10px;padding:12px 14px;margin-bottom:10px">
+    <div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:700">학생 노출 ${pub?'<span class="app-badge approved" style="margin-left:4px">ON</span>':'<span class="app-badge" style="margin-left:4px;background:#e5e7eb;color:#6b7280">OFF</span>'}</p>
+    <p style="font-size:11px;color:#6b7280;margin-top:2px;word-break:keep-all">${pub?'학생 홈에 강의실 카드가 표시됩니다.':'OFF 상태에서는 학생에게 강의실 카드가 보이지 않습니다.'}</p></div>
+    <button class="btn ${pub?'bd':'bp'} bsm" onclick="toggleClassroomPublic()">${pub?'OFF로':'ON으로'}</button>
+  </div>`;
   const mntBanner=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:${mnt?'#fef3c7':'#f9fafb'};border:1px solid ${mnt?'#fcd34d':'#e5e7eb'};border-radius:10px;padding:12px 14px;margin-bottom:14px">
     <div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:700">준비중 모드 ${mnt?'<span class="app-badge pending" style="margin-left:4px">ON</span>':''}</p>
-    <p style="font-size:11px;color:#6b7280;margin-top:2px;word-break:keep-all">활성화 시 학생에게 강의 대신 준비중 안내가 표시됩니다.</p></div>
+    <p style="font-size:11px;color:#6b7280;margin-top:2px;word-break:keep-all">활성화 시 강의실 입장 학생에게 강의 대신 준비중 안내가 표시됩니다.</p></div>
     <button class="btn ${mnt?'bd':'bp'} bsm" onclick="toggleClassroomMaintenance()">${mnt?'OFF로':'ON으로'}</button>
   </div>`;
   const addBtn=`<div style="margin-bottom:12px;text-align:right"><button class="btn bp bsm" onclick="openLectureForm()">+ 강의 추가</button></div>`;
-  if(S.lectures.length===0)return mntBanner+addBtn+`<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">등록된 강의가 없습니다. 추가 버튼으로 시작하세요.</div>`;
-  return mntBanner+addBtn+S.lectures.map(l=>`<div class="lec-card">
+  if(S.lectures.length===0)return pubBanner+mntBanner+addBtn+`<div class="empty" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px">등록된 강의가 없습니다. 추가 버튼으로 시작하세요.</div>`;
+  return pubBanner+mntBanner+addBtn+S.lectures.map(l=>`<div class="lec-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px">
       <div style="flex:1"><p class="lec-title">${escapeHtml(l.title||'제목 없음')} <span class="app-badge" style="background:#eef2ff;color:#4338ca;margin-left:4px">${providerLabel(l.provider)}</span></p>
       ${l.description?`<p class="lec-desc" style="margin-bottom:6px">${escapeHtml(l.description)}</p>`:''}
@@ -3033,12 +3142,13 @@ function renderClassAdminList(){
 }
 function openLectureForm(id){
   const editing=id?S.lectures.find(l=>l._docId===id):null;
-  const prov=editing?.provider||'youtube';
+  const prov=editing?.provider||'vimeo';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">${editing?'강의 수정':'강의 추가'}</p>
     <div class="fg"><label class="fl">제목</label><input class="fi" id="lfTitle" value="${escapeHtml(editing?.title||'')}" placeholder="예) 고3 수학 - 미적분 1강"></div>
     <div class="frow">
       <div class="fg"><label class="fl">제공자</label>
         <select class="fi fsel" id="lfProvider" onchange="updateLectureFormHint()">
+          <option value="vimeo" ${prov==='vimeo'?'selected':''}>Vimeo</option>
           <option value="youtube" ${prov==='youtube'?'selected':''}>YouTube</option>
           <option value="kollus" ${prov==='kollus'?'selected':''}>Kollus</option>
         </select></div>
@@ -3052,12 +3162,16 @@ function openLectureForm(id){
   updateLectureFormHint();
 }
 function updateLectureFormHint(){
-  const p=_('lfProvider')?.value||'youtube';
+  const p=_('lfProvider')?.value||'vimeo';
   const lbl=_('lfUrlLabel'),inp=_('lfUrl'),hint=_('lfUrlHint');
   if(p==='kollus'){
     if(lbl)lbl.textContent='Kollus 공유 URL 또는 vcode';
     if(inp)inp.placeholder='https://v.kr.kollus.com/S0Tigaoz 또는 S0Tigaoz';
     if(hint)hint.textContent='Kollus 대시보드의 공유 URL 또는 vcode(마지막 경로) 를 붙여 넣으세요.';
+  }else if(p==='vimeo'){
+    if(lbl)lbl.textContent='Vimeo 링크 또는 영상 ID';
+    if(inp)inp.placeholder='https://vimeo.com/123456789 또는 123456789/abcdef';
+    if(hint)hint.textContent='Vimeo 영상 URL을 붙여 넣으세요. 비공개(unlisted) 영상은 ID/해시 형태도 가능합니다.';
   }else{
     if(lbl)lbl.textContent='YouTube 링크 또는 11자 ID';
     if(inp)inp.placeholder='https://www.youtube.com/watch?v=...';
@@ -3066,7 +3180,7 @@ function updateLectureFormHint(){
 }
 async function submitLecture(id){
   const title=_('lfTitle').value.trim();
-  const provider=_('lfProvider').value||'youtube';
+  const provider=_('lfProvider').value||'vimeo';
   const url=_('lfUrl').value.trim();
   const desc=_('lfDesc').value.trim();
   const order=Number(_('lfOrder').value||0);
@@ -3074,6 +3188,8 @@ async function submitLecture(id){
   if(!url){showErr('mErr','영상 링크를 입력해주세요.');return;}
   if(provider==='kollus'){
     if(!kollusEmbedUrl(url)){showErr('mErr','올바른 Kollus 공유 URL/vcode 가 아닙니다.');return;}
+  }else if(provider==='vimeo'){
+    if(!vimeoEmbedUrl(url)){showErr('mErr','올바른 Vimeo 링크/ID 가 아닙니다.');return;}
   }else{
     if(!ytEmbedUrl(url)){showErr('mErr','올바른 YouTube 링크가 아닙니다.');return;}
   }
@@ -3261,7 +3377,7 @@ window.addEventListener('popstate',function(e){
     }else if(st.v==='vAdmin'){
       if(S.user.type==='student'){enterHome();return;}
       showView('vAdmin');
-      if(S.consultStuId&&(!st.consultStuId||st.tab!=='consult')){var cId=S.consultStuId;var cNote=_('consultInput')?.value||'';var cStu=S.students.find(function(x){return x._docId===cId;});if(cStu&&cNote!==(cStu.consultNote||'')){db.collection('students').doc(cId).update({consultNote:cNote}).catch(function(){});cStu.consultNote=cNote;}}
+      if(S.consultStuId&&(!st.consultStuId||st.tab!=='consult')){var cId=S.consultStuId;var cExs=getExams();var cIdx=Math.min(S.consultNoteTab||0,cExs.length-1);var cExam=cExs[cIdx];if(cExam){var cNote=_('consultInput')?.value||'';var cVis=_('consultVisible')?.checked||false;var cStu=S.students.find(function(x){return x._docId===cId;});if(cStu){var prev=(cStu.consultNotes&&cStu.consultNotes[cExam.id])||{note:'',visible:false};if(cNote!==(prev.note||'')||cVis!==!!prev.visible){if(!cStu.consultNotes)cStu.consultNotes={};cStu.consultNotes[cExam.id]={note:cNote,visible:cVis};db.collection('students').doc(cId).update({['consultNotes.'+cExam.id]:{note:cNote,visible:cVis}}).catch(function(){});}}}}
       if(st.consultStuId){S.consultStuId=st.consultStuId;S.tab='consult';_origSetTab('consult');}
       else if(st.tab){if(st.tab==='consult')S.consultStuId=null;_origSetTab(st.tab);}
     }
