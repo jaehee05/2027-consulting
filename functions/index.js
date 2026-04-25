@@ -14,6 +14,13 @@ async function loadStudent(studentId) {
   return snap.exists ? snap.data() : null;
 }
 
+// 학생 연락처가 없는 경우(noStudentPhone) 보호자 연락처를 사용한다.
+function notifyPhone(student) {
+  if (!student) return "";
+  if (student.noStudentPhone) return student.guardianPhone || "";
+  return student.studentPhone || student.guardianPhone || "";
+}
+
 function fmtOfferedSlots(offered) {
   if (!Array.isArray(offered)) return "";
   return offered.map((s) => `${s.dateLabel} ${s.slot}`).join(" / ");
@@ -23,7 +30,7 @@ function baseCtx(student, booking, request) {
   // admin_change 수락 시에는 request.chosenSlot 에 선택한 슬롯이 들어간다
   const chosen = request?.chosenSlot;
   return {
-    phone: student?.studentPhone,
+    phone: notifyPhone(student),
     name: (request?.studentName) || (booking?.studentName) || student?.name || "",
     school: student?.school || "",
     grade: student?.grade || "",
@@ -265,7 +272,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
-        const phone = String(s.studentPhone || "").replace(/\D/g, "");
+        const phone = String(notifyPhone(s)).replace(/\D/g, "");
         if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
         try {
           const r = await sendAlimtalk("scoreInputReminder", {
@@ -301,7 +308,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
-        const phone = String(s.studentPhone || "").replace(/\D/g, "");
+        const phone = String(notifyPhone(s)).replace(/\D/g, "");
         if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
         try {
           const r = await sendAlimtalk("bookingStarted", {
@@ -337,7 +344,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
-        const phone = String(s.studentPhone || "").replace(/\D/g, "");
+        const phone = String(notifyPhone(s)).replace(/\D/g, "");
         if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
         // 이미 예약한 학생은 제외
         const bookingSnap = await admin.firestore().collection("bookings")
@@ -391,7 +398,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
-        const phone = String(s.studentPhone || "").replace(/\D/g, "");
+        const phone = String(notifyPhone(s)).replace(/\D/g, "");
         if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
         try {
           const r = await sendAlimtalk("accountCreated", {
