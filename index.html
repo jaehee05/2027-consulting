@@ -1596,7 +1596,7 @@ function renderAdminStudents(){
     <td style="text-align:center">${cb}</td>
     <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
     <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
-    <td style="font-weight:600">${s.name}</td><td>${s.school}</td><td>${s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':s.studentPhone}</td><td>${s.guardianPhone}${s.noStudentPhone?' <span class="bx bb" style="font-size:10px;margin-left:4px">알림톡</span>':''}</td>
+    <td style="font-weight:600">${s.name}</td><td>${s.school}</td><td>${s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':s.studentPhone}</td><td>${s.guardianPhone}</td>
     <td><code>${s.accountId}</code></td>
     <td style="white-space:nowrap"><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
   </tr>`;}).join('');
@@ -2422,7 +2422,7 @@ function openBookDetail(docId){
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${b.studentName}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">예약 일시</p><p style="font-weight:700;font-size:14px">${b.dateLabel} ${b.slot}</p></div>
-      ${stu?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div><div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':stu.studentPhone}</p></div>${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자${stu.noStudentPhone?' <span class="bx bb" style="font-size:10px;margin-left:4px">알림톡</span>':''}</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}`:''}
+      ${stu?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div><div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':stu.studentPhone}</p></div>${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}`:''}
     </div></div>
     ${examSections}
     <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px"><p style="font-size:14px;font-weight:700">질문 & 고민</p>${isAdmin&&b.question?`<button class="btn bd bsm" onclick="adminDelQuestion('${docId}')">고민 삭제</button>`:''}</div>
@@ -2603,7 +2603,7 @@ function openStuDetail(stuDocId){
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">좌석</p><p style="font-weight:700;font-size:14px;color:#1C64F2">${stu.seat||'—'}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':stu.studentPhone}</p></div>
-      ${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자${stu.noStudentPhone?' <span class="bx bb" style="font-size:10px;margin-left:4px">알림톡</span>':''}</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}
+      ${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}
     </div></div>
     ${examSections}
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1" onclick="closeModal();openNewBookForStu('${stuDocId}')">예약 등록</button></div>`;openModal();}
