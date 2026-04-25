@@ -1477,10 +1477,8 @@ function consultMemoCardHtml(stu){
 function consultNotesEditorHtml(stu){
   const cExams=getExams();
   if(!cExams.length){
-    const legacy=stu.consultNote||'';
     return `<div class="card"><p style="font-size:13px;font-weight:700;margin-bottom:8px">컨설팅 내용</p>
       <p style="font-size:12px;color:#9ca3af">시험을 먼저 등록해주세요.</p>
-      ${legacy?`<div style="margin-top:10px;padding:10px;background:#f9fafb;border-radius:8px;font-size:12px;color:#6b7280;white-space:pre-wrap">이전 기록: ${escapeHtml(legacy)}</div>`:''}
     </div>`;
   }
   const tabIdx=Math.min(S.consultNoteTab||0, cExams.length-1);
@@ -1493,8 +1491,6 @@ function consultNotesEditorHtml(stu){
     const dot=has?`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${vis?'#22c55e':'#9ca3af'};margin-left:4px;vertical-align:middle"></span>`:'';
     return `<button class="dt ${i===tabIdx?'on':''}" onclick="switchConsultNoteTab(${i})">${escapeHtml(ex.name)}${dot}</button>`;
   }).join('');
-  const legacy=stu.consultNote||'';
-  const legacyBlock=legacy?`<div style="margin-top:12px;padding:10px 12px;background:#f9fafb;border:1px dashed #e5e7eb;border-radius:8px"><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">이전 기록 (시험 미지정)</p><p style="font-size:12px;color:#6b7280;white-space:pre-wrap;line-height:1.5">${escapeHtml(legacy)}</p></div>`:'';
   return `<div class="card">
     <p style="font-size:13px;font-weight:700;margin-bottom:10px">컨설팅 내용</p>
     <div class="dtabs" style="margin-bottom:10px">${tabs}</div>
@@ -1506,7 +1502,6 @@ function consultNotesEditorHtml(stu){
       </label>
       <button class="btn bp bsm" onclick="saveConsultNote('${stu._docId}','${selExam.id}')">저장</button>
     </div>
-    ${legacyBlock}
   </div>`;
 }
 
