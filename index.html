@@ -3080,8 +3080,14 @@ function kollusEmbedUrl(urlOrCode){
   return vcode?`https://v.kr.kollus.com/${vcode}`:'';
 }
 function vimeoEmbedUrl(urlOrId){
-  const s=String(urlOrId||'').trim();
+  let s=String(urlOrId||'').trim();
   if(!s)return '';
+  if(/<iframe\b/i.test(s)){
+    const im=s.match(/<iframe[^>]*\bsrc=["']([^"']+)["']/i);
+    if(!im)return '';
+    s=im[1].replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"').trim();
+  }
+  if(/^https?:\/\/player\.vimeo\.com\/video\/\d+/i.test(s))return s.split('#')[0];
   if(/^\d+$/.test(s))return `https://player.vimeo.com/video/${s}`;
   let m=s.match(/^(\d+)\/([A-Za-z0-9]+)$/);
   if(m)return `https://player.vimeo.com/video/${m[1]}?h=${m[2]}`;
@@ -3140,7 +3146,7 @@ function renderClass(){
         <div class="lec-card">
           <p class="lec-title" style="font-size:18px;margin-bottom:8px">${escapeHtml(sel.title||'제목 없음')}</p>
           ${sel.description?`<p class="lec-desc">${escapeHtml(sel.description)}</p>`:''}
-          ${emb?`<div class="lec-embed"><iframe src="${emb}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`:`<div class="empty" style="background:#f9fafb;border-radius:10px">영상 링크가 없습니다.</div>`}
+          ${emb?`<div class="lec-embed"><iframe src="${escapeHtml(emb)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`:`<div class="empty" style="background:#f9fafb;border-radius:10px">영상 링크가 없습니다.</div>`}
         </div>`;
       return;
     }
@@ -3252,7 +3258,7 @@ function openLectureForm(id){
         </select></div>
       <div class="fg"><label class="fl">정렬 순서 (작을수록 위)</label><input class="fi" id="lfOrder" type="number" value="${editing?.order??S.lectures.length}"></div>
     </div>
-    <div class="fg"><label class="fl" id="lfUrlLabel">영상 링크</label><input class="fi" id="lfUrl" value="${escapeHtml(editing?.videoUrl||'')}" placeholder=""><p id="lfUrlHint" style="font-size:11px;color:#9ca3af;margin-top:4px"></p></div>
+    <div class="fg"><label class="fl" id="lfUrlLabel">영상 링크</label><textarea class="fi ta" id="lfUrl" placeholder="" style="min-height:64px">${escapeHtml(editing?.videoUrl||'')}</textarea><p id="lfUrlHint" style="font-size:11px;color:#9ca3af;margin-top:4px"></p></div>
     <div class="fg"><label class="fl">설명 (선택)</label><textarea class="fi ta" id="lfDesc" placeholder="강의 소개">${escapeHtml(editing?.description||'')}</textarea></div>
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitLecture(${editing?`'${id}'`:'null'})">${editing?'저장':'추가'}</button></div>`;
@@ -3267,9 +3273,9 @@ function updateLectureFormHint(){
     if(inp)inp.placeholder='https://v.kr.kollus.com/S0Tigaoz 또는 S0Tigaoz';
     if(hint)hint.textContent='Kollus 대시보드의 공유 URL 또는 vcode(마지막 경로) 를 붙여 넣으세요.';
   }else if(p==='vimeo'){
-    if(lbl)lbl.textContent='Vimeo 링크 또는 영상 ID';
-    if(inp)inp.placeholder='https://vimeo.com/123456789 또는 123456789/abcdef';
-    if(hint)hint.textContent='Vimeo 영상 URL을 붙여 넣으세요. 비공개(unlisted) 영상은 ID/해시 형태도 가능합니다.';
+    if(lbl)lbl.textContent='Vimeo 링크 / 영상 ID / 임베드 코드';
+    if(inp)inp.placeholder='https://vimeo.com/123456789  ·  123456789/abcdef  ·  <iframe src="https://player.vimeo.com/video/...">';
+    if(hint)hint.textContent='Vimeo URL, ID/해시, 또는 Vimeo "임베드 코드 가져오기"의 <iframe> HTML 전체를 그대로 붙여 넣을 수 있습니다.';
   }else{
     if(lbl)lbl.textContent='YouTube 링크 또는 11자 ID';
     if(inp)inp.placeholder='https://www.youtube.com/watch?v=...';
