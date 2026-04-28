@@ -1242,7 +1242,7 @@ function renderAdminConsult(){
         if(bA.date!==bB.date)return bA.date.localeCompare(bB.date);
         if(bA.slot!==bB.slot)return bA.slot.localeCompare(bB.slot);
       }
-      return a.name.localeCompare(b.name,'ko');
+      return (a.seat||999)-(b.seat||999);
     }
     return 0;
   });
