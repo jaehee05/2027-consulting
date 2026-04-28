@@ -1372,7 +1372,8 @@ function drawGradeGraph(exams,stu,subjInfo){
   exams.forEach((ex,i)=>{
     const x=PL+(exams.length>1?i*(cw/(exams.length-1)):cw/2);
     const shortName=(ex.name.replace(/\s*모의.*$/,'').replace(/^\d{4}\s+/,'').trim())||ex.name;
-    xLabels+=`<text x="${x}" y="${H-12}" text-anchor="middle" font-size="11" fill="#6b7280" font-weight="700">${escapeHtml(shortName)}</text>`;
+    const anchor=(exams.length<=1)?'middle':(i===0?'start':(i===exams.length-1?'end':'middle'));
+    xLabels+=`<text x="${x}" y="${H-12}" text-anchor="${anchor}" font-size="11" fill="#6b7280" font-weight="700">${escapeHtml(shortName)}</text>`;
     gridLines+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${PT+ch}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>`;
   });
   /* actual grade path */
