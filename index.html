@@ -1394,6 +1394,9 @@ function drawGradeGraph(exams,stu,subjInfo){
     xLabels+=`<text x="${x}" y="${H-12}" text-anchor="middle" font-size="11" fill="#6b7280" font-weight="700">${escapeHtml(shortName)}</text>`;
     gridLines+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${PT+ch}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>`;
   });
+  /* animation timing */
+  const T_LINE=1.0,T_EST_OFFSET=0.55,T_EST_DUR=0.9;
+  const dotDelay=(i,n,t0,t1)=>(n<=1?(t0+t1)/2:t0+(i/(n-1))*(t1-t0)).toFixed(2);
   /* actual grade path */
   let path='',dots='';
   if(pts.length>1){
@@ -1402,13 +1405,14 @@ function drawGradeGraph(exams,stu,subjInfo){
       const cp=(pts[i].x-pts[i-1].x)*0.3;
       d+=` C${pts[i-1].x+cp},${pts[i-1].y} ${pts[i].x-cp},${pts[i].y} ${pts[i].x},${pts[i].y}`;
     }
-    path=`<path d="${d}" fill="none" stroke="#1C64F2" stroke-width="2.5" stroke-linecap="round"/>`;
+    path=`<path d="${d}" pathLength="1" class="gg-ln" fill="none" stroke="#1C64F2" stroke-width="2.5" stroke-linecap="round"/>`;
   }
   pts.forEach((p,i)=>{
     const isLast=i===pts.length-1&&!estPts.length;
-    if(isLast)dots+=`<circle cx="${p.x}" cy="${p.y}" r="9.5" fill="#1C64F2" opacity="0.18"/>`;
-    dots+=`<circle cx="${p.x}" cy="${p.y}" r="${isLast?5.5:4.5}" fill="#fff" stroke="#1C64F2" stroke-width="${isLast?3:2.5}"><title>${escapeHtml(p.exam)} · ${p.g}등급</title></circle>`;
-    dots+=`<text x="${p.x}" y="${p.y-11}" text-anchor="middle" font-size="11" fill="#1C64F2" font-weight="800">${p.g}</text>`;
+    const t=dotDelay(i,pts.length,0.08,T_LINE-0.02);
+    if(isLast)dots+=`<circle cx="${p.x}" cy="${p.y}" r="9.5" fill="#1C64F2" class="gg-dt" style="animation-delay:${t}s;--op:0.18"/>`;
+    dots+=`<circle cx="${p.x}" cy="${p.y}" r="${isLast?5.5:4.5}" fill="#fff" stroke="#1C64F2" stroke-width="${isLast?3:2.5}" class="gg-dt" style="animation-delay:${t}s"><title>${escapeHtml(p.exam)} · ${p.g}등급</title></circle>`;
+    dots+=`<text x="${p.x}" y="${p.y-11}" text-anchor="middle" font-size="11" fill="#1C64F2" font-weight="800" class="gg-dt" style="animation-delay:${t}s">${p.g}</text>`;
   });
   /* estimated paths (yellow dashed) */
   let estPath='',estDots='';
@@ -1431,19 +1435,20 @@ function drawGradeGraph(exams,stu,subjInfo){
       const revArr=[...worstArr].reverse();
       let rev=`L${revArr[0].x},${revArr[0].y}`;
       for(let i=1;i<revArr.length;i++){const cp=(revArr[i].x-revArr[i-1].x)*0.3;rev+=` C${revArr[i-1].x+cp},${revArr[i-1].y} ${revArr[i].x-cp},${revArr[i].y} ${revArr[i].x},${revArr[i].y}`;}
-      estPath+=`<path d="${fwd}${rev}Z" fill="#f59e0b" opacity="0.13"/>`;
+      estPath+=`<path d="${fwd}${rev}Z" fill="#f59e0b" class="gg-dt" style="animation-delay:${(T_EST_OFFSET+T_EST_DUR-0.1).toFixed(2)}s;--op:0.13"/>`;
     }
-    if(bestD)estPath+=`<path d="${bestD}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6,4"/>`;
-    if(hasRange&&worstD)estPath+=`<path d="${worstD}" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6,4" opacity="0.5"/>`;
+    if(bestD)estPath+=`<path d="${bestD}" class="gg-lne" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6,4"/>`;
+    if(hasRange&&worstD)estPath+=`<path d="${worstD}" class="gg-lne" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6,4" style="--op:0.5"/>`;
     estPts.forEach((p,i)=>{
       const isLast=i===estPts.length-1;
-      if(isLast)estDots+=`<circle cx="${p.x}" cy="${p.yBest}" r="9.5" fill="#f59e0b" opacity="0.18"/>`;
-      if(p.range)estDots+=`<line x1="${p.x}" y1="${p.yBest}" x2="${p.x}" y2="${p.yWorst}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,3" opacity="0.4"/>`;
-      estDots+=`<circle cx="${p.x}" cy="${p.yBest}" r="${isLast?5.5:4.5}" fill="#fff" stroke="#f59e0b" stroke-width="${isLast?3:2.5}"><title>${escapeHtml(p.exam)} · ${p.label}등급 (추정)</title></circle>`;
-      estDots+=`<text x="${p.x}" y="${p.yBest-11}" text-anchor="middle" font-size="11" fill="#f59e0b" font-weight="800">${p.best}</text>`;
+      const t=dotDelay(i,estPts.length,T_EST_OFFSET+0.08,T_EST_OFFSET+T_EST_DUR-0.02);
+      if(isLast)estDots+=`<circle cx="${p.x}" cy="${p.yBest}" r="9.5" fill="#f59e0b" class="gg-dt" style="animation-delay:${t}s;--op:0.18"/>`;
+      if(p.range)estDots+=`<line x1="${p.x}" y1="${p.yBest}" x2="${p.x}" y2="${p.yWorst}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,3" class="gg-dt" style="animation-delay:${t}s;--op:0.4"/>`;
+      estDots+=`<circle cx="${p.x}" cy="${p.yBest}" r="${isLast?5.5:4.5}" fill="#fff" stroke="#f59e0b" stroke-width="${isLast?3:2.5}" class="gg-dt" style="animation-delay:${t}s"><title>${escapeHtml(p.exam)} · ${p.label}등급 (추정)</title></circle>`;
+      estDots+=`<text x="${p.x}" y="${p.yBest-11}" text-anchor="middle" font-size="11" fill="#f59e0b" font-weight="800" class="gg-dt" style="animation-delay:${t}s">${p.best}</text>`;
       if(p.range){
-        estDots+=`<circle cx="${p.x}" cy="${p.yWorst}" r="4.5" fill="#fff" stroke="#f59e0b" stroke-width="2.5" opacity="0.55"/>`;
-        estDots+=`<text x="${p.x}" y="${p.yWorst+18}" text-anchor="middle" font-size="11" fill="#f59e0b" font-weight="800" opacity="0.7">${p.worst}</text>`;
+        estDots+=`<circle cx="${p.x}" cy="${p.yWorst}" r="4.5" fill="#fff" stroke="#f59e0b" stroke-width="2.5" class="gg-dt" style="animation-delay:${t}s;--op:0.55"/>`;
+        estDots+=`<text x="${p.x}" y="${p.yWorst+18}" text-anchor="middle" font-size="11" fill="#f59e0b" font-weight="800" class="gg-dt" style="animation-delay:${t}s;--op:0.7">${p.worst}</text>`;
       }
     });
   }
@@ -1481,7 +1486,15 @@ function drawGradeGraph(exams,stu,subjInfo){
     ${lg('<span style="display:inline-block;width:11px;height:9px;background:#fef3c7;border-radius:2px"></span>','5·6등급')}
     ${lg('<span style="display:inline-block;width:11px;height:9px;background:#fee2e2;border-radius:2px"></span>','7·8·9등급')}
   </div>`;
-  return `<div>${summary}<div style="overflow-x:auto;display:flex;justify-content:center"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${bands}${gridLines}${yLabels}${xLabels}${path}${dots}${estPath}${estDots}</svg></div>${legend}</div>`;
+  const animStyle=`<style>
+    .gg-ln{stroke-dasharray:1;stroke-dashoffset:1;animation:gg-d 1s ease-out forwards}
+    .gg-lne{opacity:0;animation:gg-f ${T_EST_DUR}s ease-out forwards ${T_EST_OFFSET}s}
+    .gg-dt{opacity:0;animation:gg-f .4s ease-out forwards}
+    @keyframes gg-d{to{stroke-dashoffset:0}}
+    @keyframes gg-f{to{opacity:var(--op,1)}}
+    @media (prefers-reduced-motion:reduce){.gg-ln{stroke-dashoffset:0;animation:none}.gg-lne,.gg-dt{opacity:var(--op,1);animation:none}}
+  </style>`;
+  return `<div>${summary}<div style="overflow-x:auto;display:flex;justify-content:center"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${animStyle}${bands}${gridLines}${yLabels}${xLabels}${path}${dots}${estPath}${estDots}</svg></div>${legend}</div>`;
 }
 
 function renderConsultDetail(){
