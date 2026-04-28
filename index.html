@@ -335,7 +335,7 @@ const S = {
   tab:null, selDate:null, adminSel:null,
   editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), stuSubView:'active',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
-  consultStuId:null, consultScoreTab:0, consultGraphTab:0
+  consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0
 };
 
 const _=id=>document.getElementById(id);
@@ -683,7 +683,8 @@ function renderStu(){
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
   const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
   const consultCard=myStu?stuConsultNotesCardHtml(myStu):'';
-  if(myB){clearBookCountdown();_('stuC').innerHTML=bookCardHtml(myB)+consultCard+examCards+qCardHtml(myB);}
+  const graphCard=myStu?stuGradeGraphCardHtml(myStu):'';
+  if(myB){clearBookCountdown();_('stuC').innerHTML=bookCardHtml(myB)+consultCard+graphCard+examCards+qCardHtml(myB);}
   else if(myStu){
     const bOpen=isBookingOpen();
     const pl=bookPeriodLabel();
@@ -705,7 +706,7 @@ function renderStu(){
       }
       emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간일 경우, 아래에서 입력 가능합니다.</p></div>`;
     }
-    _('stuC').innerHTML=emptyCard+consultCard+examCards;
+    _('stuC').innerHTML=emptyCard+consultCard+graphCard+examCards;
     if(!bOpen){const st=bookPeriodStatus();if(st.kind==='before')startBookCountdown(st.startAt);}
   }
   else{clearBookCountdown();showBookForm(false);}
@@ -988,6 +989,24 @@ function examScoreCardHtml(exam,stu){
   if(hasSc)body=examScoreTblHtml(exam,sc);
   else if(!open)body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${exam.scoreStart?`<br><span style="font-size:12px">기간: ${exam.scoreStart} ~ ${exam.scoreEnd||'무기한'}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
   return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">${exam.name} 성적</p></div>${editBtn||startBtn}</div>${pNote}${body}</div>`;}
+
+function stuGradeGraphCardHtml(stu){
+  if(!stu)return '';
+  const exams=getExams();
+  const examsWithScore=exams.filter(ex=>hasStuExamScore(stu,ex.id));
+  if(!examsWithScore.length)return '';
+  const subjects=getGradeSubjects(stu);
+  if(!subjects.length)return '';
+  const tabIdx=Math.min(S.stuGraphTab||0,subjects.length-1);
+  const selSubj=subjects[tabIdx]||subjects[0];
+  const graphTabs=subjects.map((s,i)=>`<button class="dt ${i===tabIdx?'on':''}" onclick="S.stuGraphTab=${i};renderStu()">${escapeHtml(s.label)}</button>`).join('');
+  const graphBody=drawGradeGraph(exams,stu,selSubj);
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bg">성적</span><p style="font-size:15px;font-weight:700">등급 추이</p></div>
+    ${subjects.length>1?`<div class="dtabs" style="margin-bottom:10px">${graphTabs}</div>`:''}
+    ${graphBody}
+  </div>`;
+}
 
 function stuConsultNotesCardHtml(stu){
   if(!stu||!stu.consultNotes)return '';
