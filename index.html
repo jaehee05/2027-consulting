@@ -1228,10 +1228,22 @@ const _NA_DOT='<span style="color:#d1d5db;font-size:20px;line-height:1;font-weig
 function renderAdminConsult(){
   if(S.consultStuId){renderConsultDetail();return;}
   const baseStu=realStu();
+  const bookingByStu={};
+  for(const bk of S.bookings){if(bk.studentId&&!bookingByStu[bk.studentId])bookingByStu[bk.studentId]=bk;}
   const sorted=[...baseStu].sort((a,b)=>{
     if(S.stuSort==='grade'){const go={'고3':0,'고2':1,'고1':2};return (go[a.grade]??3)-(go[b.grade]??3)||a.name.localeCompare(b.name,'ko');}
     if(S.stuSort==='name')return a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='seat')return (a.seat||999)-(b.seat||999);
+    if(S.stuSort==='booking'){
+      const bA=bookingByStu[a._docId],bB=bookingByStu[b._docId];
+      if(bA&&!bB)return -1;
+      if(!bA&&bB)return 1;
+      if(bA&&bB){
+        if(bA.date!==bB.date)return bA.date.localeCompare(bB.date);
+        if(bA.slot!==bB.slot)return bA.slot.localeCompare(bB.slot);
+      }
+      return a.name.localeCompare(b.name,'ko');
+    }
     return 0;
   });
   const cExams=getExams();
@@ -1263,7 +1275,7 @@ function renderAdminConsult(){
       ${scoreCells}
       ${noteCell}
     </tr>`;}).join('');
-  const sortOpts=[['seat','좌석순'],['grade','학년순'],['name','이름순']];
+  const sortOpts=[['seat','좌석순'],['grade','학년순'],['name','이름순'],['booking','예약순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminConsult()">${l}</button>`).join('');
   const examHeaders=cExams.map(ex=>`<th title="${escapeHtml(ex.name)}">${ex.name.replace(/\s*모의.*$/,'')}</th>`).join('');
   _('adminC').innerHTML=`<style>#adminC .consult-tbl tbody tr:hover{background:#f9fafb}</style>
