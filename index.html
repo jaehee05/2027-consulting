@@ -1231,8 +1231,8 @@ function renderAdminConsult(){
   const bookingByStu={};
   for(const bk of S.bookings){if(bk.studentId&&!bookingByStu[bk.studentId])bookingByStu[bk.studentId]=bk;}
   const sorted=[...baseStu].sort((a,b)=>{
-    if(S.stuSort==='grade'){const go={'고3':0,'고2':1,'고1':2};return (go[a.grade]??3)-(go[b.grade]??3)||a.name.localeCompare(b.name,'ko');}
-    if(S.stuSort==='name')return a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='grade'){const go={'고3':0,'고2':1,'고1':2};return (go[a.grade]??3)-(go[b.grade]??3)||(a.seat||999)-(b.seat||999);}
+    if(S.stuSort==='name')return a.name.localeCompare(b.name,'ko')||(a.seat||999)-(b.seat||999);
     if(S.stuSort==='seat')return (a.seat||999)-(b.seat||999);
     if(S.stuSort==='booking'){
       const bA=bookingByStu[a._docId],bB=bookingByStu[b._docId];
