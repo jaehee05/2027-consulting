@@ -2362,11 +2362,11 @@ function renderAdminBookings(){
   const byDate={};sorted.forEach(b=>{if(!byDate[b.date])byDate[b.date]={label:b.dateLabel,items:[]};byDate[b.date].items.push(b);});
   const printHtml=Object.values(byDate).map(g=>`<div style="margin-bottom:20px"><p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:8px">${g.label}</p>${g.items.map(b=>{const stu=S.students.find(s=>s._docId===b.studentId);return `<div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><b style="color:#1C64F2;min-width:48px">${b.slot}</b><b style="min-width:60px">${b.studentName}</b><span>${stu?.school||''}</span><span style="color:#6b7280">${stu?.grade||''}</span><span style="color:#6b7280">${stu?.studentPhone||''}</span></div>`;}).join('')}</div>`).join('');
   const adminDisabled=bookingAdminDisabled();
-  const disableCard=`<div class="card np" style="margin-bottom:14px;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${adminDisabled?'#fef2f2':'#f9fafb'};border:1px solid ${adminDisabled?'#fecaca':'#e5e7eb'}">
+  const disableCard=S.user.type==='admin'?`<div class="card np" style="margin-bottom:14px;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${adminDisabled?'#fef2f2':'#f9fafb'};border:1px solid ${adminDisabled?'#fecaca':'#e5e7eb'}">
     <div><p style="font-size:13px;font-weight:700;margin-bottom:2px">학생 예약 ${adminDisabled?'<span style="color:#dc2626">비활성화됨</span>':'<span style="color:#16a34a">활성화됨</span>'}</p>
       <p style="font-size:11px;color:#6b7280">${adminDisabled?'학생들이 예약 화면에서 "예약 기간이 아닙니다" 안내를 보게 됩니다.':'예약 기간 설정에 따라 학생들이 예약할 수 있습니다.'}</p></div>
     <button class="btn ${adminDisabled?'bp':'bd'} bsm" onclick="toggleBookingDisabled()">${adminDisabled?'예약 활성화':'예약 비활성화'}</button>
-  </div>`;
+  </div>`:'';
   _('adminC').innerHTML=`<div class="sh np"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bg">예약</span>예약 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(예약 ${sorted.length}건 · 미예약 ${unbooked.length}명)</span></span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
     ${disableCard}
