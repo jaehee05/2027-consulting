@@ -365,7 +365,9 @@ function bookDatetimeISO(date,time,isEnd){
   const t=time||(isEnd?'23:59':'00:00');
   return `${date}T${t.length===5?t+':00':t}+09:00`;
 }
+function bookingAdminDisabled(){return S.config&&S.config.bookingDisabled===true;}
 function isBookingOpen(){
+  if(bookingAdminDisabled())return false;
   const p=getBookPeriod();
   if(!p.start&&!p.end)return true;
   const now=Date.now();
@@ -693,9 +695,12 @@ function renderStu(){
       clearBookCountdown();
       emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`;
     }else{
-      const st=bookPeriodStatus();
+      const adminDisabled=bookingAdminDisabled();
+      const st=adminDisabled?{kind:'disabled'}:bookPeriodStatus();
       let bodyHtml;
-      if(st.kind==='before'){
+      if(st.kind==='disabled'){
+        bodyHtml=`<p style="color:#6b7280;font-size:13px">예약이 일시 중지되었습니다.</p><p style="color:#9ca3af;font-size:12px;margin-top:4px">자세한 내용은 학원으로 문의해 주세요.</p>`;
+      }else if(st.kind==='before'){
         bodyHtml=`<p style="font-size:13px;color:#6b7280;margin-bottom:4px">예약 시작까지 남은 시간</p>
           <p id="bookCountdown" style="font-size:22px;font-weight:700;color:#1d4ed8;letter-spacing:1px;margin-bottom:8px">계산 중...</p>
           <p style="font-size:12px;color:#9ca3af">${pl?'예약 가능 기간: '+pl:''}</p>`;
@@ -1061,7 +1066,7 @@ async function saveQuestion(){
 
 function showBookForm(isChange){
   const c=_('stuC');
-  if(!isBookingOpen()){const pl=bookPeriodLabel();c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p><p style="color:#6b7280;font-size:13px">${pl?'예약 가능 기간: '+pl:'관리자가 예약 기간을 설정하면 예약할 수 있어요.'}</p>${isChange?'<div style="margin-top:16px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}</div>`;return;}
+  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'예약이 일시 중지되었습니다. 자세한 내용은 학원으로 문의해 주세요.':(pl?'예약 가능 기간: '+pl:'관리자가 예약 기간을 설정하면 예약할 수 있어요.');c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p><p style="color:#6b7280;font-size:13px">${sub}</p>${isChange?'<div style="margin-top:16px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}</div>`;return;}
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
   if(!avail.length){c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 가능한 일정이 없습니다</p><p style="color:#6b7280;font-size:13px">관리자가 일정을 등록하면 예약할 수 있어요.</p></div>`;return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
@@ -2356,8 +2361,15 @@ function renderAdminBookings(){
   const unbookedRows=unbooked.map(s=>`<tr><td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td><td style="font-weight:600">${s.name}</td><td>${s.school}</td><td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td><td>${s.studentPhone}</td><td>${s.guardianPhone}</td><td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bs bsm" onclick="openStuDetail('${s._docId}')">상세</button><button class="btn bp bsm" onclick="openNewBookForStu('${s._docId}')">예약</button></div></td></tr>`).join('');
   const byDate={};sorted.forEach(b=>{if(!byDate[b.date])byDate[b.date]={label:b.dateLabel,items:[]};byDate[b.date].items.push(b);});
   const printHtml=Object.values(byDate).map(g=>`<div style="margin-bottom:20px"><p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:8px">${g.label}</p>${g.items.map(b=>{const stu=S.students.find(s=>s._docId===b.studentId);return `<div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><b style="color:#1C64F2;min-width:48px">${b.slot}</b><b style="min-width:60px">${b.studentName}</b><span>${stu?.school||''}</span><span style="color:#6b7280">${stu?.grade||''}</span><span style="color:#6b7280">${stu?.studentPhone||''}</span></div>`;}).join('')}</div>`).join('');
+  const adminDisabled=bookingAdminDisabled();
+  const disableCard=`<div class="card np" style="margin-bottom:14px;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:${adminDisabled?'#fef2f2':'#f9fafb'};border:1px solid ${adminDisabled?'#fecaca':'#e5e7eb'}">
+    <div><p style="font-size:13px;font-weight:700;margin-bottom:2px">학생 예약 ${adminDisabled?'<span style="color:#dc2626">비활성화됨</span>':'<span style="color:#16a34a">활성화됨</span>'}</p>
+      <p style="font-size:11px;color:#6b7280">${adminDisabled?'학생들이 예약 화면에서 "예약 기간이 아닙니다" 안내를 보게 됩니다.':'예약 기간 설정에 따라 학생들이 예약할 수 있습니다.'}</p></div>
+    <button class="btn ${adminDisabled?'bp':'bd'} bsm" onclick="toggleBookingDisabled()">${adminDisabled?'예약 활성화':'예약 비활성화'}</button>
+  </div>`;
   _('adminC').innerHTML=`<div class="sh np"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bg">예약</span>예약 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(예약 ${sorted.length}건 · 미예약 ${unbooked.length}명)</span></span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
+    ${disableCard}
     <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${sorted.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
     <div class="card np" style="padding:0;margin-bottom:24px"><div class="tw"><table>
       <thead><tr><th>날짜</th><th>시간</th><th>학생명</th><th>학교</th><th>학년</th><th>좌석</th><th>연락처</th>${getExams().map(ex=>`<th>${ex.name.replace(/\s*모의.*$/,'')}</th>`).join('')}<th>질문</th><th>관리</th></tr></thead>
@@ -2491,6 +2503,16 @@ async function toggleRequestEnabled(){
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);renderAdminBookings();}
   catch(e){alert('설정 저장 실패: '+e.message);S.config.requestEnabled=cur;}
+  showLoad(false);}
+
+async function toggleBookingDisabled(){
+  const cur=bookingAdminDisabled();
+  const next=!cur;
+  if(!confirm(next?'학생들의 예약을 비활성화하시겠습니까?\n예약 화면에 "예약 기간이 아닙니다" 안내가 표시됩니다.':'학생들의 예약을 다시 활성화하시겠습니까?'))return;
+  S.config.bookingDisabled=next;
+  showLoad(true);
+  try{await db.collection('config').doc('main').set(S.config);renderAdminBookings();}
+  catch(e){alert('설정 저장 실패: '+e.message);S.config.bookingDisabled=cur;}
   showLoad(false);}
 
 async function refreshBookings(){showLoad(true);try{const[bkSnap,reqSnap]=await Promise.all([db.collection('bookings').get(),db.collection('requests').get()]);S.bookings=bkSnap.docs.map(d=>({_docId:d.id,...d.data()}));S.requests=reqSnap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminBookings();}catch(e){alert('새로고침 실패: '+e.message);}showLoad(false);}
