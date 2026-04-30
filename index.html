@@ -113,7 +113,19 @@ tr:last-child td{border-bottom:none}
 .mactions{display:flex;gap:8px;padding-top:14px;margin-top:6px;border-top:1px solid #f3f4f6}
 .head-meta{display:none}
 .seat-chip{display:inline-flex;align-items:center;color:#1C64F2;font-size:13px;font-weight:700;letter-spacing:.02em}
-.sel-btn{display:none}
+.alimtalk-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;margin-bottom:12px;position:sticky;top:60px;z-index:40}
+.alimtalk-bar .ab-info{display:flex;align-items:center;gap:10px;flex:1;min-width:200px}
+.alimtalk-bar .ab-icon{font-size:24px;flex:0 0 auto}
+.alimtalk-bar .ab-info b{display:block;font-size:14px;color:#1C64F2;font-weight:700}
+.alimtalk-bar .ab-info span{display:block;font-size:11px;color:#1d4ed8;opacity:.85}
+.alimtalk-bar .ab-count{font-size:13px;font-weight:700;color:#1d4ed8;background:#fff;border-radius:8px;padding:6px 10px;border:1px solid #bfdbfe}
+.alimtalk-bar .ab-actions{display:flex;gap:6px}
+@media(max-width:640px){
+  .alimtalk-bar{top:96px;padding:10px 12px;gap:8px}
+  .alimtalk-bar .ab-info{min-width:0;flex-basis:100%}
+  .alimtalk-bar .ab-icon{font-size:20px}
+  .alimtalk-bar .ab-count{font-size:12px;padding:4px 8px}
+}
 .sheet-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
 .sheet-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s;width:100%}
 .sheet-item:hover:not(:disabled){border-color:#1C64F2;background:#eff6ff}
@@ -370,7 +382,7 @@ const S = {
   admins:[], requests:[], reqSlots:[],
   lectures:[], classSub:'list', classLectureId:null,
   tab:null, selDate:null, adminSel:null,
-  editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), stuSubView:'active',
+  editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), alimtalkMode:null, stuSubView:'active',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
   consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0
 };
@@ -1717,14 +1729,18 @@ function renderAdminStudents(){
   });
   const selectableIds=sorted.filter(s=>!s.isTest).map(s=>s._docId);
   const allSelected=selectableIds.length>0&&selectableIds.every(id=>S.stuSelected.has(id));
+  const inMode=!!S.alimtalkMode;
   const rows=sorted.map(s=>{
     const selectable=!s.isTest;
     const checked=S.stuSelected.has(s._docId);
     const cb=selectable?`<input type="checkbox" ${checked?'checked':''} onchange="toggleStuSelect('${s._docId}',this.checked)">`:'';
     const stuPhone=s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':s.studentPhone;
-    const trAttrs=selectable&&checked?'class="selected"':'';
-    const selBtn=selectable?`<button class="btn ${checked?'bp':'bs'} bsm sel-btn" onclick="toggleStuSelect('${s._docId}',${!checked})">${checked?'✓ 선택됨':'선택'}</button>`:'';
-    return `<tr ${trAttrs}>
+    const trCls=[];
+    if(checked)trCls.push('selected');
+    if(inMode&&selectable)trCls.push('selectable');
+    const trAttrs=trCls.length?`class="${trCls.join(' ')}"`:'';
+    const trClick=inMode&&selectable?`onclick="cardTapSelect(event,'${s._docId}')"`:'';
+    return `<tr ${trAttrs} ${trClick}>
     <td data-label="" class="cell-hide" style="text-align:center;width:36px">${cb}</td>
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
@@ -1733,20 +1749,26 @@ function renderAdminStudents(){
     <td data-label="학생 연락처">${stuPhone}</td>
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
     <td data-label="계정 ID"><code>${s.accountId}</code></td>
-    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:space-between;align-items:center;width:100%">${selBtn||'<span></span>'}<div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></div></td>
+    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
   </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
   const selCount=selectableIds.filter(id=>S.stuSelected.has(id)).length;
   const wCount=withdrawnStu().length;
   const unbookedIds=sorted.filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
-  const ddDisabled=selCount===0;
-  const ddBtn=`<button class="btn ${ddDisabled?'bs':'bp'} bsm" onclick="openAlimtalkSheet()">📩 알림톡 발송${selCount?` (${selCount})`:''}</button>`;
+  const mode=ALIMTALK_MODES[S.alimtalkMode];
+  const ddBtn=mode?'':`<button class="btn bp bsm" onclick="openAlimtalkSheet()">📩 알림톡 발송</button>`;
+  const modeBanner=mode?`<div class="alimtalk-bar">
+    <div class="ab-info"><span class="ab-icon">${mode.icon}</span><div><b>${mode.title}</b><span>학생 카드를 탭하여 수신자를 선택하세요</span></div></div>
+    <div class="ab-count">${selCount}명 선택</div>
+    <div class="ab-actions"><button class="btn bs bsm" onclick="exitAlimtalkMode()">취소</button><button class="btn ${selCount?'bp':'bs'} bsm" ${selCount?'':'disabled style="opacity:.5;cursor:not-allowed"'} onclick="confirmAlimtalkBulk()">발송 →</button></div>
+  </div>`:'';
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
+  ${modeBanner}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
     <span style="flex:1"></span>
-    <button class="btn bs bsm" onclick="selectUnbookedStudents()">미예약 학생 (${unbookedIds.length})</button>
+    ${mode?`<button class="btn bs bsm" onclick="selectUnbookedStudents()">미예약만 선택 (${unbookedIds.length})</button>`:''}
     ${ddBtn}
   </div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table>
@@ -1805,24 +1827,48 @@ function toggleStuSelectAll(checked){
   else ids.forEach(id=>S.stuSelected.delete(id));
   renderAdminStudents();
 }
+const ALIMTALK_MODES={
+  accountInfo:{title:'계정 정보 안내',icon:'🔑',desc:'로그인 ID와 초기 비밀번호 안내',send:'sendAccountInfoBulk'},
+  bookingStarted:{title:'예약 시작 안내',icon:'📅',desc:'컨설팅 예약 시작 공지',send:'sendBookingStartedBulk'},
+  bookingReminder:{title:'예약 미완료 안내',icon:'⏰',desc:'아직 예약 안 한 학생 독촉',send:'sendBookingReminderBulk'}
+};
 function openAlimtalkSheet(){
-  const selCount=Array.from(S.stuSelected).filter(id=>!S.students.find(s=>s._docId===id)?.isTest).length;
-  const sel=selCount>0;
-  const item=(icon,title,desc,onclick,enabled)=>`<button class="sheet-item" ${enabled?'':'disabled'} onclick="${enabled?`closeModal();${onclick}`:''}">
+  const item=(icon,title,desc,onclick)=>`<button class="sheet-item" onclick="closeModal();${onclick}">
     <span class="sheet-icon">${icon}</span>
     <span class="sheet-text"><b>${title}</b><span>${desc}</span></span>
     <span class="sheet-arrow">›</span>
   </button>`;
   _('mCt').innerHTML=`<p class="mtitle">알림톡 발송</p>
-    <p class="msub">${sel?`선택된 학생 <b>${selCount}명</b>에게 발송합니다.`:'학생을 먼저 선택해 주세요. (성적 미입력 안내는 별도 선택)'}</p>
+    <p class="msub">발송할 종류를 선택한 뒤, 학생 카드를 탭해서 수신자를 고르세요.</p>
     <div class="sheet-list">
-      ${item('🔑','계정 정보 안내','로그인 ID와 초기 비밀번호 안내','sendAccountInfoBulk()',sel)}
-      ${item('📅','예약 시작 안내','컨설팅 예약 시작 공지','sendBookingStartedBulk()',sel)}
-      ${item('⏰','예약 미완료 안내','아직 예약 안 한 학생 독촉','sendBookingReminderBulk()',sel)}
-      ${item('📊','성적 미입력 안내','시험별 성적 미입력 학생 (개별 선택)','openScoreReminderModal()',true)}
+      ${item('🔑','계정 정보 안내','로그인 ID와 초기 비밀번호 안내',`enterAlimtalkMode('accountInfo')`)}
+      ${item('📅','예약 시작 안내','컨설팅 예약 시작 공지',`enterAlimtalkMode('bookingStarted')`)}
+      ${item('⏰','예약 미완료 안내','아직 예약 안 한 학생 독촉',`enterAlimtalkMode('bookingReminder')`)}
+      ${item('📊','성적 미입력 안내','시험별 성적 미입력 학생 (개별 선택)','openScoreReminderModal()')}
     </div>
     <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">닫기</button></div>`;
   openModal();
+}
+function enterAlimtalkMode(mode){
+  S.alimtalkMode=mode;
+  S.stuSelected.clear();
+  renderAdminStudents();
+}
+function exitAlimtalkMode(){
+  S.alimtalkMode=null;
+  S.stuSelected.clear();
+  renderAdminStudents();
+}
+function cardTapSelect(e,id){
+  if(!S.alimtalkMode)return;
+  if(e.target.closest('button,a,input,.btn'))return;
+  toggleStuSelect(id,!S.stuSelected.has(id));
+}
+function confirmAlimtalkBulk(){
+  const m=ALIMTALK_MODES[S.alimtalkMode];
+  if(!m)return;
+  if(S.stuSelected.size===0){alert('학생을 선택해주세요.');return;}
+  window[m.send]();
 }
 async function sendAccountInfoBulk(){
   const ids=Array.from(S.stuSelected);
@@ -1840,6 +1886,7 @@ async function sendAccountInfoBulk(){
     }
     alert(msg);
     S.stuSelected.clear();
+    S.alimtalkMode=null;
     renderAdminStudents();
   }catch(e){alert('발송 실패: '+e.message);}
   showLoad(false);
@@ -1889,6 +1936,7 @@ async function submitBookingStartedBulk(){
     }
     alert(msg);
     S.stuSelected.clear();
+    S.alimtalkMode=null;
     renderAdminStudents();
   }catch(e){alert('발송 실패: '+e.message);}
   showLoad(false);
@@ -1928,6 +1976,7 @@ async function submitBookingReminderBulk(){
     }
     alert(msg);
     S.stuSelected.clear();
+    S.alimtalkMode=null;
     renderAdminStudents();
   }catch(e){alert('발송 실패: '+e.message);}
   showLoad(false);
