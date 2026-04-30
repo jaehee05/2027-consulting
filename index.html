@@ -1725,7 +1725,7 @@ function renderAdminStudents(){
     return `<tr>
     <td data-label="" class="cell-cb" style="text-align:center;width:36px">${cb}</td>
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
-    <td data-label="학년"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
+    <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
     <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}</span><span class="head-meta">${s.seat?`<span style="color:#1C64F2;font-weight:700">#${s.seat}</span>`:''}</span></td>
     <td data-label="학교">${s.school}</td>
     <td data-label="학생 연락처">${stuPhone}</td>
@@ -2428,7 +2428,7 @@ function renderAdminBookings(){
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
     <td data-label="" class="cell-head"><span>${s.name}</span><span class="head-meta">${s.seat?`<span style="color:#1C64F2;font-weight:700">#${s.seat}</span>`:''}</span></td>
     <td data-label="학교">${s.school}</td>
-    <td data-label="학년"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
+    <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
     <td data-label="학생 연락처">${s.studentPhone}</td>
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
     <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:5px;justify-content:flex-end"><button class="btn bs bsm" onclick="openStuDetail('${s._docId}')">상세</button><button class="btn bp bsm" onclick="openNewBookForStu('${s._docId}')">예약</button></div></td>
