@@ -108,20 +108,19 @@ tr:last-child td{border-bottom:none}
 .ta{height:auto;padding:10px;resize:vertical;min-height:90px}
 .spin{width:30px;height:30px;border:3px solid #e5e7eb;border-top-color:#1C64F2;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
-.dd{position:relative;display:inline-block}
-.dd>summary{list-style:none;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:6px}
-.dd>summary::-webkit-details-marker{display:none}
-.dd>summary::after{content:'▾';font-size:10px;opacity:.7}
-.dd-menu{position:absolute;top:calc(100% + 4px);right:0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.08);padding:6px;min-width:200px;z-index:30}
-.dd-item{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:9px 12px;border:none;background:none;font-family:inherit;font-size:13px;border-radius:6px;cursor:pointer;color:#111827;gap:8px}
-.dd-item:hover:not(:disabled){background:#f3f4f6}
-.dd-item:disabled{color:#9ca3af;cursor:not-allowed}
-.dd-item .ddc{font-size:11px;color:#6b7280;font-weight:600}
-.dd-sep{height:1px;background:#f3f4f6;margin:4px 8px}
 .mtitle{font-size:17px;font-weight:700;margin-bottom:4px}
 .msub{font-size:12px;color:#6b7280;margin-bottom:16px;line-height:1.5}
 .mactions{display:flex;gap:8px;padding-top:14px;margin-top:6px;border-top:1px solid #f3f4f6}
 .head-meta{display:none}
+.sheet-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.sheet-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s;width:100%}
+.sheet-item:hover:not(:disabled){border-color:#1C64F2;background:#eff6ff}
+.sheet-item:disabled{opacity:.45;cursor:not-allowed}
+.sheet-icon{flex:0 0 36px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:#f3f4f6;border-radius:10px;font-size:18px}
+.sheet-text{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.sheet-text b{font-size:14px;font-weight:700;color:#111827}
+.sheet-text span{font-size:11px;color:#6b7280;line-height:1.35}
+.sheet-arrow{flex:0 0 auto;color:#9ca3af;font-size:18px}
 @media(max-width:640px){
   .topbar{height:48px;padding:0 12px}
   .tname{font-size:13px}.chip{font-size:9px;padding:2px 6px}
@@ -373,8 +372,6 @@ const S = {
 };
 
 const _=id=>document.getElementById(id);
-function closeDd(){document.querySelectorAll('details.dd[open]').forEach(d=>d.removeAttribute('open'));}
-document.addEventListener('click',e=>{document.querySelectorAll('details.dd[open]').forEach(d=>{if(!d.contains(e.target))d.removeAttribute('open');});});
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function fmtPhone(p){const d=p.replace(/\D/g,'');if(d.length===11)return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7);if(d.length===10)return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);return p;}
 function fmtSchool(s){s=s.trim();if(s.endsWith('고')&&!s.endsWith('등학교'))return s+'등학교';return s;}
@@ -1738,14 +1735,7 @@ function renderAdminStudents(){
   const wCount=withdrawnStu().length;
   const unbookedIds=sorted.filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
   const ddDisabled=selCount===0;
-  const ddBtn=`<details class="dd"><summary class="btn ${ddDisabled?'bs':'bp'} bsm">📩 알림톡${selCount?` (${selCount})`:''}</summary>
-    <div class="dd-menu">
-      <button class="dd-item" ${ddDisabled?'disabled':''} onclick="closeDd();sendAccountInfoBulk()">계정 정보 안내${selCount?`<span class="ddc">${selCount}명</span>`:''}</button>
-      <button class="dd-item" ${ddDisabled?'disabled':''} onclick="closeDd();sendBookingStartedBulk()">예약 시작 안내${selCount?`<span class="ddc">${selCount}명</span>`:''}</button>
-      <button class="dd-item" ${ddDisabled?'disabled':''} onclick="closeDd();sendBookingReminderBulk()">예약 미완료 안내${selCount?`<span class="ddc">${selCount}명</span>`:''}</button>
-      <div class="dd-sep"></div>
-      <button class="dd-item" onclick="closeDd();openScoreReminderModal()">성적 미입력 안내<span class="ddc">개별 선택</span></button>
-    </div></details>`;
+  const ddBtn=`<button class="btn ${ddDisabled?'bs':'bp'} bsm" onclick="openAlimtalkSheet()">📩 알림톡 발송${selCount?` (${selCount})`:''}</button>`;
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
@@ -1808,6 +1798,25 @@ function toggleStuSelectAll(checked){
   if(checked)ids.forEach(id=>S.stuSelected.add(id));
   else ids.forEach(id=>S.stuSelected.delete(id));
   renderAdminStudents();
+}
+function openAlimtalkSheet(){
+  const selCount=Array.from(S.stuSelected).filter(id=>!S.students.find(s=>s._docId===id)?.isTest).length;
+  const sel=selCount>0;
+  const item=(icon,title,desc,onclick,enabled)=>`<button class="sheet-item" ${enabled?'':'disabled'} onclick="${enabled?`closeModal();${onclick}`:''}">
+    <span class="sheet-icon">${icon}</span>
+    <span class="sheet-text"><b>${title}</b><span>${desc}</span></span>
+    <span class="sheet-arrow">›</span>
+  </button>`;
+  _('mCt').innerHTML=`<p class="mtitle">알림톡 발송</p>
+    <p class="msub">${sel?`선택된 학생 <b>${selCount}명</b>에게 발송합니다.`:'학생을 먼저 선택해 주세요. (성적 미입력 안내는 별도 선택)'}</p>
+    <div class="sheet-list">
+      ${item('🔑','계정 정보 안내','로그인 ID와 초기 비밀번호 안내','sendAccountInfoBulk()',sel)}
+      ${item('📅','예약 시작 안내','컨설팅 예약 시작 공지','sendBookingStartedBulk()',sel)}
+      ${item('⏰','예약 미완료 안내','아직 예약 안 한 학생 독촉','sendBookingReminderBulk()',sel)}
+      ${item('📊','성적 미입력 안내','시험별 성적 미입력 학생 (개별 선택)','openScoreReminderModal()',true)}
+    </div>
+    <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">닫기</button></div>`;
+  openModal();
 }
 async function sendAccountInfoBulk(){
   const ids=Array.from(S.stuSelected);
