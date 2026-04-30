@@ -699,7 +699,7 @@ function renderStu(){
       const st=adminDisabled?{kind:'disabled'}:bookPeriodStatus();
       let bodyHtml;
       if(st.kind==='disabled'){
-        bodyHtml=`<p style="color:#6b7280;font-size:13px">예약이 일시 중지되었습니다.</p><p style="color:#9ca3af;font-size:12px;margin-top:4px">자세한 내용은 학원으로 문의해 주세요.</p>`;
+        bodyHtml='';
       }else if(st.kind==='before'){
         bodyHtml=`<p style="font-size:13px;color:#6b7280;margin-bottom:4px">예약 시작까지 남은 시간</p>
           <p id="bookCountdown" style="font-size:22px;font-weight:700;color:#1d4ed8;letter-spacing:1px;margin-bottom:8px">계산 중...</p>
@@ -1066,7 +1066,7 @@ async function saveQuestion(){
 
 function showBookForm(isChange){
   const c=_('stuC');
-  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'예약이 일시 중지되었습니다. 자세한 내용은 학원으로 문의해 주세요.':(pl?'예약 가능 기간: '+pl:'관리자가 예약 기간을 설정하면 예약할 수 있어요.');c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p><p style="color:#6b7280;font-size:13px">${sub}</p>${isChange?'<div style="margin-top:16px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}</div>`;return;}
+  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'':(pl?'예약 가능 기간: '+pl:'관리자가 예약 기간을 설정하면 예약할 수 있어요.');c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p>${sub?`<p style="color:#6b7280;font-size:13px">${sub}</p>`:''}${isChange?'<div style="margin-top:16px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}</div>`;return;}
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
   if(!avail.length){c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 가능한 일정이 없습니다</p><p style="color:#6b7280;font-size:13px">관리자가 일정을 등록하면 예약할 수 있어요.</p></div>`;return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
