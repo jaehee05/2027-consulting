@@ -112,7 +112,8 @@ tr:last-child td{border-bottom:none}
 .msub{font-size:12px;color:#6b7280;margin-bottom:16px;line-height:1.5}
 .mactions{display:flex;gap:8px;padding-top:14px;margin-top:6px;border-top:1px solid #f3f4f6}
 .head-meta{display:none}
-.seat-chip{display:inline-flex;align-items:center;justify-content:center;background:#eff6ff;color:#1C64F2;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:700;letter-spacing:.02em;border:1px solid #bfdbfe}
+.seat-chip{display:inline-flex;align-items:center;color:#1C64F2;font-size:13px;font-weight:700;letter-spacing:.02em}
+.sel-btn{display:none}
 .sheet-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
 .sheet-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s;width:100%}
 .sheet-item:hover:not(:disabled){border-color:#1C64F2;background:#eff6ff}
@@ -152,11 +153,10 @@ tr:last-child td{border-bottom:none}
   .tw-cards>table{display:block}
   .tw-cards>table>thead{display:none}
   .tw-cards>table>tbody{display:block}
-  .tw-cards>table>tbody>tr{display:block;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.03);position:relative;cursor:pointer;transition:.15s}
+  .tw-cards>table>tbody>tr{display:block;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.03);position:relative;transition:.15s}
   .tw-cards>table>tbody>tr:last-child{margin-bottom:0}
   .tw-cards>table>tbody>tr.selected{border-color:#1C64F2;background:#eff6ff;box-shadow:0 0 0 1px #1C64F2 inset}
-  .tw-cards>table>tbody>tr.selected::before{content:'✓';position:absolute;top:8px;right:10px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:#1C64F2;color:#fff;border-radius:50%;font-size:13px;font-weight:700}
-  .tw-cards>table>tbody>tr.selected .cell-head{padding-right:32px!important}
+  .tw-cards .sel-btn{display:inline-flex}
   .tw-cards>table>tbody>tr.empty-row{padding:20px 12px;text-align:center;color:#9ca3af;background:transparent;box-shadow:none;border-style:dashed}
   .tw-cards td{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:2px 0!important;border:none!important;text-align:right!important;font-size:12px;line-height:1.35;min-width:0}
   .tw-cards td>*{min-width:0}
@@ -1722,17 +1722,18 @@ function renderAdminStudents(){
     const checked=S.stuSelected.has(s._docId);
     const cb=selectable?`<input type="checkbox" ${checked?'checked':''} onchange="toggleStuSelect('${s._docId}',this.checked)">`:'';
     const stuPhone=s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':s.studentPhone;
-    const trAttrs=selectable?`class="${checked?'selected':''}" onclick="cardTapSelect(event,'${s._docId}')"`:'';
+    const trAttrs=selectable&&checked?'class="selected"':'';
+    const selBtn=selectable?`<button class="btn ${checked?'bp':'bs'} bsm sel-btn" onclick="toggleStuSelect('${s._docId}',${!checked})">${checked?'✓ 선택됨':'선택'}</button>`:'';
     return `<tr ${trAttrs}>
     <td data-label="" class="cell-hide" style="text-align:center;width:36px">${cb}</td>
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
-    <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">좌석 ${s.seat}</span>`:''}</span></td>
+    <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}</span></td>
     <td data-label="학교">${s.school}</td>
     <td data-label="학생 연락처">${stuPhone}</td>
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
     <td data-label="계정 ID"><code>${s.accountId}</code></td>
-    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
+    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:space-between;align-items:center;width:100%">${selBtn||'<span></span>'}<div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></div></td>
   </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
@@ -1798,11 +1799,6 @@ async function restoreStu(docId){
   }catch(e){alert('복구 실패: '+e.message);}
   showLoad(false);}
 function toggleStuSelect(id,checked){if(checked)S.stuSelected.add(id);else S.stuSelected.delete(id);renderAdminStudents();}
-function cardTapSelect(e,id){
-  if(window.innerWidth>640)return;
-  if(e.target.closest('button,a,input,.btn'))return;
-  toggleStuSelect(id,!S.stuSelected.has(id));
-}
 function toggleStuSelectAll(checked){
   const ids=realStu().filter(s=>!s.isTest).map(s=>s._docId);
   if(checked)ids.forEach(id=>S.stuSelected.add(id));
@@ -2432,7 +2428,7 @@ function renderAdminBookings(){
     </tr>`;}).join('');
   const unbookedRows=unbooked.map(s=>`<tr>
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
-    <td data-label="" class="cell-head"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">좌석 ${s.seat}</span>`:''}</span></td>
+    <td data-label="" class="cell-head"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}</span></td>
     <td data-label="학교">${s.school}</td>
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
     <td data-label="학생 연락처">${s.studentPhone}</td>
