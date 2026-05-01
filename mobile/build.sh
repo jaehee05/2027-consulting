@@ -19,7 +19,7 @@ cp "$ROOT_DIR/index.html" "$WWW_DIR/index.html"
 cp "$ROOT_DIR/favicon.png" "$WWW_DIR/favicon.png"
 
 # 선택 자산 (있을 때만 복사)
-for f in manifest.webmanifest sw.js apple-touch-icon.png robots.txt; do
+for f in privacy.html manifest.webmanifest sw.js apple-touch-icon.png robots.txt; do
   if [ -f "$ROOT_DIR/$f" ]; then
     cp "$ROOT_DIR/$f" "$WWW_DIR/$f"
     echo "[build] copied $f"
