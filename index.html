@@ -271,6 +271,19 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 .app-badge.approved{background:var(--success-soft);color:var(--success)}
 .app-badge.rejected{background:var(--danger-soft);color:var(--danger)}
 @media(max-width:640px){.home-grid{grid-template-columns:1fr}.home-card{padding:20px;min-height:auto}}
+/* Toast */
+#toastWrap{position:fixed;left:0;right:0;top:max(16px,env(safe-area-inset-top));z-index:2000;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 12px}
+.toast{pointer-events:auto;display:inline-flex;align-items:flex-start;gap:10px;max-width:520px;width:auto;padding:12px 16px;border-radius:var(--radius-xl);font-size:13px;font-weight:500;line-height:1.45;background:var(--gray-900);color:var(--surface);box-shadow:0 10px 30px rgba(0,0,0,.18),0 2px 6px rgba(0,0,0,.08);transform:translateY(-12px);opacity:0;transition:transform .22s ease-out,opacity .22s ease-out;word-break:keep-all}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:#064e2f;color:#d1fae5}
+.toast.error{background:#7f1d1d;color:#fee2e2}
+.toast.warn{background:#78350f;color:#fef3c7}
+.toast .t-ico{flex:0 0 auto;font-size:16px;line-height:1.2}
+.toast .t-msg{flex:1;min-width:0;white-space:pre-line}
+.toast .t-x{flex:0 0 auto;background:none;border:none;color:inherit;opacity:.6;font-size:16px;cursor:pointer;padding:0;margin-left:4px;line-height:1;font-family:inherit}
+.toast .t-x:hover{opacity:1}
+@media(prefers-reduced-motion:reduce){.toast{transition:opacity .15s linear;transform:none}}
+@media(max-width:640px){#toastWrap{top:max(10px,env(safe-area-inset-top));padding:0 10px}.toast{font-size:12px;padding:10px 14px;width:100%}}
 /* Focus-visible — keyboard accessibility */
 :focus{outline:none}
 .btn:focus-visible,.tab:focus-visible,.dt:focus-visible,.sb:focus-visible,
@@ -407,6 +420,9 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <div id="mOv" class="overlay hidden" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="mCt"></div>
 </div>
+
+<!-- 토스트 -->
+<div id="toastWrap" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 firebase.initializeApp({
@@ -683,7 +699,7 @@ async function loadAll(){
     });
     S.bookings=bkSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.requests=reqSnap.docs.map(d=>({_docId:d.id,...d.data()}));
-  }catch(e){alert('데이터 로딩 실패: '+e.message);}
+  }catch(e){toast('데이터 로딩 실패: '+e.message,'error');}
   showLoad(false);
   startRequestsListener();
 }
@@ -781,7 +797,7 @@ async function createFirstAdmin(){
   showLoad(true);
   try{
     await db.collection('admins').doc(id).set({id,name,password:pw,role:'admin',createdAt:Date.now()});
-    showLoad(false);alert('관리자 계정이 생성되었습니다.');showView('vLogin');
+    showLoad(false);toast('관리자 계정이 생성되었습니다.','success');showView('vLogin');
   }catch(e){showLoad(false);showErr('setupErr','Firestore 오류: '+e.message);}
 }
 
@@ -1006,8 +1022,8 @@ function renderScoreWizard(){
 function swValidateRaw(el,max){
   if(el.value==='')return;
   const v=Number(el.value);
-  if(v<0){alert('원점수는 0 이상이어야 합니다.');el.value='';return;}
-  if(v>max){alert('원점수는 '+max+' 이하여야 합니다.');el.value='';return;}
+  if(v<0){toast('원점수는 0 이상이어야 합니다.','warn');el.value='';return;}
+  if(v>max){toast('원점수는 '+max+' 이하여야 합니다.','warn');el.value='';return;}
 }
 function swSaveStep(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
@@ -1022,7 +1038,7 @@ async function finishScoreWizard(){
   const w=S.scoreWizard;
   if(w.exp1Subj&&w.exp2Subj){
     const i1=expSubjIndex(exam,w.exp1Subj),i2=expSubjIndex(exam,w.exp2Subj);
-    if(i1>=0&&i2>=0&&i2<=i1){alert('탐구 과목 순서가 올바르지 않습니다.\n\n1선택 과목이 2선택 과목보다 우선순위가 높아야 합니다.\n(사회탐구 > 과학탐구, 과탐Ⅰ > 과탐Ⅱ)\n\n탐구 과목을 다시 선택해주세요.');return;}
+    if(i1>=0&&i2>=0&&i2<=i1){toast('탐구 과목 순서가 올바르지 않습니다.\n1선택 과목이 2선택 과목보다 우선순위가 높아야 합니다.\n(사회탐구 > 과학탐구, 과탐Ⅰ > 과탐Ⅱ)','warn',{duration:5000});return;}
   }
   const scoreData={korSubj:w.korSubj,korRaw:w.korRaw,korGrade:getExamGrade(exam,w.korSubj,w.korRaw),matSubj:w.matSubj,matRaw:w.matRaw,matGrade:getExamGrade(exam,w.matSubj,w.matRaw),engRaw:w.engRaw,engGrade:getAbsGrade('eng',w.engRaw),hisRaw:w.hisRaw,hisGrade:getAbsGrade('his',w.hisRaw),exp1Subj:w.exp1Subj,exp1Raw:w.exp1Raw,exp1Grade:getExamGrade(exam,w.exp1Subj,w.exp1Raw),exp2Subj:w.exp2Subj,exp2Raw:w.exp2Raw,exp2Grade:getExamGrade(exam,w.exp2Subj,w.exp2Raw)};
   if(exam.hasLang2){scoreData.lang2Subj=w.lang2Subj;scoreData.lang2Raw=w.lang2Raw;scoreData.lang2Grade=getAbsGrade('lang2',w.lang2Raw);}
@@ -1032,7 +1048,7 @@ async function finishScoreWizard(){
     if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;
     await db.collection('students').doc(S.studentDocId).update({['scores.'+examId]:scoreData});
     S.editingExamId=null;S.scoreStep=getScoreSteps(exam).length;renderScoreWizard();
-  }catch(e){alert('저장 실패: '+e.message);}
+  }catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
 }
 
@@ -1155,7 +1171,7 @@ async function saveExamScore(examId){
     if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;
     await db.collection('students').doc(S.studentDocId).update({['scores.'+examId]:scoreData});
     S.editingExamId=null;renderStu();}
-  catch(e){alert('저장 실패: '+e.message);}
+  catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
 }
 
@@ -1166,7 +1182,7 @@ async function saveQuestion(){
   try{
     await db.collection('bookings').doc(myB._docId).update({question:q});myB.question=q;
     const btn=_('qSaveBtn');if(btn){btn.textContent='✓ 저장됨';btn.classList.replace('bp','bs');setTimeout(()=>{if(btn){btn.textContent='저장';btn.classList.replace('bs','bp');}},1500);}
-  }catch(e){alert('저장 실패: '+e.message);}
+  }catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
 }
 
@@ -1197,7 +1213,7 @@ function showBookForm(isChange){
 function selDate(id){S.selDate=id;const myB=S.bookings.find(b=>b.studentId===S.studentDocId);showBookForm(!!myB);}
 
 async function bookSlot(dateId,slot){
-  if(!isBookingOpen()){alert('예약 기간이 아닙니다.');renderStu();return;}
+  if(!isBookingOpen()){toast('예약 기간이 아닙니다.','warn');renderStu();return;}
   const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
   if(!confirm(`${d.label} ${slot}에 예약하시겠습니까?`))return;
   showLoad(true);
@@ -1207,14 +1223,14 @@ async function bookSlot(dateId,slot){
     const newBook={studentId:S.studentDocId,studentName:S.user.name,date:d.date,dateLabel:d.label,slot,createdAt:Date.now()};
     const ref=await db.collection('bookings').add(newBook);
     S.bookings.push({_docId:ref.id,...newBook});renderStu();
-  }catch(e){alert('예약 실패: '+e.message);}
+  }catch(e){toast('예약 실패: '+e.message,'error');}
   showLoad(false);
 }
 
 async function dismissNotif(reqId){
   const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
   try{await db.collection('requests').doc(reqId).update({dismissed:true});req.dismissed=true;renderStu();}
-  catch(e){alert('삭제 실패: '+e.message);}}
+  catch(e){toast('삭제 실패: '+e.message,'error');}}
 
 async function stuAcceptAdminChange(reqId,slotIdx){
   const req=S.requests.find(r=>r._docId===reqId);if(!req||req.status!=='pending')return;
@@ -1223,13 +1239,13 @@ async function stuAcceptAdminChange(reqId,slotIdx){
   showLoad(true);
   try{
     const taken=S.bookings.filter(x=>x.date===chosen.date&&x._docId!==req.bookingId).map(x=>x.slot);
-    if(taken.includes(chosen.slot)){alert('해당 시간이 이미 예약되어 있습니다. 다른 시간을 선택하거나 거절해 주세요.');showLoad(false);return;}
+    if(taken.includes(chosen.slot)){toast('해당 시간이 이미 예약되어 있습니다. 다른 시간을 선택하거나 거절해 주세요.','warn');showLoad(false);return;}
     await db.collection('bookings').doc(req.bookingId).update({date:chosen.date,dateLabel:chosen.dateLabel,slot:chosen.slot});
     const b=S.bookings.find(x=>x._docId===req.bookingId);if(b){b.date=chosen.date;b.dateLabel=chosen.dateLabel;b.slot=chosen.slot;}
     await db.collection('requests').doc(reqId).update({status:'accepted',chosenSlot:chosen,resolvedAt:Date.now()});
     req.status='accepted';req.chosenSlot=chosen;req.resolvedAt=Date.now();
-    renderStu();alert('예약 시간이 변경되었습니다.');
-  }catch(e){alert('변경 실패: '+e.message);}
+    renderStu();toast('예약 시간이 변경되었습니다.','success');
+  }catch(e){toast('변경 실패: '+e.message,'error');}
   showLoad(false);
 }
 
@@ -1265,7 +1281,7 @@ async function cancelMyBook(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
   showLoad(true);
   try{await db.collection('bookings').doc(myB._docId).delete();S.bookings=S.bookings.filter(b=>b.studentId!==S.studentDocId);renderStu();}
-  catch(e){alert('취소 실패: '+e.message);}
+  catch(e){toast('취소 실패: '+e.message,'error');}
   showLoad(false);}
 
 function requestCancelBook(){
@@ -1279,7 +1295,7 @@ function requestCancelBook(){
 
 async function submitCancelRequest(){
   const reason=_('cancelReason')?.value?.trim();
-  if(!reason){alert('취소 사유를 입력해주세요.');return;}
+  if(!reason){toast('취소 사유를 입력해주세요.','warn');return;}
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
   showLoad(true);
   try{
@@ -1287,14 +1303,14 @@ async function submitCancelRequest(){
     const ref=await db.collection('requests').add(req);
     if(!S.requests.find(r=>r._docId===ref.id))S.requests.push({_docId:ref.id,...req});
     renderStu();
-  }catch(e){alert('요청 실패: '+e.message);}
+  }catch(e){toast('요청 실패: '+e.message,'error');}
   showLoad(false);}
 
 function showChangeRequestForm(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
-  if(!isBookingOpen()){const pl=bookPeriodLabel();alert('예약 기간이 아닙니다.'+(pl?'\n예약 가능 기간: '+pl:''));return;}
+  if(!isBookingOpen()){const pl=bookPeriodLabel();toast('예약 기간이 아닙니다.'+(pl?'\n예약 가능 기간: '+pl:''),'warn',{duration:4000});return;}
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
-  if(!avail.length){alert('예약 가능한 일정이 없습니다.');return;}
+  if(!avail.length){toast('예약 가능한 일정이 없습니다.','warn');return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
   S.adminSel=null;renderChangeForm();}
 
@@ -1317,9 +1333,9 @@ function renderChangeForm(){
 function pickChangeSlot(dateId,slot,btn){S.adminSel=dateId+'|'+slot;const cont=btn.closest('.sg');cont.querySelectorAll('.sb').forEach(b=>{if(!b.classList.contains('bk')&&!b.classList.contains('mn'))b.classList.remove('sl');});btn.classList.add('sl');}
 
 async function submitChangeRequest(){
-  if(!S.adminSel){alert('변경할 시간을 선택하세요.');return;}
+  if(!S.adminSel){toast('변경할 시간을 선택하세요.','warn');return;}
   const reason=_('changeReason')?.value?.trim();
-  if(!reason){alert('변경 사유를 입력해주세요.');return;}
+  if(!reason){toast('변경 사유를 입력해주세요.','warn');return;}
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
   const [dateId,slot]=S.adminSel.split('|'),date=S.schedule.dates.find(d=>d.id===dateId);if(!date)return;
   showLoad(true);
@@ -1328,7 +1344,7 @@ async function submitChangeRequest(){
     const ref=await db.collection('requests').add(req);
     if(!S.requests.find(r=>r._docId===ref.id))S.requests.push({_docId:ref.id,...req});
     S.adminSel=null;renderStu();
-  }catch(e){alert('요청 실패: '+e.message);}
+  }catch(e){toast('요청 실패: '+e.message,'error');}
   showLoad(false);}
 
 /* ── ADMIN: TAB ── */
@@ -1748,7 +1764,7 @@ async function saveStuMemo(stuDocId){
     const stu=S.students.find(x=>x._docId===stuDocId);if(stu)stu.memo=memo;
     const btn=document.querySelector(`button[onclick="saveStuMemo('${stuDocId}')"]`);
     if(btn){btn.textContent='✓ 저장됨';btn.classList.replace('bp','bs');setTimeout(()=>{if(btn){btn.textContent='저장';btn.classList.replace('bs','bp');}},1500);}
-  }catch(e){alert('저장 실패: '+e.message);}
+  }catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
 }
 
@@ -1756,14 +1772,14 @@ async function saveConsultNote(stuDocId,examId){
   const data=_readConsultEditor();
   showLoad(true);
   try{await _persistConsultNote(stuDocId,examId,data);renderConsultDetail();}
-  catch(e){alert('저장 실패: '+e.message);}
+  catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
 }
 async function toggleConsultVisible(stuDocId,examId,visible){
   const note=_('consultInput')?.value||'';
   showLoad(true);
   try{await _persistConsultNote(stuDocId,examId,{note,visible});}
-  catch(e){alert('저장 실패: '+e.message);_('consultVisible').checked=!visible;}
+  catch(e){toast('저장 실패: '+e.message,'error');_('consultVisible').checked=!visible;}
   showLoad(false);
 }
 async function switchConsultNoteTab(newIdx){
@@ -1869,7 +1885,7 @@ async function withdrawStu(docId){
     S.bookings=S.bookings.filter(b=>b.studentId!==docId);
     S.stuSelected.delete(docId);
     renderAdminStudents();
-  }catch(e){alert('퇴원 처리 실패: '+e.message);}
+  }catch(e){toast('퇴원 처리 실패: '+e.message,'error');}
   showLoad(false);}
 
 async function restoreStu(docId){
@@ -1879,7 +1895,7 @@ async function restoreStu(docId){
     await db.collection('students').doc(docId).update({withdrawn:false,withdrawnAt:firebase.firestore.FieldValue.delete()});
     s.withdrawn=false;delete s.withdrawnAt;
     renderAdminStudents();
-  }catch(e){alert('복구 실패: '+e.message);}
+  }catch(e){toast('복구 실패: '+e.message,'error');}
   showLoad(false);}
 function toggleStuSelect(id,checked){if(checked)S.stuSelected.add(id);else S.stuSelected.delete(id);renderAdminStudents();}
 function toggleStuSelectAll(checked){
@@ -1928,12 +1944,12 @@ function cardTapSelect(e,id){
 function confirmAlimtalkBulk(){
   const m=ALIMTALK_MODES[S.alimtalkMode];
   if(!m)return;
-  if(S.stuSelected.size===0){alert('학생을 선택해주세요.');return;}
+  if(S.stuSelected.size===0){toast('학생을 선택해주세요.','warn');return;}
   window[m.send]();
 }
 async function sendAccountInfoBulk(){
   const ids=Array.from(S.stuSelected);
-  if(ids.length===0){alert('발송할 학생을 선택해주세요.');return;}
+  if(ids.length===0){toast('발송할 학생을 선택해주세요.','warn');return;}
   const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
   if(!confirm(`선택한 ${ids.length}명에게 계정 정보 알림톡을 발송하시겠습니까?\n\n${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`))return;
   showLoad(true);
@@ -1945,11 +1961,11 @@ async function sendAccountInfoBulk(){
       const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
     }
-    alert(msg);
+    toast(msg,r.failed>0?'warn':'success',{duration:5000});
     S.stuSelected.clear();
     S.alimtalkMode=null;
     renderAdminStudents();
-  }catch(e){alert('발송 실패: '+e.message);}
+  }catch(e){toast('발송 실패: '+e.message,'error');}
   showLoad(false);
 }
 function selectUnbookedStudents(){
@@ -1964,7 +1980,7 @@ function fmtDeadlineKR(ymd){
 }
 function sendBookingStartedBulk(){
   const ids=Array.from(S.stuSelected);
-  if(ids.length===0){alert('발송할 학생을 선택해주세요.');return;}
+  if(ids.length===0){toast('발송할 학생을 선택해주세요.','warn');return;}
   const defName=localStorage.getItem('consultingName')||'';
   const defDeadline=localStorage.getItem('bookingDeadline')||'';
   const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
@@ -1999,16 +2015,16 @@ async function submitBookingStartedBulk(){
       const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
     }
-    alert(msg);
+    toast(msg,r.failed>0?'warn':'success',{duration:5000});
     S.stuSelected.clear();
     S.alimtalkMode=null;
     renderAdminStudents();
-  }catch(e){alert('발송 실패: '+e.message);}
+  }catch(e){toast('발송 실패: '+e.message,'error');}
   showLoad(false);
 }
 function sendBookingReminderBulk(){
   const ids=Array.from(S.stuSelected);
-  if(ids.length===0){alert('발송할 학생을 선택해주세요.');return;}
+  if(ids.length===0){toast('발송할 학생을 선택해주세요.','warn');return;}
   const defName=localStorage.getItem('consultingName')||'';
   const defDeadline=localStorage.getItem('bookingDeadline')||'';
   const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
@@ -2043,11 +2059,11 @@ async function submitBookingReminderBulk(){
       const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
     }
-    alert(msg);
+    toast(msg,r.failed>0?'warn':'success',{duration:5000});
     S.stuSelected.clear();
     S.alimtalkMode=null;
     renderAdminStudents();
-  }catch(e){alert('발송 실패: '+e.message);}
+  }catch(e){toast('발송 실패: '+e.message,'error');}
   showLoad(false);
 }
 
@@ -2058,7 +2074,7 @@ function hasExamScore(student,examId){
 
 function openScoreReminderModal(){
   const exams=getExams();
-  if(!exams.length){alert('등록된 시험이 없습니다. 시험 관리 탭에서 먼저 시험을 추가하세요.');return;}
+  if(!exams.length){toast('등록된 시험이 없습니다. 시험 관리 탭에서 먼저 시험을 추가하세요.','warn',{duration:4000});return;}
   const exOpts=exams.map((ex,i)=>`<option value="${i}">${ex.name}${ex.scoreEnd?' (마감: '+ex.scoreEnd+')':''}</option>`).join('');
   _('mCt').style.maxWidth='520px';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">성적 미입력 안내 발송</p>
@@ -2114,7 +2130,8 @@ async function sendScoreReminderBulk(){
       const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
     }
-    alert(msg);closeModal();
+    toast(msg,r.failed>0?'warn':'success',{duration:5000});
+    closeModal();
   }catch(e){showErr('mErr','발송 실패: '+e.message);}
   showLoad(false);
 }
@@ -2172,7 +2189,7 @@ function openScoreDetail(stuDocId){
     ${examSections}
     <button class="btn bs bfw" style="margin-top:16px" onclick="closeModal()">닫기</button>`;openModal();}
 
-async function refreshStudents(){showLoad(true);try{const snap=await db.collection('students').get();S.students=snap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminScores();}catch(e){alert('새로고침 실패: '+e.message);}showLoad(false);}
+async function refreshStudents(){showLoad(true);try{const snap=await db.collection('students').get();S.students=snap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminScores();}catch(e){toast('새로고침 실패: '+e.message,'error');}showLoad(false);}
 
 function openStuModal(docId){
   const s=docId?S.students.find(x=>x._docId===docId):null;
@@ -2249,14 +2266,14 @@ async function delStu(docId){
     for(const b of related)await db.collection('bookings').doc(b._docId).delete();
     S.students=S.students.filter(x=>x._docId!==docId);S.bookings=S.bookings.filter(b=>b.studentId!==docId);
     renderAdminStudents();
-  }catch(e){alert('삭제 실패: '+e.message);}
+  }catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);}
 
 async function resetPw(docId){
   const s=S.students.find(x=>x._docId===docId);if(!s||!confirm(`'${s.name}' 학생의 비밀번호를 초기화하시겠습니까?`))return;
   const newPw=initPw(effectivePhone(s));showLoad(true);
-  try{await db.collection('students').doc(docId).update({accountPw:newPw,isFirstLogin:true});s.accountPw=newPw;s.isFirstLogin=true;closeModal();alert(`초기 비밀번호: ${newPw}`);renderAdminStudents();}
-  catch(e){alert('초기화 실패: '+e.message);}
+  try{await db.collection('students').doc(docId).update({accountPw:newPw,isFirstLogin:true});s.accountPw=newPw;s.isFirstLogin=true;closeModal();toast(`초기 비밀번호: ${newPw}`,'success',{duration:6000});renderAdminStudents();}
+  catch(e){toast('초기화 실패: '+e.message,'error');}
   showLoad(false);}
 
 /* ── ADMIN: 시험 관리 ── */
@@ -2341,7 +2358,7 @@ async function deleteExam(examId){
   S.config.exams=S.config.exams.filter(e=>e.id!==examId);
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);renderAdminExams();}
-  catch(e){alert('삭제 실패: '+e.message);}
+  catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);}
 
 function openExamGradeCuts(examId){
@@ -2366,8 +2383,8 @@ async function saveExamGradeCutsFromModal(examId){
     if(hasVal)ex.gradeCuts[subj]=vals;
   }
   showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();alert('등급컷이 저장되었습니다.');}
-  catch(e){alert('저장 실패: '+e.message);}
+  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();toast('등급컷이 저장되었습니다.','success');}
+  catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);}
 
 function openEstGradeCuts(examId){
@@ -2393,8 +2410,8 @@ async function saveEstGradeCutsFromModal(examId){
     if(hasVal)ex.estGradeCuts[subj]=vals;
   }
   showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();alert('예상 등급컷이 저장되었습니다.');}
-  catch(e){alert('저장 실패: '+e.message);}
+  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();toast('예상 등급컷이 저장되었습니다.','success');}
+  catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);}
 
 async function saveAbsGradeCuts(){
@@ -2406,8 +2423,8 @@ async function saveAbsGradeCuts(){
     if(hasVal)S.config.gradeCuts.abs[key]=vals;else delete S.config.gradeCuts.abs[key];
   }
   showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);closeModal();alert('절대평가 등급컷이 저장되었습니다.');}
-  catch(e){alert('저장 실패: '+e.message);}
+  try{await db.collection('config').doc('main').set(S.config);closeModal();toast('절대평가 등급컷이 저장되었습니다.','success');}
+  catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);}
 
 /* ── ADMIN: 일정 ── */
@@ -2450,19 +2467,19 @@ async function saveBookPeriod(){
   if(start&&end){
     const sDt=start+'T'+(startTime||'00:00');
     const eDt=end+'T'+(endTime||'23:59');
-    if(sDt>eDt){alert('종료 일시가 시작 일시보다 빠를 수 없습니다.');return;}
+    if(sDt>eDt){toast('종료 일시가 시작 일시보다 빠를 수 없습니다.','warn');return;}
   }
   S.schedule.bookStart=start;S.schedule.bookEnd=end;
   S.schedule.bookStartTime=startTime;S.schedule.bookEndTime=endTime;
-  showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();alert('예약 기간이 저장되었습니다.');}
-  catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
+  showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();toast('예약 기간이 저장되었습니다.','success');}
+  catch(e){toast('저장 실패: '+e.message,'error');}showLoad(false);}
 
 async function clearBookPeriod(){
   if(!confirm('예약 기간 설정을 해제하시겠습니까? (항상 예약 가능 상태가 됩니다)'))return;
   S.schedule.bookStart='';S.schedule.bookEnd='';
   S.schedule.bookStartTime='';S.schedule.bookEndTime='';
   showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();}
-  catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
+  catch(e){toast('저장 실패: '+e.message,'error');}showLoad(false);}
 
 function openAddDate(){renderModal({
   title:'날짜 추가',
@@ -2498,13 +2515,13 @@ async function confirmEditDate(id){
 async function rmDate(id){
   const d=S.schedule.dates.find(x=>x.id===id);if(!d||!confirm(`'${d.label}'를 삭제하시겠습니까? 관련 예약도 삭제됩니다.`))return;
   const related=S.bookings.filter(b=>b.date===d.date);S.schedule.dates=S.schedule.dates.filter(x=>x.id!==id);
-  showLoad(true);try{await saveScheduleToDb();for(const b of related)await db.collection('bookings').doc(b._docId).delete();S.bookings=S.bookings.filter(b=>b.date!==d.date);renderAdminSchedule();}catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
+  showLoad(true);try{await saveScheduleToDb();for(const b of related)await db.collection('bookings').doc(b._docId).delete();S.bookings=S.bookings.filter(b=>b.date!==d.date);renderAdminSchedule();}catch(e){toast('삭제 실패: '+e.message,'error');}showLoad(false);}
 
 async function addSlot(dateId){
-  const val=document.getElementById('at-'+dateId)?.value;if(!val){alert('시간을 선택하세요.');return;}
+  const val=document.getElementById('at-'+dateId)?.value;if(!val){toast('시간을 선택하세요.','warn');return;}
   const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
-  if(d.slots.includes(val)){alert('이미 추가된 시간입니다.');return;}
-  d.slots.push(val);d.slots.sort();showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();}catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
+  if(d.slots.includes(val)){toast('이미 추가된 시간입니다.','warn');return;}
+  d.slots.push(val);d.slots.sort();showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();}catch(e){toast('저장 실패: '+e.message,'error');}showLoad(false);}
 
 async function rmSlot(dateId,slot){
   const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
@@ -2512,7 +2529,7 @@ async function rmSlot(dateId,slot){
   if(bk&&!confirm(`${slot}에 ${bk.studentName} 학생이 예약되어 있습니다. 삭제하시겠습니까?`))return;
   d.slots=d.slots.filter(s=>s!==slot);showLoad(true);
   try{await saveScheduleToDb();if(bk){await db.collection('bookings').doc(bk._docId).delete();S.bookings=S.bookings.filter(b=>b._docId!==bk._docId);}renderAdminSchedule();}
-  catch(e){alert('저장 실패: '+e.message);}showLoad(false);}
+  catch(e){toast('저장 실패: '+e.message,'error');}showLoad(false);}
 
 function openBulk(dateId){_('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">시간대 일괄 추가</p>
   <p style="font-size:12px;color:#6b7280;margin-bottom:6px">30분 단위로 자동 생성합니다.</p>
@@ -2532,7 +2549,7 @@ async function doBulk(){
   let [h,m]=start.split(':').map(Number);const [eh,em]=end.split(':').map(Number),endMin=eh*60+em;
   let added=0,skipped=0;
   while(h*60+m<endMin){const sl=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;if(EXCL.includes(sl))skipped++;else if(!d.slots.includes(sl)){d.slots.push(sl);added++;}m+=30;if(m>=60){m-=60;h++;}}
-  d.slots.sort();showLoad(true);try{await saveScheduleToDb();closeModal();renderAdminSchedule();alert(`${added}개 추가됨${skipped?` (${skipped}개 제외)`:''}`);} catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);}
+  d.slots.sort();showLoad(true);try{await saveScheduleToDb();closeModal();renderAdminSchedule();toast(`${added}개 추가됨${skipped?` (${skipped}개 제외)`:''}`,'success');} catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);}
 
 /* ── ADMIN: 예약 현황 ── */
 function renderAdminBookings(){
@@ -2660,14 +2677,14 @@ async function approveRequest(reqId){
       S.bookings=S.bookings.filter(b=>b._docId!==req.bookingId);
     }else if(req.type==='change'){
       const taken=S.bookings.filter(b=>b.date===req.newDate&&b._docId!==req.bookingId).map(b=>b.slot);
-      if(taken.includes(req.newSlot)){alert('해당 시간이 이미 예약되어 있습니다. 승인할 수 없습니다.');showLoad(false);return;}
+      if(taken.includes(req.newSlot)){toast('해당 시간이 이미 예약되어 있습니다. 승인할 수 없습니다.','warn');showLoad(false);return;}
       await db.collection('bookings').doc(req.bookingId).update({date:req.newDate,dateLabel:req.newDateLabel,slot:req.newSlot});
       const b=S.bookings.find(x=>x._docId===req.bookingId);if(b){b.date=req.newDate;b.dateLabel=req.newDateLabel;b.slot=req.newSlot;}
     }
     await db.collection('requests').doc(reqId).update({status:'approved'});
     req.status='approved';
     renderAdminBookings();
-  }catch(e){alert('승인 실패: '+e.message);}
+  }catch(e){toast('승인 실패: '+e.message,'error');}
   showLoad(false);}
 
 function rejectRequest(reqId){
@@ -2697,16 +2714,16 @@ async function deleteRequest(reqId){
   if(!confirm('이 요청 기록을 삭제하시겠습니까?'))return;
   showLoad(true);
   try{await db.collection('requests').doc(reqId).delete();S.requests=S.requests.filter(r=>r._docId!==reqId);renderAdminBookings();}
-  catch(e){alert('삭제 실패: '+e.message);}
+  catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);}
 
 async function toggleRequestEnabled(){
-  if(S.user?.type!=='admin'){alert('ADMIN 권한이 필요합니다.');return;}
+  if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
   const cur=S.config.requestEnabled!==false;
   S.config.requestEnabled=!cur;
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);renderAdminBookings();}
-  catch(e){alert('설정 저장 실패: '+e.message);S.config.requestEnabled=cur;}
+  catch(e){toast('설정 저장 실패: '+e.message,'error');S.config.requestEnabled=cur;}
   showLoad(false);}
 
 async function toggleBookingDisabled(){
@@ -2716,10 +2733,10 @@ async function toggleBookingDisabled(){
   S.config.bookingDisabled=next;
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);renderAdminBookings();}
-  catch(e){alert('설정 저장 실패: '+e.message);S.config.bookingDisabled=cur;}
+  catch(e){toast('설정 저장 실패: '+e.message,'error');S.config.bookingDisabled=cur;}
   showLoad(false);}
 
-async function refreshBookings(){showLoad(true);try{const[bkSnap,reqSnap]=await Promise.all([db.collection('bookings').get(),db.collection('requests').get()]);S.bookings=bkSnap.docs.map(d=>({_docId:d.id,...d.data()}));S.requests=reqSnap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminBookings();}catch(e){alert('새로고침 실패: '+e.message);}showLoad(false);}
+async function refreshBookings(){showLoad(true);try{const[bkSnap,reqSnap]=await Promise.all([db.collection('bookings').get(),db.collection('requests').get()]);S.bookings=bkSnap.docs.map(d=>({_docId:d.id,...d.data()}));S.requests=reqSnap.docs.map(d=>({_docId:d.id,...d.data()}));renderAdminBookings();}catch(e){toast('새로고침 실패: '+e.message,'error');}showLoad(false);}
 
 function openBookDetail(docId){
   const b=S.bookings.find(x=>x._docId===docId);if(!b)return;
@@ -2752,7 +2769,7 @@ async function adminDelExamScore(stuDocId, examId, from, bookDocId){
     if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
     else if(from==='stuDetail'){closeModal();openStuDetail(stuDocId);}
     else{closeModal();renderAdminScores();}
-  }catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
+  }catch(e){toast('삭제 실패: '+e.message,'error');}showLoad(false);}
 
 async function adminDelQuestion(docId){
   if(!confirm('이 학생의 질문 & 고민 내용을 삭제하시겠습니까?'))return;
@@ -2760,7 +2777,7 @@ async function adminDelQuestion(docId){
   try{await db.collection('bookings').doc(docId).update({question:''});
   const b=S.bookings.find(x=>x._docId===docId);if(b)b.question='';
   closeModal();renderAdminBookings();}
-  catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
+  catch(e){toast('삭제 실패: '+e.message,'error');}showLoad(false);}
 
 function openAdminScoreEdit(stuDocId, examId, from, bookDocId){
   const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
@@ -2802,7 +2819,7 @@ async function saveAdminScore(stuDocId, examId, from, bookDocId){
     if(from==='booking'&&bookDocId)openBookDetail(bookDocId);
     else if(from==='stuDetail')openStuDetail(stuDocId);
     else{closeModal();renderAdminScores();}
-  }catch(e){alert('저장 실패: '+e.message);}
+  }catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
 }
 
@@ -2823,17 +2840,17 @@ function renderAdminSlots(){
 function adminPickSlot(dateId,slot,btn){S.adminSel=dateId+'|'+slot;btn.closest('.sg').querySelectorAll('.sb').forEach(b=>{if(!b.classList.contains('bk')&&!b.classList.contains('mn'))b.classList.remove('sl');});btn.classList.add('sl');}
 
 async function saveAdminBook(){
-  if(!S.adminSel){alert('시간을 선택하세요.');return;}
+  if(!S.adminSel){toast('시간을 선택하세요.','warn');return;}
   const [dateId,slot]=S.adminSel.split('|'),date=S.schedule.dates.find(d=>d.id===dateId),b=S.bookings.find(x=>x._docId===_('abid').value);
   if(!b||!date)return;showLoad(true);
   try{await db.collection('bookings').doc(b._docId).update({date:date.date,dateLabel:date.label,slot});b.date=date.date;b.dateLabel=date.label;b.slot=slot;closeModal();S.adminSel=null;renderAdminBookings();}
-  catch(e){alert('변경 실패: '+e.message);}showLoad(false);}
+  catch(e){toast('변경 실패: '+e.message,'error');}showLoad(false);}
 
 /* ── ADMIN: 예약 변경 요청 보내기 ── */
 function openAdminChangeReq(bookingId){
   const b=S.bookings.find(x=>x._docId===bookingId);if(!b)return;
   const existing=S.requests.find(r=>r.type==='admin_change'&&r.bookingId===bookingId&&r.status==='pending');
-  if(existing){alert('이미 이 예약에 대한 변경 요청이 전송되어 학생의 응답을 기다리는 중입니다.');return;}
+  if(existing){toast('이미 이 예약에 대한 변경 요청이 전송되어 학생의 응답을 기다리는 중입니다.','warn',{duration:4500});return;}
   S.reqSlots=[];
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 변경 요청 보내기</p>
     <p style="font-size:13px;color:#6b7280;margin-bottom:12px">${b.studentName} · 현재 <b>${b.dateLabel} ${b.slot}</b></p>
@@ -2884,7 +2901,7 @@ async function sendAdminChangeReq(){
   try{
     const ref=await db.collection('requests').add(req);
     if(!S.requests.find(r=>r._docId===ref.id))S.requests.push({_docId:ref.id,...req});
-    closeModal();S.reqSlots=[];renderAdminBookings();alert('변경 요청이 전송되었습니다. 학생이 응답하면 알려드립니다.');
+    closeModal();S.reqSlots=[];renderAdminBookings();toast('변경 요청이 전송되었습니다. 학생이 응답하면 알려드립니다.','success',{duration:3500});
   }catch(e){showErr('mErr','전송 실패: '+e.message);}
   showLoad(false);
 }
@@ -2893,13 +2910,13 @@ async function cancelAdminChangeReq(reqId){
   if(!confirm('이 변경 요청을 취소하시겠습니까?'))return;
   showLoad(true);
   try{await db.collection('requests').doc(reqId).delete();S.requests=S.requests.filter(r=>r._docId!==reqId);renderAdminBookings();}
-  catch(e){alert('취소 실패: '+e.message);}
+  catch(e){toast('취소 실패: '+e.message,'error');}
   showLoad(false);
 }
 
 async function adminDelBook(docId){
   const b=S.bookings.find(x=>x._docId===docId);if(!b||!confirm(`${b.studentName} 학생의 ${b.dateLabel} ${b.slot} 예약을 삭제하시겠습니까?`))return;
-  showLoad(true);try{await db.collection('bookings').doc(docId).delete();S.bookings=S.bookings.filter(x=>x._docId!==docId);renderAdminBookings();}catch(e){alert('삭제 실패: '+e.message);}showLoad(false);}
+  showLoad(true);try{await db.collection('bookings').doc(docId).delete();S.bookings=S.bookings.filter(x=>x._docId!==docId);renderAdminBookings();}catch(e){toast('삭제 실패: '+e.message,'error');}showLoad(false);}
 
 function openStuDetail(stuDocId){
   const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
@@ -2938,7 +2955,7 @@ function renderNewBookSlots(){
   cont.innerHTML=date.slots.map(slot=>{const isTaken=taken.includes(slot),isSel=S.adminSel===dateId+'|'+slot;return `<button class="sb ${isTaken?'bk':isSel?'sl':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'adminPickSlot(\''+dateId+'\',\''+slot+'\',this)'}">${slot}</button>`;}).join('')||'<p style="font-size:13px;color:#9ca3af">슬롯 없음</p>';}
 
 async function saveNewBookForStu(){
-  if(!S.adminSel){alert('시간을 선택하세요.');return;}
+  if(!S.adminSel){toast('시간을 선택하세요.','warn');return;}
   const stuDocId=_('nbStuId')?.value;const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
   const [dateId,slot]=S.adminSel.split('|'),date=S.schedule.dates.find(d=>d.id===dateId);if(!date)return;
   showLoad(true);
@@ -2947,7 +2964,7 @@ async function saveNewBookForStu(){
     const docRef=await db.collection('bookings').add(bookData);
     bookData._docId=docRef.id;S.bookings.push(bookData);
     S.adminSel=null;closeModal();renderAdminBookings();
-  }catch(e){alert('예약 등록 실패: '+e.message);}
+  }catch(e){toast('예약 등록 실패: '+e.message,'error');}
   showLoad(false);}
 
 /* ── ADMIN: 계정 관리 ── */
@@ -3043,13 +3060,13 @@ async function submitSendAdminAccountInfo(adminId){
   closeModal();showLoad(true);
   try{
     const r=await ppurioCall('sendAdminAccountInfo',{adminAccountId:adminId,phone});
-    alert(`발송 완료\n수신자: ${r.name} (${phone})`);
-  }catch(e){alert('발송 실패: '+e.message);}
+    toast(`발송 완료 — 수신자: ${r.name} (${phone})`,'success');
+  }catch(e){toast('발송 실패: '+e.message,'error');}
   showLoad(false);
 }
 
 async function delAcct(id){
-  if(id===S.user.id){alert('본인 계정은 삭제할 수 없습니다.');return;}
+  if(id===S.user.id){toast('본인 계정은 삭제할 수 없습니다.','warn');return;}
   const acc=S.admins.find(x=>x.id===id);
   if(!confirm(`'${id}' 계정을 삭제하시겠습니까?${acc?.role==='test'?'\n(연결된 테스트 학생 데이터도 함께 삭제됩니다)':''}`))return;
   showLoad(true);
@@ -3064,7 +3081,7 @@ async function delAcct(id){
       S.bookings=S.bookings.filter(b=>b.studentId!==acc.linkedStudentId);
     }
     renderAdminAccounts();
-  }catch(e){alert('삭제 실패: '+e.message);}
+  }catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);}
 
 /* ── ADMIN: 알림톡 (뿌리오) ── */
@@ -3212,6 +3229,35 @@ async function testAlimtalkSend(){
   }catch(e){msg.style.color='#dc2626';msg.textContent='테스트 실패: '+e.message;}
 }
 
+/* ── TOAST ── */
+const TOAST_ICONS={info:'',success:'✓',error:'!',warn:'!'};
+/**
+ * 화면 상단에 토스트 메시지를 띄움.
+ *   msg  : 표시할 텍스트 (필수)
+ *   kind : 'info'|'success'|'error'|'warn' (기본 'info')
+ *   opts : { duration: ms (기본 2400, 0이면 무한), dismissible: bool (기본 true) }
+ */
+function toast(msg,kind='info',opts={}){
+  const wrap=_('toastWrap');if(!wrap||!msg)return;
+  const dur=opts.duration!==undefined?opts.duration:(kind==='error'?4200:2400);
+  const dismissible=opts.dismissible!==false;
+  const el=document.createElement('div');
+  el.className='toast '+(kind||'info');
+  const ico=TOAST_ICONS[kind]||'';
+  const safe=String(msg).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  el.innerHTML=`${ico?`<span class="t-ico">${ico}</span>`:''}<span class="t-msg">${safe}</span>${dismissible?'<button type="button" class="t-x" aria-label="닫기">×</button>':''}`;
+  wrap.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  let t=null;
+  const dismiss=()=>{if(t){clearTimeout(t);t=null;}el.classList.remove('show');setTimeout(()=>el.remove(),250);};
+  if(dur>0)t=setTimeout(dismiss,dur);
+  if(dismissible){
+    const x=el.querySelector('.t-x');
+    if(x)x.addEventListener('click',dismiss);
+  }
+  return dismiss;
+}
+
 /* ── MODAL ── */
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
 function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';}
@@ -3271,7 +3317,7 @@ async function editChip(key,defaultValue){
     await db.collection('config').doc('main').set({[key]:val},{merge:true});
     S.config=S.config||{};S.config[key]=val;
     applyChips();
-  }catch(e){alert('저장 실패: '+e.message);}
+  }catch(e){toast('저장 실패: '+e.message,'error');}
 }
 function enterHome(){
   const tr=_('homeTr'),hdr=_('homeHeader'),cards=_('homeCards');
@@ -3388,7 +3434,7 @@ async function submitMyPwChange(){
   try{
     await db.collection('students').doc(S.studentDocId).update({accountPw:newPw});
     stu.accountPw=newPw;
-    closeModal();alert('비밀번호가 변경되었습니다.');
+    closeModal();toast('비밀번호가 변경되었습니다.','success');
   }catch(e){showErr('mErr','저장 실패: '+e.message);}
   showLoad(false);
 }
@@ -3453,7 +3499,7 @@ async function toggleClassroomMaintenance(){
     await db.collection('config').doc('main').set({classroomMaintenance:next},{merge:true});
     S.config=S.config||{};S.config.classroomMaintenance=next;
     renderClass();
-  }catch(e){alert('실패: '+e.message);}
+  }catch(e){toast('실패: '+e.message,'error');}
 }
 async function toggleClassroomPublic(){
   const next=!(S.config?.classroomPublic===true);
@@ -3461,7 +3507,7 @@ async function toggleClassroomPublic(){
     await db.collection('config').doc('main').set({classroomPublic:next},{merge:true});
     S.config=S.config||{};S.config.classroomPublic=next;
     renderClass();
-  }catch(e){alert('실패: '+e.message);}
+  }catch(e){toast('실패: '+e.message,'error');}
 }
 function renderClass(){
   const box=_('classC');if(!box)return;
@@ -3518,7 +3564,7 @@ function renderClass(){
 }
 function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function openClassApplyForm(){
-  const stu=S.students.find(x=>x._docId===S.studentDocId);if(!stu){alert('학생 정보를 찾을 수 없습니다.');return;}
+  const stu=S.students.find(x=>x._docId===S.studentDocId);if(!stu){toast('학생 정보를 찾을 수 없습니다.','error');return;}
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">강의 신청</p>
     <p style="font-size:12px;color:#6b7280;margin-bottom:14px">${escapeHtml(stu.name||'')} · ${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}</p>
     <div class="fg"><label class="fl">연락처</label><input class="fi" id="caPhone" value="${escapeHtml(fmtPhone(effectivePhone(stu)))}" oninput="fmtPhoneInput(this)" maxlength="13"></div>
@@ -3660,7 +3706,7 @@ async function deleteLecture(id){
     await db.collection('lectures').doc(id).delete();
     S.lectures=S.lectures.filter(l=>l._docId!==id);
     renderClass();
-  }catch(e){alert('삭제 실패: '+e.message);}
+  }catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);
 }
 function renderClassAdminApps(){
@@ -3687,7 +3733,7 @@ async function approveClassApp(studentId){
     await db.collection('students').doc(studentId).update({classroomStatus:'approved',classroomProcessedAt:Date.now()});
     const s=S.students.find(x=>x._docId===studentId);if(s){s.classroomStatus='approved';s.classroomProcessedAt=Date.now();}
     renderClass();
-  }catch(e){alert('승인 실패: '+e.message);}
+  }catch(e){toast('승인 실패: '+e.message,'error');}
   showLoad(false);
 }
 function openRejectClassApp(studentId){
@@ -3725,7 +3771,7 @@ async function revokeClassAccess(studentId){
     await db.collection('students').doc(studentId).update({classroomStatus:firebase.firestore.FieldValue.delete(),classroomProcessedAt:Date.now()});
     const st=S.students.find(x=>x._docId===studentId);if(st)delete st.classroomStatus;
     renderClass();
-  }catch(e){alert('실패: '+e.message);}
+  }catch(e){toast('실패: '+e.message,'error');}
   showLoad(false);
 }
 
