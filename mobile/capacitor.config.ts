@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'kr.kjhedu.consulting2027',
-  appName: '2027 컨설팅',
+  appName: 'KJHEDU',
   webDir: 'www',
   // 로컬 번들 모드 (App Store 심사 통과 명분).
   // 개발 중 라이브 리로드를 쓰려면 server.url 을 임시로 활성화.
