@@ -1,0 +1,32 @@
+# Capacitor 빌드 산출물 — 빌드 시마다 재생성되므로 커밋하지 않음
+www/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# iOS — 프로젝트 파일은 커밋하되 빌드 산출물은 제외
+ios/App/App/public/
+ios/App/build/
+ios/App/Pods/
+ios/App/DerivedData/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/.DS_Store
+
+# Android
+android/app/src/main/assets/public/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.idea/
+android/*.iml
+android/app/release/
+android/keystore/
+
+# 공통
+.DS_Store
+*.log

@@ -1,0 +1,27 @@
+{
+  "name": "consulting2027-mobile",
+  "version": "1.0.0",
+  "description": "2027 컨설팅 iOS/Android 앱 (Capacitor 래퍼)",
+  "private": true,
+  "scripts": {
+    "build": "bash ./build.sh",
+    "sync": "bash ./build.sh && cap sync",
+    "ios": "bash ./build.sh && cap copy ios && cap open ios",
+    "android": "bash ./build.sh && cap copy android && cap open android",
+    "add:ios": "cap add ios",
+    "add:android": "cap add android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/keyboard": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

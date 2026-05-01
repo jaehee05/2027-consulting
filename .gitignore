@@ -6,3 +6,15 @@ firebase-debug.log
 firebase-debug.*.log
 .DS_Store
 Thumbs.db
+
+# Mobile (Capacitor)
+mobile/node_modules/
+mobile/www/
+mobile/ios/App/build/
+mobile/ios/App/Pods/
+mobile/ios/App/DerivedData/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/*.log
