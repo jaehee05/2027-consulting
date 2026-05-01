@@ -1215,7 +1215,7 @@ function selDate(id){S.selDate=id;const myB=S.bookings.find(b=>b.studentId===S.s
 async function bookSlot(dateId,slot){
   if(!isBookingOpen()){toast('예약 기간이 아닙니다.','warn');renderStu();return;}
   const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
-  if(!confirm(`${d.label} ${slot}에 예약하시겠습니까?`))return;
+  if(!(await confirmDialog({title:'예약 확인',message:`${d.label} ${slot}에 예약하시겠습니까?`,confirmLabel:'예약'})))return;
   showLoad(true);
   try{
     const myB=S.bookings.find(b=>b.studentId===S.studentDocId);
@@ -1235,7 +1235,7 @@ async function dismissNotif(reqId){
 async function stuAcceptAdminChange(reqId,slotIdx){
   const req=S.requests.find(r=>r._docId===reqId);if(!req||req.status!=='pending')return;
   const chosen=req.offeredSlots[slotIdx];if(!chosen)return;
-  if(!confirm(`${chosen.dateLabel} ${chosen.slot}(으)로 예약을 변경하시겠습니까?`))return;
+  if(!(await confirmDialog({title:'예약 변경',message:`${chosen.dateLabel} ${chosen.slot}(으)로 예약을 변경하시겠습니까?`,confirmLabel:'변경'})))return;
   showLoad(true);
   try{
     const taken=S.bookings.filter(x=>x.date===chosen.date&&x._docId!==req.bookingId).map(x=>x.slot);
@@ -1277,7 +1277,7 @@ async function stuSubmitRejectAdminChange(reqId){
 }
 
 async function cancelMyBook(){
-  if(!confirm('예약을 취소하시겠습니까?'))return;
+  if(!(await confirmDialog({title:'예약 취소',message:'예약을 취소하시겠습니까?',confirmLabel:'취소하기',kind:'danger'})))return;
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
   showLoad(true);
   try{await db.collection('bookings').doc(myB._docId).delete();S.bookings=S.bookings.filter(b=>b.studentId!==S.studentDocId);renderStu();}
@@ -1874,7 +1874,7 @@ function renderWithdrawnStudents(){
 
 async function withdrawStu(docId){
   const s=S.students.find(x=>x._docId===docId);if(!s)return;
-  if(!confirm(`'${s.name}' 학생을 퇴원 처리하시겠습니까?\n\n진행 중인 예약은 자동으로 취소됩니다.\n학생 정보와 과거 성적은 '퇴원 학생 관리'에서 확인·복구 가능합니다.`))return;
+  if(!(await confirmDialog({title:'퇴원 처리',message:`'${s.name}' 학생을 퇴원 처리하시겠습니까?\n\n진행 중인 예약은 자동으로 취소됩니다.\n학생 정보와 과거 성적은 '퇴원 학생 관리'에서 확인·복구 가능합니다.`,confirmLabel:'퇴원 처리',kind:'danger'})))return;
   showLoad(true);
   try{
     const now=Date.now();
@@ -1889,7 +1889,8 @@ async function withdrawStu(docId){
   showLoad(false);}
 
 async function restoreStu(docId){
-  const s=S.students.find(x=>x._docId===docId);if(!s||!confirm(`'${s.name}' 학생을 활성 목록으로 복구하시겠습니까?`))return;
+  const s=S.students.find(x=>x._docId===docId);if(!s)return;
+  if(!(await confirmDialog({title:'학생 복구',message:`'${s.name}' 학생을 활성 목록으로 복구하시겠습니까?`,confirmLabel:'복구'})))return;
   showLoad(true);
   try{
     await db.collection('students').doc(docId).update({withdrawn:false,withdrawnAt:firebase.firestore.FieldValue.delete()});
@@ -1951,7 +1952,7 @@ async function sendAccountInfoBulk(){
   const ids=Array.from(S.stuSelected);
   if(ids.length===0){toast('발송할 학생을 선택해주세요.','warn');return;}
   const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
-  if(!confirm(`선택한 ${ids.length}명에게 계정 정보 알림톡을 발송하시겠습니까?\n\n${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`))return;
+  if(!(await confirmDialog({title:'계정 정보 알림톡 발송',message:`선택한 ${ids.length}명에게 계정 정보 알림톡을 발송하시겠습니까?\n\n${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`,confirmLabel:'발송'})))return;
   showLoad(true);
   try{
     const r=await ppurioCall('sendAccountInfo',{studentIds:ids});
@@ -2120,7 +2121,7 @@ async function sendScoreReminderBulk(){
   const missing=realStu().filter(s=>!hasExamScore(s,ex.id)&&effectivePhoneDigits(s).length>=9);
   if(missing.length===0){showErr('mErr','발송 대상이 없습니다.');return;}
   const ids=missing.map(s=>s._docId);
-  if(!confirm(`${missing.length}명에게 성적 미입력 안내 알림톡을 발송하시겠습니까?\n\n시험명: ${examName}\n마감일: ${scoreDeadline}`))return;
+  if(!(await confirmDialog({title:'성적 미입력 안내 발송',message:`${missing.length}명에게 성적 미입력 안내 알림톡을 발송하시겠습니까?\n\n시험명: ${examName}\n마감일: ${scoreDeadline}`,confirmLabel:'발송'})))return;
   showLoad(true);
   try{
     const r=await ppurioCall('sendScoreReminder',{studentIds:ids,examName,scoreDeadline});
@@ -2258,7 +2259,8 @@ async function saveStu(docId){
   showLoad(false);}
 
 async function delStu(docId){
-  const s=S.students.find(x=>x._docId===docId);if(!s||!confirm(`'${s.name}' 학생을 삭제하시겠습니까?`))return;
+  const s=S.students.find(x=>x._docId===docId);if(!s)return;
+  if(!(await confirmDialog({title:'학생 삭제',message:`'${s.name}' 학생을 삭제하시겠습니까?`,confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
   try{
     await db.collection('students').doc(docId).delete();
@@ -2270,7 +2272,8 @@ async function delStu(docId){
   showLoad(false);}
 
 async function resetPw(docId){
-  const s=S.students.find(x=>x._docId===docId);if(!s||!confirm(`'${s.name}' 학생의 비밀번호를 초기화하시겠습니까?`))return;
+  const s=S.students.find(x=>x._docId===docId);if(!s)return;
+  if(!(await confirmDialog({title:'비밀번호 초기화',message:`'${s.name}' 학생의 비밀번호를 초기화하시겠습니까?`,confirmLabel:'초기화'})))return;
   const newPw=initPw(effectivePhone(s));showLoad(true);
   try{await db.collection('students').doc(docId).update({accountPw:newPw,isFirstLogin:true});s.accountPw=newPw;s.isFirstLogin=true;closeModal();toast(`초기 비밀번호: ${newPw}`,'success',{duration:6000});renderAdminStudents();}
   catch(e){toast('초기화 실패: '+e.message,'error');}
@@ -2354,7 +2357,8 @@ async function saveExamForm(){
   showLoad(false);}
 
 async function deleteExam(examId){
-  const ex=getExam(examId);if(!ex||!confirm(`'${ex.name}' 시험을 삭제하시겠습니까? 해당 시험의 학생 성적 데이터는 유지됩니다.`))return;
+  const ex=getExam(examId);if(!ex)return;
+  if(!(await confirmDialog({title:'시험 삭제',message:`'${ex.name}' 시험을 삭제하시겠습니까? 해당 시험의 학생 성적 데이터는 유지됩니다.`,confirmLabel:'삭제',kind:'danger'})))return;
   S.config.exams=S.config.exams.filter(e=>e.id!==examId);
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);renderAdminExams();}
@@ -2475,7 +2479,7 @@ async function saveBookPeriod(){
   catch(e){toast('저장 실패: '+e.message,'error');}showLoad(false);}
 
 async function clearBookPeriod(){
-  if(!confirm('예약 기간 설정을 해제하시겠습니까? (항상 예약 가능 상태가 됩니다)'))return;
+  if(!(await confirmDialog({title:'예약 기간 해제',message:'예약 기간 설정을 해제하시겠습니까? (항상 예약 가능 상태가 됩니다)',confirmLabel:'해제'})))return;
   S.schedule.bookStart='';S.schedule.bookEnd='';
   S.schedule.bookStartTime='';S.schedule.bookEndTime='';
   showLoad(true);try{await saveScheduleToDb();renderAdminSchedule();}
@@ -2513,7 +2517,8 @@ async function confirmEditDate(id){
   showLoad(true);try{await saveScheduleToDb();for(const b of related)await db.collection('bookings').doc(b._docId).update({date:newDate,dateLabel:label});closeModal();renderAdminSchedule();}catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);}
 
 async function rmDate(id){
-  const d=S.schedule.dates.find(x=>x.id===id);if(!d||!confirm(`'${d.label}'를 삭제하시겠습니까? 관련 예약도 삭제됩니다.`))return;
+  const d=S.schedule.dates.find(x=>x.id===id);if(!d)return;
+  if(!(await confirmDialog({title:'날짜 삭제',message:`'${d.label}'를 삭제하시겠습니까? 관련 예약도 삭제됩니다.`,confirmLabel:'삭제',kind:'danger'})))return;
   const related=S.bookings.filter(b=>b.date===d.date);S.schedule.dates=S.schedule.dates.filter(x=>x.id!==id);
   showLoad(true);try{await saveScheduleToDb();for(const b of related)await db.collection('bookings').doc(b._docId).delete();S.bookings=S.bookings.filter(b=>b.date!==d.date);renderAdminSchedule();}catch(e){toast('삭제 실패: '+e.message,'error');}showLoad(false);}
 
@@ -2526,7 +2531,7 @@ async function addSlot(dateId){
 async function rmSlot(dateId,slot){
   const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
   const bk=S.bookings.find(b=>b.date===d.date&&b.slot===slot);
-  if(bk&&!confirm(`${slot}에 ${bk.studentName} 학생이 예약되어 있습니다. 삭제하시겠습니까?`))return;
+  if(bk&&!(await confirmDialog({title:'시간대 삭제',message:`${slot}에 ${bk.studentName} 학생이 예약되어 있습니다. 삭제하시겠습니까?`,confirmLabel:'삭제',kind:'danger'})))return;
   d.slots=d.slots.filter(s=>s!==slot);showLoad(true);
   try{await saveScheduleToDb();if(bk){await db.collection('bookings').doc(bk._docId).delete();S.bookings=S.bookings.filter(b=>b._docId!==bk._docId);}renderAdminSchedule();}
   catch(e){toast('저장 실패: '+e.message,'error');}showLoad(false);}
@@ -2669,7 +2674,7 @@ function renderRequestsSection(){
 async function approveRequest(reqId){
   const req=S.requests.find(r=>r._docId===reqId);if(!req)return;
   const typeLabel=req.type==='cancel'?'취소':'변경';
-  if(!confirm(`${req.studentName} 학생의 예약 ${typeLabel} 요청을 승인하시겠습니까?`))return;
+  if(!(await confirmDialog({title:'요청 승인',message:`${req.studentName} 학생의 예약 ${typeLabel} 요청을 승인하시겠습니까?`,confirmLabel:'승인'})))return;
   showLoad(true);
   try{
     if(req.type==='cancel'){
@@ -2711,7 +2716,7 @@ async function confirmReject(reqId){
   showLoad(false);}
 
 async function deleteRequest(reqId){
-  if(!confirm('이 요청 기록을 삭제하시겠습니까?'))return;
+  if(!(await confirmDialog({title:'요청 기록 삭제',message:'이 요청 기록을 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
   try{await db.collection('requests').doc(reqId).delete();S.requests=S.requests.filter(r=>r._docId!==reqId);renderAdminBookings();}
   catch(e){toast('삭제 실패: '+e.message,'error');}
@@ -2729,7 +2734,7 @@ async function toggleRequestEnabled(){
 async function toggleBookingDisabled(){
   const cur=bookingAdminDisabled();
   const next=!cur;
-  if(!confirm(next?'학생들의 예약을 비활성화하시겠습니까?\n예약 화면에 "예약 기간이 아닙니다" 안내가 표시됩니다.':'학생들의 예약을 다시 활성화하시겠습니까?'))return;
+  if(!(await confirmDialog({title:next?'예약 비활성화':'예약 활성화',message:next?'학생들의 예약을 비활성화하시겠습니까?\n예약 화면에 "예약 기간이 아닙니다" 안내가 표시됩니다.':'학생들의 예약을 다시 활성화하시겠습니까?',confirmLabel:next?'비활성화':'활성화'})))return;
   S.config.bookingDisabled=next;
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);renderAdminBookings();}
@@ -2761,7 +2766,7 @@ function openBookDetail(docId){
 
 async function adminDelExamScore(stuDocId, examId, from, bookDocId){
   const ex=getExam(examId);if(!ex)return;
-  if(!confirm(`이 학생의 ${ex.name} 성적을 삭제하시겠습니까?`))return;
+  if(!(await confirmDialog({title:'성적 삭제',message:`이 학생의 ${ex.name} 성적을 삭제하시겠습니까?`,confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
   try{
     await db.collection('students').doc(stuDocId).update({['scores.'+examId]:firebase.firestore.FieldValue.delete()});
@@ -2772,7 +2777,7 @@ async function adminDelExamScore(stuDocId, examId, from, bookDocId){
   }catch(e){toast('삭제 실패: '+e.message,'error');}showLoad(false);}
 
 async function adminDelQuestion(docId){
-  if(!confirm('이 학생의 질문 & 고민 내용을 삭제하시겠습니까?'))return;
+  if(!(await confirmDialog({title:'내용 삭제',message:'이 학생의 질문 & 고민 내용을 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
   try{await db.collection('bookings').doc(docId).update({question:''});
   const b=S.bookings.find(x=>x._docId===docId);if(b)b.question='';
@@ -2907,7 +2912,7 @@ async function sendAdminChangeReq(){
 }
 
 async function cancelAdminChangeReq(reqId){
-  if(!confirm('이 변경 요청을 취소하시겠습니까?'))return;
+  if(!(await confirmDialog({title:'변경 요청 취소',message:'이 변경 요청을 취소하시겠습니까?',confirmLabel:'취소하기',kind:'danger'})))return;
   showLoad(true);
   try{await db.collection('requests').doc(reqId).delete();S.requests=S.requests.filter(r=>r._docId!==reqId);renderAdminBookings();}
   catch(e){toast('취소 실패: '+e.message,'error');}
@@ -2915,7 +2920,8 @@ async function cancelAdminChangeReq(reqId){
 }
 
 async function adminDelBook(docId){
-  const b=S.bookings.find(x=>x._docId===docId);if(!b||!confirm(`${b.studentName} 학생의 ${b.dateLabel} ${b.slot} 예약을 삭제하시겠습니까?`))return;
+  const b=S.bookings.find(x=>x._docId===docId);if(!b)return;
+  if(!(await confirmDialog({title:'예약 삭제',message:`${b.studentName} 학생의 ${b.dateLabel} ${b.slot} 예약을 삭제하시겠습니까?`,confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);try{await db.collection('bookings').doc(docId).delete();S.bookings=S.bookings.filter(x=>x._docId!==docId);renderAdminBookings();}catch(e){toast('삭제 실패: '+e.message,'error');}showLoad(false);}
 
 function openStuDetail(stuDocId){
@@ -3068,7 +3074,7 @@ async function submitSendAdminAccountInfo(adminId){
 async function delAcct(id){
   if(id===S.user.id){toast('본인 계정은 삭제할 수 없습니다.','warn');return;}
   const acc=S.admins.find(x=>x.id===id);
-  if(!confirm(`'${id}' 계정을 삭제하시겠습니까?${acc?.role==='test'?'\n(연결된 테스트 학생 데이터도 함께 삭제됩니다)':''}`))return;
+  if(!(await confirmDialog({title:'계정 삭제',message:`'${id}' 계정을 삭제하시겠습니까?${acc?.role==='test'?'\n(연결된 테스트 학생 데이터도 함께 삭제됩니다)':''}`,confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
   try{
     await db.collection('admins').doc(id).delete();
@@ -3259,8 +3265,28 @@ function toast(msg,kind='info',opts={}){
 }
 
 /* ── MODAL ── */
+let _confirmResolver=null;
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
-function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';}
+function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;r(false);}}
+/**
+ * confirm()의 비동기 모달 버전. true/false 반환.
+ *   await confirmDialog({message:'정말 삭제할까요?'})
+ *   options: {title, message, confirmLabel, cancelLabel, kind:'primary'|'danger'}
+ */
+function confirmDialog({title='확인',message='',confirmLabel='확인',cancelLabel='취소',kind='primary'}={}){
+  return new Promise(resolve=>{
+    _confirmResolver=resolve;
+    renderModal({
+      title,
+      sub:message,
+      actions:[
+        {label:cancelLabel,kind:'secondary',onclick:'__confirmEnd(false)'},
+        {label:confirmLabel,kind,onclick:'__confirmEnd(true)'}
+      ]
+    });
+  });
+}
+function __confirmEnd(v){if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;closeModal();r(v);}else closeModal();}
 /**
  * 표준 모달 렌더링 헬퍼.
  *   title   : 모달 제목 (필수)
@@ -3700,7 +3726,7 @@ async function submitLecture(id){
   showLoad(false);
 }
 async function deleteLecture(id){
-  if(!confirm('이 강의를 삭제하시겠습니까?'))return;
+  if(!(await confirmDialog({title:'강의 삭제',message:'이 강의를 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
   try{
     await db.collection('lectures').doc(id).delete();
@@ -3727,7 +3753,7 @@ function renderClassAdminApps(){
   }).join('');
 }
 async function approveClassApp(studentId){
-  if(!confirm('이 학생의 강의 신청을 승인하시겠습니까?'))return;
+  if(!(await confirmDialog({title:'강의 신청 승인',message:'이 학생의 강의 신청을 승인하시겠습니까?',confirmLabel:'승인'})))return;
   showLoad(true);
   try{
     await db.collection('students').doc(studentId).update({classroomStatus:'approved',classroomProcessedAt:Date.now()});
@@ -3765,7 +3791,7 @@ function renderClassAdminMembers(){
 }
 async function revokeClassAccess(studentId){
   const s=S.students.find(x=>x._docId===studentId);if(!s)return;
-  if(!confirm(`${s.name||''} 학생의 강의실 접근을 해제하시겠습니까?`))return;
+  if(!(await confirmDialog({title:'강의실 접근 해제',message:`${s.name||''} 학생의 강의실 접근을 해제하시겠습니까?`,confirmLabel:'해제',kind:'danger'})))return;
   showLoad(true);
   try{
     await db.collection('students').doc(studentId).update({classroomStatus:firebase.firestore.FieldValue.delete(),classroomProcessedAt:Date.now()});
