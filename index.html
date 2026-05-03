@@ -1817,15 +1817,23 @@ function renderAdminLogins(){
     return;
   }
   const baseStu=realStu();
+  // 로그인 판정: lastLoginAt 기록이 있거나, isFirstLogin이 명시적으로 false인 경우
+  // (첫 로그인 시 비밀번호를 변경한 학생은 isFirstLogin=false로 마이그레이션됨)
+  const everLoggedIn=(s)=>!!s.lastLoginAt||s.isFirstLogin===false;
   const sortKey=S.loginSort||'recent';
   const sorted=[...baseStu].sort((a,b)=>{
     if(sortKey==='never'){
-      const aN=!a.lastLoginAt,bN=!b.lastLoginAt;
+      const aN=!everLoggedIn(a),bN=!everLoggedIn(b);
       if(aN!==bN)return aN?-1:1;
       return (b.lastLoginAt||0)-(a.lastLoginAt||0)||a.name.localeCompare(b.name,'ko');
     }
     if(sortKey==='count')return (b.loginCount||0)-(a.loginCount||0)||a.name.localeCompare(b.name,'ko');
-    return (b.lastLoginAt||0)-(a.lastLoginAt||0)||a.name.localeCompare(b.name,'ko');
+    // recent: lastLoginAt 있는 학생 → 미기록이지만 접속한 학생 → 미접속
+    const aT=a.lastLoginAt||0,bT=b.lastLoginAt||0;
+    if(aT!==bT)return bT-aT;
+    const aE=everLoggedIn(a),bE=everLoggedIn(b);
+    if(aE!==bE)return aE?-1:1;
+    return a.name.localeCompare(b.name,'ko');
   });
   const fmtTs=(ts)=>{
     if(!ts)return '<span style="color:#9ca3af">—</span>';
@@ -1839,13 +1847,17 @@ function renderAdminLogins(){
     return `<span title="${d.toLocaleString('ko-KR')}">${rel}</span>`;
   };
   const total=baseStu.length;
-  const loggedIn=baseStu.filter(s=>s.lastLoginAt).length;
+  const loggedIn=baseStu.filter(everLoggedIn).length;
   const never=total-loggedIn;
   const rows=sorted.map(s=>{
-    const has=!!s.lastLoginAt;
-    const badge=has
-      ?'<span class="bx" style="background:#dcfce7;color:#166534">✓ 로그인</span>'
+    const ever=everLoggedIn(s);
+    const hasTs=!!s.lastLoginAt;
+    const badge=ever
+      ?(hasTs
+        ?'<span class="bx" style="background:#dcfce7;color:#166534">✓ 로그인</span>'
+        :'<span class="bx" style="background:#dbeafe;color:#1e40af" title="비밀번호 변경 이력으로 추정">✓ 접속함</span>')
       :'<span class="bx" style="background:#fee2e2;color:#991b1b">미접속</span>';
+    const lastCell=hasTs?fmtTs(s.lastLoginAt):(ever?'<span style="color:#6b7280;font-size:12px">시각 미기록</span>':'<span style="color:#9ca3af">—</span>');
     return `<tr>
       <td data-label="좌석" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td data-label="학년"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
@@ -1853,7 +1865,7 @@ function renderAdminLogins(){
       <td data-label="학교">${s.school||''}</td>
       <td data-label="계정 ID"><code>${s.accountId}</code></td>
       <td data-label="상태" style="text-align:center">${badge}</td>
-      <td data-label="마지막 로그인">${fmtTs(s.lastLoginAt)}</td>
+      <td data-label="마지막 로그인">${lastCell}</td>
       <td data-label="횟수" style="text-align:center">${s.loginCount||0}</td>
     </tr>`;
   }).join('');
