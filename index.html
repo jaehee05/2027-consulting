@@ -354,7 +354,17 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
     <div class="card">
       <p style="font-size:14px;font-weight:700;margin-bottom:4px">2차 비밀번호 입력</p>
       <p style="font-size:12px;color:#6b7280;margin-bottom:18px">관리자 계정에 설정된 6자리 PIN을 입력하세요.</p>
-      <div class="fg" style="margin-bottom:14px"><input class="fi" id="lPin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="_ _ _ _ _ _" autocomplete="one-time-code" style="text-align:center;letter-spacing:8px;font-size:20px;font-weight:600" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter')doPinVerify()"></div>
+      <div class="fg" style="margin-bottom:14px">
+        <div id="pinWrap" style="position:relative;display:flex;justify-content:center;gap:8px;cursor:text" onclick="const e=_('lPin');if(e)e.focus()">
+          <div id="pinS0" style="width:40px;height:48px;border:1.5px solid #d1d5db;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#9ca3af;background:#fff;transition:border-color .15s,box-shadow .15s,color .15s">_</div>
+          <div id="pinS1" style="width:40px;height:48px;border:1.5px solid #d1d5db;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#9ca3af;background:#fff;transition:border-color .15s,box-shadow .15s,color .15s">_</div>
+          <div id="pinS2" style="width:40px;height:48px;border:1.5px solid #d1d5db;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#9ca3af;background:#fff;transition:border-color .15s,box-shadow .15s,color .15s">_</div>
+          <div id="pinS3" style="width:40px;height:48px;border:1.5px solid #d1d5db;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#9ca3af;background:#fff;transition:border-color .15s,box-shadow .15s,color .15s">_</div>
+          <div id="pinS4" style="width:40px;height:48px;border:1.5px solid #d1d5db;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#9ca3af;background:#fff;transition:border-color .15s,box-shadow .15s,color .15s">_</div>
+          <div id="pinS5" style="width:40px;height:48px;border:1.5px solid #d1d5db;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#9ca3af;background:#fff;transition:border-color .15s,box-shadow .15s,color .15s">_</div>
+          <input id="lPin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" oninput="onPinInput()" onfocus="updatePinSlots()" onblur="updatePinSlots()" onkeydown="if(event.key==='Enter')doPinVerify()" style="position:absolute;inset:0;width:100%;height:48px;opacity:0;border:0;outline:none;caret-color:transparent;color:transparent;background:transparent;font-size:1px;padding:0;text-align:center;cursor:text">
+        </div>
+      </div>
       <div class="ferr" id="lPinErr"></div>
       <button class="btn bp bfw" onclick="doPinVerify()">확인</button>
       <button class="btn bs bfw" style="margin-top:8px" onclick="cancelPin()">취소</button>
@@ -760,9 +770,9 @@ async function doLogin(){
       if(a.role==='admin'&&a.pinCode){
         S._pendingAdmin={a,keep};
         showLoad(false);
-        hideErr('lPinErr');_('lPin').value='';
+        hideErr('lPinErr');resetPinInput();
         showView('vPin');
-        setTimeout(()=>{const el=_('lPin');if(el)el.focus();},50);
+        setTimeout(()=>{const el=_('lPin');if(el){el.focus();updatePinSlots();}},50);
         return;
       }
       S.user={type:a.role,id:a.id,name:a.name};
@@ -801,6 +811,26 @@ async function doLogin(){
   showLoad(false);
 }
 
+function onPinInput(){
+  const el=_('lPin');if(!el)return;
+  el.value=el.value.replace(/\D/g,'').slice(0,6);
+  updatePinSlots();
+}
+function updatePinSlots(){
+  const el=_('lPin');if(!el)return;
+  const v=el.value;
+  const focused=document.activeElement===el;
+  for(let i=0;i<6;i++){
+    const slot=_('pinS'+i);if(!slot)continue;
+    const filled=i<v.length;
+    const active=focused&&!filled&&i===v.length;
+    slot.textContent=filled?'●':'_';
+    if(filled){slot.style.borderColor='#1C64F2';slot.style.color='#1C64F2';slot.style.boxShadow='none';}
+    else if(active){slot.style.borderColor='#1C64F2';slot.style.color='#9ca3af';slot.style.boxShadow='0 0 0 3px rgba(28,100,242,0.15)';}
+    else{slot.style.borderColor='#d1d5db';slot.style.color='#9ca3af';slot.style.boxShadow='none';}
+  }
+}
+function resetPinInput(){const el=_('lPin');if(el){el.value='';}updatePinSlots();}
 async function doPinVerify(){
   const pin=_('lPin').value.trim();
   hideErr('lPinErr');
@@ -816,14 +846,14 @@ async function doPinVerify(){
     _('adminUname').textContent=pending.a.name;
     _('adminRoleLabel').textContent=pending.a.role==='admin'?'ADMIN':'OP';
     S._pendingAdmin=null;
-    _('lPin').value='';
+    resetPinInput();
     enterHome();
   }catch(e){showErr('lPinErr','오류: '+e.message);}
   showLoad(false);
 }
 function cancelPin(){
   S._pendingAdmin=null;
-  _('lPin').value='';hideErr('lPinErr');
+  resetPinInput();hideErr('lPinErr');
   showView('vLogin');
 }
 
