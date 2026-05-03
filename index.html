@@ -354,7 +354,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
     <div class="card">
       <p style="font-size:14px;font-weight:700;margin-bottom:4px">2차 비밀번호 입력</p>
       <p style="font-size:12px;color:#6b7280;margin-bottom:18px">관리자 계정에 설정된 6자리 PIN을 입력하세요.</p>
-      <div class="fg" style="margin-bottom:14px"><input class="fi" id="lPin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="● ● ● ● ● ●" autocomplete="one-time-code" style="text-align:center;letter-spacing:8px;font-size:18px;font-weight:600" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter')doPinVerify()"></div>
+      <div class="fg" style="margin-bottom:14px"><input class="fi" id="lPin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="6자리 숫자" autocomplete="one-time-code" style="text-align:center;letter-spacing:6px;font-size:18px;font-weight:600" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter')doPinVerify()"></div>
       <div class="ferr" id="lPinErr"></div>
       <button class="btn bp bfw" onclick="doPinVerify()">확인</button>
       <button class="btn bs bfw" style="margin-top:8px" onclick="cancelPin()">취소</button>
