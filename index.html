@@ -343,6 +343,25 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   </div>
 </div>
 
+<!-- 2차 비밀번호 (PIN) -->
+<div id="vPin" class="lwrap hidden" style="position:relative">
+  <div style="width:100%;max-width:380px">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="display:inline-flex;align-items:center;gap:8px">
+        <span class="chip">2차 인증</span><span style="font-size:20px;font-weight:800">KJHEDU</span>
+      </div>
+    </div>
+    <div class="card">
+      <p style="font-size:14px;font-weight:700;margin-bottom:4px">2차 비밀번호 입력</p>
+      <p style="font-size:12px;color:#6b7280;margin-bottom:18px">관리자 계정에 설정된 6자리 PIN을 입력하세요.</p>
+      <div class="fg" style="margin-bottom:14px"><input class="fi" id="lPin" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="● ● ● ● ● ●" autocomplete="one-time-code" style="text-align:center;letter-spacing:8px;font-size:18px;font-weight:600" oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter')doPinVerify()"></div>
+      <div class="ferr" id="lPinErr"></div>
+      <button class="btn bp bfw" onclick="doPinVerify()">확인</button>
+      <button class="btn bs bfw" style="margin-top:8px" onclick="cancelPin()">취소</button>
+    </div>
+  </div>
+</div>
+
 <!-- 비밀번호 변경 -->
 <div id="vCpw" class="hidden">
   <div class="topbar"><div class="tl"><span class="chip">LOGIN</span><span class="tname">KJHEDU</span></div></div>
@@ -662,9 +681,9 @@ function stopRequestsListener(){if(_reqListener){try{_reqListener();}catch(e){}_
 
 var _skipPush=false;
 function showView(id){
-  ['vSetup','vLogin','vCpw','vStu','vAdmin','vHome','vClass','vMy'].forEach(v=>{
+  ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy'].forEach(v=>{
     const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
-    if(['vSetup','vLogin'].includes(v))el.style.display=v===id?'flex':'none';
+    if(['vSetup','vLogin','vPin'].includes(v))el.style.display=v===id?'flex':'none';
   });
 }
 
@@ -738,6 +757,14 @@ async function doLogin(){
         _('stuUname').textContent=a.name+' (테스트)';
         enterHome();return;
       }
+      if(a.role==='admin'&&a.pinCode){
+        S._pendingAdmin={a,keep};
+        showLoad(false);
+        hideErr('lPinErr');_('lPin').value='';
+        showView('vPin');
+        setTimeout(()=>{const el=_('lPin');if(el)el.focus();},50);
+        return;
+      }
       S.user={type:a.role,id:a.id,name:a.name};
       saveSession({type:a.role,id:a.id,name:a.name},keep);
       await loadAll();
@@ -772,6 +799,32 @@ async function doLogin(){
     showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');
   }catch(e){showErr('lErr','오류: '+e.message);}
   showLoad(false);
+}
+
+async function doPinVerify(){
+  const pin=_('lPin').value.trim();
+  hideErr('lPinErr');
+  if(!/^\d{6}$/.test(pin)){showErr('lPinErr','6자리 숫자를 입력하세요.');return;}
+  const pending=S._pendingAdmin;
+  if(!pending){showErr('lPinErr','세션이 만료되었습니다. 다시 로그인하세요.');return;}
+  if(pin!==pending.a.pinCode){showErr('lPinErr','2차 비밀번호가 올바르지 않습니다.');return;}
+  showLoad(true);
+  try{
+    S.user={type:pending.a.role,id:pending.a.id,name:pending.a.name};
+    saveSession({type:pending.a.role,id:pending.a.id,name:pending.a.name},pending.keep);
+    await loadAll();
+    _('adminUname').textContent=pending.a.name;
+    _('adminRoleLabel').textContent=pending.a.role==='admin'?'ADMIN':'OP';
+    S._pendingAdmin=null;
+    _('lPin').value='';
+    enterHome();
+  }catch(e){showErr('lPinErr','오류: '+e.message);}
+  showLoad(false);
+}
+function cancelPin(){
+  S._pendingAdmin=null;
+  _('lPin').value='';hideErr('lPinErr');
+  showView('vLogin');
 }
 
 function showWithdrawnNotice(){
@@ -3100,12 +3153,14 @@ function renderAdminAccounts(){
   const rows=S.admins.map(a=>{
     const canSend=a.role!=='test'&&a.phone&&a.phone.replace(/\D/g,'').length>=9;
     const sendBtn=a.role==='test'?'':`<button class="btn bs bsm" ${canSend?'':'disabled style="opacity:.5;cursor:not-allowed" title="연락처를 먼저 등록하세요"'} onclick="openSendAdminAccountInfo('${a.id}')">계정 안내</button>`;
+    const isOwn=a.id===S.user.id;
+    const pinBtn=(isOwn&&a.role==='admin')?`<button class="btn bs bsm" onclick="openPinSettingsModal()">🔒 2차 ${a.pinCode?'변경':'설정'}</button>`:'';
     return `<tr>
     <td data-label="ID"><code>${a.id}</code></td>
-    <td data-label="" class="cell-head"><span style="font-weight:700">${a.name}</span><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span></td>
+    <td data-label="" class="cell-head"><span style="font-weight:700">${a.name}</span><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span>${(isOwn&&a.role==='admin'&&a.pinCode)?'<span class="bx" style="background:#dcfce7;color:#166534;margin-left:4px" title="2차 비밀번호 설정됨">🔒</span>':''}</td>
     <td data-label="연락처" style="color:#6b7280;font-size:12px">${a.phone||'—'}</td>
     <td data-label="권한" class="cell-hide"><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span></td>
-    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end">${sendBtn}<button class="btn bs bsm" onclick="openAcctModal('${a.id}')">수정</button>${a.id!==S.user.id?`<button class="btn bd bsm" onclick="delAcct('${a.id}')">삭제</button>`:'<span style="font-size:11px;color:#9ca3af;padding:0 8px">본인</span>'}</div></td>
+    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end">${sendBtn}${pinBtn}<button class="btn bs bsm" onclick="openAcctModal('${a.id}')">수정</button>${!isOwn?`<button class="btn bd bsm" onclick="delAcct('${a.id}')">삭제</button>`:'<span style="font-size:11px;color:#9ca3af;padding:0 8px">본인</span>'}</div></td>
   </tr>`;}).join('');
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">ADMIN / OP / TEST 계정 <span style="font-size:13px;font-weight:400;color:#6b7280">(${S.admins.length}개)</span></span><button class="btn bp bsm" onclick="openAcctModal(null)">+ 계정 추가</button></div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table><thead><tr><th>ID</th><th>이름</th><th>연락처</th><th>권한</th><th>관리</th></tr></thead>
@@ -3187,6 +3242,62 @@ async function submitSendAdminAccountInfo(adminId){
     const r=await ppurioCall('sendAdminAccountInfo',{adminAccountId:adminId,phone});
     toast(`발송 완료 — 수신자: ${r.name} (${phone})`,'success');
   }catch(e){toast('발송 실패: '+e.message,'error');}
+  showLoad(false);
+}
+
+function openPinSettingsModal(){
+  const a=S.admins.find(x=>x.id===S.user.id);
+  if(!a){toast('계정을 찾을 수 없습니다.','error');return;}
+  const has=!!a.pinCode;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">2차 비밀번호 ${has?'변경 / 해제':'설정'}</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:16px">관리자 로그인 시 추가로 입력하는 6자리 PIN입니다. 분실 시 다른 ADMIN이나 Firestore 직접 접근이 필요하니 신중히 설정하세요.</p>
+    ${has?`<div class="fg"><label class="fl">현재 PIN</label><input class="fi" id="pinCur" type="password" inputmode="numeric" maxlength="6" placeholder="현재 6자리 PIN" oninput="this.value=this.value.replace(/\\D/g,'')"></div>`:''}
+    <div class="fg"><label class="fl">새 PIN ${has?'<span style="font-size:11px;color:#9ca3af;font-weight:400">(변경 시에만 입력)</span>':''}</label><input class="fi" id="pinNew" type="password" inputmode="numeric" maxlength="6" placeholder="새 6자리 PIN" oninput="this.value=this.value.replace(/\\D/g,'')"></div>
+    <div class="fg"><label class="fl">새 PIN 확인</label><input class="fi" id="pinNew2" type="password" inputmode="numeric" maxlength="6" placeholder="다시 입력" oninput="this.value=this.value.replace(/\\D/g,'')"></div>
+    <div class="ferr" id="mErr"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn bs" style="flex:1" onclick="closeModal()">취소</button>
+      ${has?`<button class="btn bd" style="flex:1" onclick="removeMyPin()">해제</button>`:''}
+      <button class="btn bp" style="flex:1" onclick="saveMyPin()">${has?'변경':'설정'}</button>
+    </div>`;
+  openModal();
+}
+async function saveMyPin(){
+  const a=S.admins.find(x=>x.id===S.user.id);if(!a)return;
+  const has=!!a.pinCode;
+  const cur=has?_('pinCur').value.trim():'';
+  const n1=_('pinNew').value.trim(),n2=_('pinNew2').value.trim();
+  hideErr('mErr');
+  if(has&&cur!==a.pinCode){showErr('mErr','현재 PIN이 올바르지 않습니다.');return;}
+  if(!/^\d{6}$/.test(n1)){showErr('mErr','새 PIN은 6자리 숫자여야 합니다.');return;}
+  if(n1!==n2){showErr('mErr','새 PIN이 일치하지 않습니다.');return;}
+  showLoad(true);
+  try{
+    const now=Date.now();
+    await db.collection('admins').doc(a.id).update({pinCode:n1,pinSetAt:now});
+    a.pinCode=n1;a.pinSetAt=now;
+    closeModal();toast('2차 비밀번호가 '+(has?'변경':'설정')+'되었습니다.','success');
+    renderAdminAccounts();
+  }catch(e){showErr('mErr','저장 실패: '+e.message);}
+  showLoad(false);
+}
+async function removeMyPin(){
+  const a=S.admins.find(x=>x.id===S.user.id);if(!a||!a.pinCode)return;
+  const cur=_('pinCur').value.trim();
+  hideErr('mErr');
+  if(cur!==a.pinCode){showErr('mErr','현재 PIN이 올바르지 않습니다.');return;}
+  closeModal();
+  if(!(await confirmDialog({title:'2차 비밀번호 해제',message:'정말 해제하시겠습니까? 다음 로그인부터 PIN 입력이 생략됩니다.',confirmLabel:'해제',kind:'danger'})))return;
+  showLoad(true);
+  try{
+    await db.collection('admins').doc(a.id).update({
+      pinCode:firebase.firestore.FieldValue.delete(),
+      pinSetAt:firebase.firestore.FieldValue.delete()
+    });
+    delete a.pinCode;delete a.pinSetAt;
+    toast('2차 비밀번호가 해제되었습니다.','success');
+    renderAdminAccounts();
+  }catch(e){toast('해제 실패: '+e.message,'error');}
   showLoad(false);
 }
 
