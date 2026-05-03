@@ -777,16 +777,7 @@ async function doLogin(){
 function showWithdrawnNotice(){
   renderModal({
     title:'로그인할 수 없습니다',
-    body:`<div style="display:flex;justify-content:center;margin:4px 0 14px">
-      <div style="width:56px;height:56px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="7.5" x2="12" y2="13"/>
-          <circle cx="12" cy="16.5" r="0.6" fill="#dc2626" stroke="none"/>
-        </svg>
-      </div>
-    </div>
-    <div style="line-height:1.65;color:#374151;font-size:13.5px;text-align:center">
+    body:`<div style="line-height:1.65;color:#374151;font-size:13.5px">
       <p style="margin-bottom:10px">퇴원 처리된 계정으로, 더 이상 로그인할 수 없습니다.</p>
       <p>문의 사항이 있으시면 화면 <b>우측 하단의 채널톡</b>으로 문의해 주세요.</p>
     </div>`,
