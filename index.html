@@ -749,6 +749,11 @@ async function doLogin(){
     if(!stuQ.empty){
       const stuDoc=stuQ.docs[0],stu=stuDoc.data();
       if(stu.accountPw!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
+      if(stu.withdrawn===true){
+        showLoad(false);
+        showWithdrawnNotice();
+        return;
+      }
       S.user={type:'student',id,name:stu.name};
       S.studentDocId=stuDoc.id;
       saveSession({type:'student',id,name:stu.name,studentDocId:stuDoc.id},keep);
@@ -767,6 +772,17 @@ async function doLogin(){
     showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');
   }catch(e){showErr('lErr','오류: '+e.message);}
   showLoad(false);
+}
+
+function showWithdrawnNotice(){
+  renderModal({
+    title:'로그인할 수 없습니다',
+    body:`<div style="line-height:1.65;color:#374151;font-size:13.5px">
+      <p style="margin-bottom:10px">퇴원 처리된 계정으로, 더 이상 로그인할 수 없습니다.</p>
+      <p>문의 사항이 있으시면 화면 <b>우측 하단의 채널톡</b>으로 문의해 주세요.</p>
+    </div>`,
+    actions:[{label:'확인',kind:'primary',onclick:'closeModal()'}]
+  });
 }
 
 function doLogout(){
