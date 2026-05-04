@@ -2161,7 +2161,7 @@ async function sendAccountInfoBulk(){
     const fails=(r.results||[]).filter(x=>!x.ok);
     let msg=`발송 완료: 성공 ${r.sent}건 / 실패 ${r.failed}건`;
     if(fails.length>0){
-      const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
+      const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}${f.role==='guardian'?'(보호자)':f.role==='student'?'(학생)':''}: ${f.skipped||f.error}`).join('\n');
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
     }
     toast(msg,r.failed>0?'warn':'success',{duration:5000});
@@ -2215,7 +2215,7 @@ async function submitBookingStartedBulk(){
     const fails=(r.results||[]).filter(x=>!x.ok);
     let msg=`발송 완료: 성공 ${r.sent}건 / 실패 ${r.failed}건`;
     if(fails.length>0){
-      const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}: ${f.skipped||f.error}`).join('\n');
+      const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}${f.role==='guardian'?'(보호자)':f.role==='student'?'(학생)':''}: ${f.skipped||f.error}`).join('\n');
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
     }
     toast(msg,r.failed>0?'warn':'success',{duration:5000});

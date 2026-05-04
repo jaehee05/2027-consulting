@@ -21,6 +21,29 @@ function notifyPhone(student) {
   return student.studentPhone || student.guardianPhone || "";
 }
 
+// 계정 안내 / 예약 시작 안내처럼 학생·보호자 양쪽에 모두 보내야 하는 경우 사용.
+// 정규화·길이검증·중복제거된 [{ phone, role }] 배열을 반환한다.
+function notifyPhonesBoth(student) {
+  if (!student) return [];
+  const list = [];
+  if (!student.noStudentPhone && student.studentPhone) {
+    list.push({ phone: student.studentPhone, role: "student" });
+  }
+  if (student.guardianPhone) {
+    list.push({ phone: student.guardianPhone, role: "guardian" });
+  }
+  const seen = new Set();
+  const out = [];
+  for (const { phone, role } of list) {
+    const p = String(phone).replace(/\D/g, "");
+    if (p.length < 9) continue;
+    if (seen.has(p)) continue;
+    seen.add(p);
+    out.push({ phone: p, role });
+  }
+  return out;
+}
+
 function fmtOfferedSlots(offered) {
   if (!Array.isArray(offered)) return "";
   return offered.map((s) => `${s.dateLabel} ${s.slot}`).join(" / ");
@@ -308,22 +331,24 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
-        const phone = String(notifyPhone(s)).replace(/\D/g, "");
-        if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
-        try {
-          const r = await sendAlimtalk("bookingStarted", {
-            phone,
-            name: s.name || "",
-            school: s.school || "",
-            grade: s.grade || "",
-            seat: s.seat ?? "",
-            consultingName,
-            bookingDeadline,
-          });
-          results.push({ id, name: s.name, ok: true, result: r });
-        } catch (err) {
-          console.error(`[bookingStarted] ${s.name}(${id}) 발송 실패:`, err);
-          results.push({ id, name: s.name, ok: false, error: String(err.message || err) });
+        const phones = notifyPhonesBoth(s);
+        if (phones.length === 0) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
+        for (const { phone, role } of phones) {
+          try {
+            const r = await sendAlimtalk("bookingStarted", {
+              phone,
+              name: s.name || "",
+              school: s.school || "",
+              grade: s.grade || "",
+              seat: s.seat ?? "",
+              consultingName,
+              bookingDeadline,
+            });
+            results.push({ id, name: s.name, role, phone, ok: true, result: r });
+          } catch (err) {
+            console.error(`[bookingStarted] ${s.name}(${id}/${role}) 발송 실패:`, err);
+            results.push({ id, name: s.name, role, phone, ok: false, error: String(err.message || err) });
+          }
         }
       }
       const sent = results.filter((r) => r.ok).length;
@@ -398,22 +423,24 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
-        const phone = String(notifyPhone(s)).replace(/\D/g, "");
-        if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
-        try {
-          const r = await sendAlimtalk("accountCreated", {
-            phone,
-            name: s.name || "",
-            school: s.school || "",
-            grade: s.grade || "",
-            seat: s.seat ?? "",
-            accountId: s.accountId || "",
-            accountPw: s.accountPw || "",
-          });
-          results.push({ id, name: s.name, ok: true, result: r });
-        } catch (err) {
-          console.error(`[accountCreated] ${s.name}(${id}) 발송 실패:`, err);
-          results.push({ id, name: s.name, ok: false, error: String(err.message || err) });
+        const phones = notifyPhonesBoth(s);
+        if (phones.length === 0) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
+        for (const { phone, role } of phones) {
+          try {
+            const r = await sendAlimtalk("accountCreated", {
+              phone,
+              name: s.name || "",
+              school: s.school || "",
+              grade: s.grade || "",
+              seat: s.seat ?? "",
+              accountId: s.accountId || "",
+              accountPw: s.accountPw || "",
+            });
+            results.push({ id, name: s.name, role, phone, ok: true, result: r });
+          } catch (err) {
+            console.error(`[accountCreated] ${s.name}(${id}/${role}) 발송 실패:`, err);
+            results.push({ id, name: s.name, role, phone, ok: false, error: String(err.message || err) });
+          }
         }
       }
       const sent = results.filter((r) => r.ok).length;
