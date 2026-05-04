@@ -610,7 +610,9 @@ function getAbsGrade(type,raw){
   const gc=S.config.gradeCuts;if(!gc||!gc.abs||raw===''||raw===undefined)return '';
   const cuts=gc.abs[type];return cuts?calcGrade(raw,cuts):'';
 }
-function examGradeCell(exam,subj,raw){
+function examGradeCell(exam,subj,raw,override){
+  const ov=override?String(override).trim():'';
+  if(ov)return `<td class="vl">${ov}</td>`;
   const g=getExamGrade(exam,subj,raw);
   if(!g)return '<td class="dl"></td>';
   const est=isEstGrade(exam,subj);
@@ -625,9 +627,18 @@ function hasAnyEstGrade(exam){
   }
   return Object.keys(exam.estGradeCuts).length>0;
 }
-function absGradeCell(type,raw){
+function absGradeCell(type,raw,override){
+  const ov=override?String(override).trim():'';
+  if(ov)return `<td class="vl">${ov}</td>`;
   const g=getAbsGrade(type,raw);
   return g?`<td class="vl">${g}</td>`:'<td class="vl">—</td>';
+}
+// 관리자가 지정한 등급 override는 학생 저장 흐름에서도 유지된다.
+const GRADE_OVERRIDE_KEYS=['korGradeOverride','matGradeOverride','engGradeOverride','hisGradeOverride','exp1GradeOverride','exp2GradeOverride','lang2GradeOverride'];
+function mergeGradeOverrides(stu,examId,scoreData){
+  const old=stu?.scores?.[examId]||{};
+  for(const k of GRADE_OVERRIDE_KEYS){if(old[k])scoreData[k]=old[k];}
+  return scoreData;
 }
 
 function showLoad(v){_('vLoad').style.display=v?'flex':'none';}
@@ -998,6 +1009,7 @@ function expOpts(sel,hasScienceII){
 function l2Opts(sel){return `<option value="">선택</option>${['독일어Ⅰ','프랑스어Ⅰ','스페인어Ⅰ','중국어Ⅰ','일본어Ⅰ','러시아어Ⅰ','아랍어Ⅰ','베트남어Ⅰ','한문Ⅰ'].map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('')}`;}
 
 function gradeOpts(sel){return [1,2,3,4,5,6,7,8,9].map(g=>`<option ${String(g)===String(sel)?'selected':''}>${g}</option>`).join('');}
+function gradeOverrideOpts(sel){const v=sel?String(sel):'';return `<option value="" ${!v?'selected':''}>자동</option>`+[1,2,3,4,5,6,7,8,9].map(g=>`<option value="${g}" ${String(g)===v?'selected':''}>${g}등급</option>`).join('');}
 
 function getExpSubjects(exam){
   const social=['생활과 윤리','윤리와 사상','한국지리','세계지리','동아시아사','세계사','경제','정치와 법','사회·문화'];
@@ -1151,6 +1163,7 @@ async function finishScoreWizard(){
   showLoad(true);
   try{
     const stu=S.students.find(x=>x._docId===S.studentDocId);
+    mergeGradeOverrides(stu,examId,scoreData);
     if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;
     await db.collection('students').doc(S.studentDocId).update({['scores.'+examId]:scoreData});
     S.editingExamId=null;S.scoreStep=getScoreSteps(exam).length;renderScoreWizard();
@@ -1183,10 +1196,10 @@ function rawWithDiff(raw,cuts){
 function examScoreTblFull(exam,sc){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
   const gc=exam.gradeCuts||{};const gca=S.config.gradeCuts?.abs||{};
-  const kg=examGradeCell(exam,sc.korSubj,sc.korRaw),mg=examGradeCell(exam,sc.matSubj,sc.matRaw);
-  const e1g=examGradeCell(exam,sc.exp1Subj,sc.exp1Raw),e2g=examGradeCell(exam,sc.exp2Subj,sc.exp2Raw);
-  const eg=absGradeCell('eng',sc.engRaw),hg=absGradeCell('his',sc.hisRaw);
-  const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw):'';
+  const kg=examGradeCell(exam,sc.korSubj,sc.korRaw,sc.korGradeOverride),mg=examGradeCell(exam,sc.matSubj,sc.matRaw,sc.matGradeOverride);
+  const e1g=examGradeCell(exam,sc.exp1Subj,sc.exp1Raw,sc.exp1GradeOverride),e2g=examGradeCell(exam,sc.exp2Subj,sc.exp2Raw,sc.exp2GradeOverride);
+  const eg=absGradeCell('eng',sc.engRaw,sc.engGradeOverride),hg=absGradeCell('his',sc.hisRaw,sc.hisGradeOverride);
+  const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw,sc.lang2GradeOverride):'';
   const krD=rawWithDiff(sc.korRaw,gc[sc.korSubj]),mrD=rawWithDiff(sc.matRaw,gc[sc.matSubj]);
   const erD=rawWithDiff(sc.engRaw,gca.eng),e1rD=rawWithDiff(sc.exp1Raw,gc[sc.exp1Subj]),e2rD=rawWithDiff(sc.exp2Raw,gc[sc.exp2Subj]);
   const gradeLabel=hasAnyEstGrade(exam)?'예상등급':'등급';
@@ -1199,10 +1212,10 @@ function examScoreTblFull(exam,sc){if(!sc)return '';
 
 function examScoreTblHtml(exam,sc){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
-  const kg=examGradeCell(exam,sc.korSubj,sc.korRaw),mg=examGradeCell(exam,sc.matSubj,sc.matRaw);
-  const e1g=examGradeCell(exam,sc.exp1Subj,sc.exp1Raw),e2g=examGradeCell(exam,sc.exp2Subj,sc.exp2Raw);
-  const eg=absGradeCell('eng',sc.engRaw),hg=absGradeCell('his',sc.hisRaw);
-  const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw):'';
+  const kg=examGradeCell(exam,sc.korSubj,sc.korRaw,sc.korGradeOverride),mg=examGradeCell(exam,sc.matSubj,sc.matRaw,sc.matGradeOverride);
+  const e1g=examGradeCell(exam,sc.exp1Subj,sc.exp1Raw,sc.exp1GradeOverride),e2g=examGradeCell(exam,sc.exp2Subj,sc.exp2Raw,sc.exp2GradeOverride);
+  const eg=absGradeCell('eng',sc.engRaw,sc.engGradeOverride),hg=absGradeCell('his',sc.hisRaw,sc.hisGradeOverride);
+  const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw,sc.lang2GradeOverride):'';
   return `<div style="overflow-x:auto"><table class="sc-tbl">
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
   <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
@@ -1274,6 +1287,7 @@ async function saveExamScore(examId){
   showLoad(true);
   try{
     const stu=S.students.find(x=>x._docId===S.studentDocId);
+    mergeGradeOverrides(stu,examId,scoreData);
     if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;
     await db.collection('students').doc(S.studentDocId).update({['scores.'+examId]:scoreData});
     S.editingExamId=null;renderStu();}
@@ -1557,20 +1571,21 @@ function getGradeSubjects(stu){
   }
   function _hasCuts(ex,subj){return !!(ex.gradeCuts&&ex.gradeCuts[subj]||ex.estGradeCuts&&ex.estGradeCuts[subj]);}
   function _hasAbsCuts(type){const gc=S.config.gradeCuts;return !!(gc&&gc.abs&&gc.abs[type]);}
-  if(korSet.size>1){for(const subj of korSet)subjects.push({key:'kor_'+subj,label:subj,getGrade:(ex,sc)=>sc?.korSubj===subj?(sc.korGrade||getExamGrade(ex,sc.korSubj,sc.korRaw)):'',isEst:(ex,sc)=>sc?.korSubj===subj&&!sc.korGrade&&isEstGrade(ex,sc.korSubj),hasCuts:(ex,sc)=>sc?.korSubj===subj&&_hasCuts(ex,subj)});}
-  else subjects.push({key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw),isEst:(ex,sc)=>!sc?.korGrade&&isEstGrade(ex,sc?.korSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.korSubj)});
-  if(matSet.size>1){for(const subj of matSet)subjects.push({key:'mat_'+subj,label:subj,getGrade:(ex,sc)=>sc?.matSubj===subj?(sc.matGrade||getExamGrade(ex,sc.matSubj,sc.matRaw)):'',isEst:(ex,sc)=>sc?.matSubj===subj&&!sc.matGrade&&isEstGrade(ex,sc.matSubj),hasCuts:(ex,sc)=>sc?.matSubj===subj&&_hasCuts(ex,subj)});}
-  else subjects.push({key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw),isEst:(ex,sc)=>!sc?.matGrade&&isEstGrade(ex,sc?.matSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.matSubj)});
-  subjects.push({key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGrade||getAbsGrade('eng',sc?.engRaw),isEst:()=>false,hasCuts:()=>_hasAbsCuts('eng')});
-  subjects.push({key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGrade||getAbsGrade('his',sc?.hisRaw),isEst:()=>false,hasCuts:()=>_hasAbsCuts('his')});
+  if(korSet.size>1){for(const subj of korSet)subjects.push({key:'kor_'+subj,label:subj,getGrade:(ex,sc)=>sc?.korSubj===subj?(sc.korGradeOverride||sc.korGrade||getExamGrade(ex,sc.korSubj,sc.korRaw)):'',isEst:(ex,sc)=>sc?.korSubj===subj&&!sc.korGradeOverride&&!sc.korGrade&&isEstGrade(ex,sc.korSubj),hasCuts:(ex,sc)=>sc?.korSubj===subj&&(_hasCuts(ex,subj)||!!sc?.korGradeOverride)});}
+  else subjects.push({key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGradeOverride||sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw),isEst:(ex,sc)=>!sc?.korGradeOverride&&!sc?.korGrade&&isEstGrade(ex,sc?.korSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.korSubj)||!!sc?.korGradeOverride});
+  if(matSet.size>1){for(const subj of matSet)subjects.push({key:'mat_'+subj,label:subj,getGrade:(ex,sc)=>sc?.matSubj===subj?(sc.matGradeOverride||sc.matGrade||getExamGrade(ex,sc.matSubj,sc.matRaw)):'',isEst:(ex,sc)=>sc?.matSubj===subj&&!sc.matGradeOverride&&!sc.matGrade&&isEstGrade(ex,sc.matSubj),hasCuts:(ex,sc)=>sc?.matSubj===subj&&(_hasCuts(ex,subj)||!!sc?.matGradeOverride)});}
+  else subjects.push({key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGradeOverride||sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw),isEst:(ex,sc)=>!sc?.matGradeOverride&&!sc?.matGrade&&isEstGrade(ex,sc?.matSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.matSubj)||!!sc?.matGradeOverride});
+  subjects.push({key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGradeOverride||sc?.engGrade||getAbsGrade('eng',sc?.engRaw),isEst:()=>false,hasCuts:(ex,sc)=>_hasAbsCuts('eng')||!!sc?.engGradeOverride});
+  subjects.push({key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGradeOverride||sc?.hisGrade||getAbsGrade('his',sc?.hisRaw),isEst:()=>false,hasCuts:(ex,sc)=>_hasAbsCuts('his')||!!sc?.hisGradeOverride});
   if(expSet.size){for(const subj of expSet)subjects.push({key:'exp_'+subj,label:subj,getGrade:(ex,sc)=>{
-    if(sc?.exp1Subj===subj)return sc.exp1Grade||getExamGrade(ex,sc.exp1Subj,sc.exp1Raw);
-    if(sc?.exp2Subj===subj)return sc.exp2Grade||getExamGrade(ex,sc.exp2Subj,sc.exp2Raw);return '';
+    if(sc?.exp1Subj===subj)return sc.exp1GradeOverride||sc.exp1Grade||getExamGrade(ex,sc.exp1Subj,sc.exp1Raw);
+    if(sc?.exp2Subj===subj)return sc.exp2GradeOverride||sc.exp2Grade||getExamGrade(ex,sc.exp2Subj,sc.exp2Raw);return '';
   },isEst:(ex,sc)=>{
-    if(sc?.exp1Subj===subj&&!sc.exp1Grade)return isEstGrade(ex,subj);
-    if(sc?.exp2Subj===subj&&!sc.exp2Grade)return isEstGrade(ex,subj);return false;
+    if(sc?.exp1Subj===subj&&!sc.exp1GradeOverride&&!sc.exp1Grade)return isEstGrade(ex,subj);
+    if(sc?.exp2Subj===subj&&!sc.exp2GradeOverride&&!sc.exp2Grade)return isEstGrade(ex,subj);return false;
   },hasCuts:(ex,sc)=>{
-    if(sc?.exp1Subj===subj||sc?.exp2Subj===subj)return _hasCuts(ex,subj);return false;
+    if(sc?.exp1Subj===subj)return _hasCuts(ex,subj)||!!sc?.exp1GradeOverride;
+    if(sc?.exp2Subj===subj)return _hasCuts(ex,subj)||!!sc?.exp2GradeOverride;return false;
   }});}else{subjects.push({key:'exp1',label:'탐구 1',getGrade:()=>'',isEst:()=>false,hasCuts:()=>false});subjects.push({key:'exp2',label:'탐구 2',getGrade:()=>'',isEst:()=>false,hasCuts:()=>false});}
   return subjects;
 }
@@ -3005,9 +3020,22 @@ function openAdminScoreEdit(stuDocId, examId, from, bookDocId){
   if(exam.hasLang2){formHtml+=`
     <div class="frow"><div class="fg"><label class="fl">제2외국어/한문 과목</label><select class="fi fsel" id="as-l2s">${l2Opts(sc.lang2Subj||'')}</select></div>
     <div class="fg"><label class="fl">제2외국어/한문 원점수</label><input class="fi" id="as-l2r" type="number" min="0" max="50" value="${sc.lang2Raw||''}" placeholder="0–50"></div></div>`;}
+  let overrideHtml=`
+    <p style="font-size:13px;font-weight:700;margin:18px 0 4px">등급 수정 (선택 사항)</p>
+    <p style="font-size:11px;color:#6b7280;margin-bottom:10px">'자동' 으로 두면 원점수 기준으로 등급이 계산됩니다. 직접 등급을 지정하면 학생 화면에 그 등급이 표시됩니다.</p>
+    <div class="frow"><div class="fg"><label class="fl">국어 등급</label><select class="fi fsel" id="ao-k">${gradeOverrideOpts(sc.korGradeOverride||'')}</select></div>
+    <div class="fg"><label class="fl">수학 등급</label><select class="fi fsel" id="ao-m">${gradeOverrideOpts(sc.matGradeOverride||'')}</select></div></div>
+    <div class="frow"><div class="fg"><label class="fl">영어 등급</label><select class="fi fsel" id="ao-e">${gradeOverrideOpts(sc.engGradeOverride||'')}</select></div>
+    <div class="fg"><label class="fl">한국사 등급</label><select class="fi fsel" id="ao-h">${gradeOverrideOpts(sc.hisGradeOverride||'')}</select></div></div>
+    <div class="frow"><div class="fg"><label class="fl">탐구 1 등급</label><select class="fi fsel" id="ao-e1">${gradeOverrideOpts(sc.exp1GradeOverride||'')}</select></div>
+    <div class="fg"><label class="fl">탐구 2 등급</label><select class="fi fsel" id="ao-e2">${gradeOverrideOpts(sc.exp2GradeOverride||'')}</select></div></div>`;
+  if(exam.hasLang2){overrideHtml+=`
+    <div class="frow"><div class="fg"><label class="fl">제2외국어/한문 등급</label><select class="fi fsel" id="ao-l2">${gradeOverrideOpts(sc.lang2GradeOverride||'')}</select></div>
+    <div class="fg"></div></div>`;}
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${exam.name} 성적 입력/수정</p>
     <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${stu.name} 학생</p>
     ${formHtml}
+    ${overrideHtml}
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="${backAction}">← 돌아가기</button><button class="btn bp" style="flex:1" onclick="saveAdminScore('${stuDocId}','${examId}','${from||''}','${bookDocId||''}')">저장</button></div>`;
   if(!_('mOv').classList.contains('hidden'))return;openModal();
 }
@@ -3019,6 +3047,13 @@ async function saveAdminScore(stuDocId, examId, from, bookDocId){
   const engRaw=_('as-er')?.value||'',hisRaw=_('as-hr')?.value||'';
   const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engRaw,engGrade:getAbsGrade('eng',engRaw),hisRaw,hisGrade:getAbsGrade('his',hisRaw),exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
   if(exam.hasLang2){scoreData.lang2Subj=_('as-l2s')?.value||'';scoreData.lang2Raw=_('as-l2r')?.value||'';scoreData.lang2Grade=getAbsGrade('lang2',scoreData.lang2Raw);}
+  scoreData.korGradeOverride=_('ao-k')?.value||'';
+  scoreData.matGradeOverride=_('ao-m')?.value||'';
+  scoreData.engGradeOverride=_('ao-e')?.value||'';
+  scoreData.hisGradeOverride=_('ao-h')?.value||'';
+  scoreData.exp1GradeOverride=_('ao-e1')?.value||'';
+  scoreData.exp2GradeOverride=_('ao-e2')?.value||'';
+  if(exam.hasLang2)scoreData.lang2GradeOverride=_('ao-l2')?.value||'';
   showLoad(true);
   try{
     await db.collection('students').doc(stuDocId).update({['scores.'+examId]:scoreData});
