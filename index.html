@@ -104,8 +104,8 @@ tr:last-child td{border-bottom:none}
 .adm-slot.filled{background:linear-gradient(135deg,#1C64F2,#1A56DB);color:#fff;border-color:#1A56DB}
 .adm-slot.filled:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(28,100,242,.32)}
 .adm-slot.filled .adm-slot-name{opacity:.95}
-.adm-slot.empty{background:#f9fafb;color:#9ca3af;border-color:#e5e7eb}
-.adm-slot.empty:hover{background:#f3f4f6;border-color:#d1d5db;color:#6b7280}
+.adm-slot.vacant{background:#f9fafb;color:#9ca3af;border-color:#e5e7eb}
+.adm-slot.vacant:hover{background:#f3f4f6;border-color:#d1d5db;color:#6b7280}
 .dt{padding:7px 14px;border-radius:var(--radius-lg);font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--gray-200);background:var(--surface);color:var(--gray-500);transition:.15s;font-family:inherit}
 .dt.on{background:var(--primary);color:var(--surface);border-color:var(--primary)}.dt:hover:not(.on){border-color:var(--primary);color:var(--primary)}
 .bx{display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--radius-pill);font-size:11px;font-weight:600}
@@ -2866,7 +2866,7 @@ function renderAdminBookings(){
       if(b){
         return `<button class="adm-slot filled" onclick="openBookDetail('${b._docId}')" title="${b.studentName} (${b.dateLabel} ${slot})"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">${b.studentName||''}</span></button>`;
       }
-      return `<button class="adm-slot empty" onclick="toast('비어있는 시간대입니다.','info',{id:'emptySlot'})" title="${sel.label} ${slot} (예약자 없음)"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">비어있음</span></button>`;
+      return `<button class="adm-slot vacant" onclick="toast('비어있는 시간대입니다.','info',{id:'emptySlot'})" title="${sel.label} ${slot} (예약자 없음)"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">비어있음</span></button>`;
     }).join('');
     const bookedCnt=S.bookings.filter(b=>b.date===sel.date).length;
     slotGridHtml=`<div class="card np" style="padding:18px;margin-bottom:24px">
@@ -2906,7 +2906,7 @@ function renderAdminBookings(){
     </div>
     <button class="btn ${adminDisabled?'bp':'bd'} bsm" onclick="toggleBookingDisabled()">${adminDisabled?'예약 활성화':'예약 비활성화'}</button>
   </div>`:'';
-  _('adminC').innerHTML=`<div class="sh np" style="margin-bottom:14px"><span class="shtitle" style="display:flex;align-items:center;gap:8px;font-size:17px"><span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:linear-gradient(135deg,#1C64F2,#1A56DB);color:#fff;border-radius:8px;font-size:13px">📋</span>예약 현황</span>
+  _('adminC').innerHTML=`<div class="sh np" style="margin-bottom:14px"><span class="shtitle" style="font-size:17px;font-weight:800">예약 현황</span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">↻ 새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
     ${statsCard}
     ${dupCard}
