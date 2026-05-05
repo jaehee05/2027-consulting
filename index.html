@@ -499,7 +499,7 @@ const S = {
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[], requests:[], reqSlots:[],
   lectures:[], classSub:'list', classLectureId:null,
-  tab:null, selDate:null, adminSel:null,
+  tab:null, selDate:null, adminSel:null, adminBookSelDate:null,
   editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), alimtalkMode:null, stuSubView:'active',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
   consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0
@@ -2791,24 +2791,32 @@ async function doBulk(){
 
 /* ── ADMIN: 예약 현황 ── */
 function renderAdminBookings(){
-  const sorted=[...S.bookings].sort((a,b)=>{const sA=S.students.find(s=>s._docId===a.studentId)?.seat||999;const sB=S.students.find(s=>s._docId===b.studentId)?.seat||999;if(sA!==sB)return sA-sB;return a.date!==b.date?a.date.localeCompare(b.date):a.slot.localeCompare(b.slot);});
   const bookedIds=new Set(S.bookings.map(b=>b.studentId));
   const unbooked=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
-  const rows=sorted.map(b=>{
-    const stu=S.students.find(s=>s._docId===b.studentId);
-    const examStatCells=getExams().map(ex=>`<td data-label="${ex.name}" class="cell-hide" style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(stu,ex.id)?'#22c55e':'#d1d5db'}"></span></td>`).join('');
-    return `<tr>
-      <td data-label="날짜" class="cell-hide" style="text-align:center"><span class="bx bb" style="font-size:11px">${b.dateLabel}</span></td>
-      <td data-label="시간" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${b.slot}</td>
-      <td data-label="" class="cell-head" style="text-align:center;font-weight:600"><span>${b.studentName}</span><span class="head-meta"><span class="bx bb" style="font-size:11px">${b.dateLabel}</span><b style="color:#1C64F2">${b.slot}</b></span></td>
-      <td data-label="학교" style="text-align:center">${stu?.school||'—'}</td>
-      <td data-label="학년" style="text-align:center"><span class="bx ${stu?.grade==='고3'?'br':stu?.grade==='고2'?'bb':'bg'}">${stu?.grade||'—'}</span></td>
-      <td data-label="좌석" style="text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td>
-      <td data-label="연락처" style="text-align:center">${stu?.studentPhone||(stu?.guardianPhone||'—')}</td>
-      ${examStatCells}
-      <td data-label="질문" class="cell-hide" style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${b.question?'#22c55e':'#d1d5db'}"></span></td>
-      <td data-label="" class="cell-actions" style="text-align:center;white-space:nowrap"><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button><button class="btn bs bsm np" style="color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${b._docId}')">변경 요청</button></div></td>
-    </tr>`;}).join('');
+  /* 버튼형 뷰: 학생용처럼 날짜 탭 + 슬롯 버튼. 클릭 시 예약자 상세 */
+  const dates=(S.schedule.dates||[]).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const availDates=dates.filter(d=>(d.slots||[]).length>0);
+  if(!S.adminBookSelDate||!availDates.find(d=>d.id===S.adminBookSelDate))S.adminBookSelDate=availDates[0]?.id||null;
+  const sel=availDates.find(d=>d.id===S.adminBookSelDate);
+  const dtabsHtml=availDates.map(d=>{
+    const cnt=S.bookings.filter(b=>b.date===d.date).length;
+    return `<button class="dt ${d.id===S.adminBookSelDate?'on':''}" onclick="adminBookSelDate('${d.id}')">${d.label} <span style="font-size:11px;opacity:.75">(${cnt})</span></button>`;
+  }).join('');
+  let slotGridHtml='';
+  if(sel){
+    const sortedSlots=[...(sel.slots||[])].sort((a,b)=>a.localeCompare(b));
+    const slotBtns=sortedSlots.map(slot=>{
+      const b=S.bookings.find(x=>x.date===sel.date&&x.slot===slot);
+      if(b){
+        return `<button class="sb sl" style="display:flex;flex-direction:column;gap:2px;height:auto;padding:10px 8px" onclick="openBookDetail('${b._docId}')" title="${b.studentName} (${b.dateLabel} ${slot})"><span style="font-size:13px;font-weight:700">${slot}</span><span style="font-size:11px;font-weight:600;opacity:.95">${b.studentName}</span></button>`;
+      }
+      return `<button class="sb" style="display:flex;flex-direction:column;gap:2px;height:auto;padding:10px 8px;color:#9ca3af" onclick="toast('비어있는 시간대입니다.','info')" title="${sel.label} ${slot} (예약자 없음)"><span style="font-size:13px;font-weight:700">${slot}</span><span style="font-size:11px">비어있음</span></button>`;
+    }).join('');
+    const bookedCnt=S.bookings.filter(b=>b.date===sel.date).length;
+    slotGridHtml=`<div class="dtabs">${dtabsHtml}</div><div style="background:#f9fafb;border-radius:10px;padding:14px"><p style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">${sel.label} 시간대별 예약 현황 <span style="font-weight:500;color:#9ca3af">· 예약 ${bookedCnt} / 전체 ${sortedSlots.length}</span></p><div class="sg">${slotBtns||'<p style="font-size:13px;color:#9ca3af">시간대가 등록되지 않았습니다.</p>'}</div><p style="font-size:11px;color:#9ca3af;margin-top:10px">예약된 시간 버튼을 누르면 학생 상세 정보를 볼 수 있습니다.</p></div>`;
+  }else{
+    slotGridHtml=`<div style="background:#f9fafb;border-radius:10px;padding:24px;text-align:center;color:#9ca3af;font-size:13px">등록된 일정이 없습니다. '일정 관리' 탭에서 먼저 일정을 추가하세요.</div>`;
+  }
   const unbookedRows=unbooked.map(s=>`<tr>
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
     <td data-label="" class="cell-head"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}</span></td>
@@ -2818,28 +2826,31 @@ function renderAdminBookings(){
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
     <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:5px;justify-content:flex-end"><button class="btn bs bsm" onclick="openStuDetail('${s._docId}')">상세</button><button class="btn bp bsm" onclick="openNewBookForStu('${s._docId}')">예약</button></div></td>
   </tr>`).join('');
-  const byDate={};sorted.forEach(b=>{if(!byDate[b.date])byDate[b.date]={label:b.dateLabel,items:[]};byDate[b.date].items.push(b);});
-  const printHtml=Object.values(byDate).map(g=>`<div style="margin-bottom:20px"><p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:8px">${g.label}</p>${g.items.map(b=>{const stu=S.students.find(s=>s._docId===b.studentId);return `<div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><b style="color:#1C64F2;min-width:48px">${b.slot}</b><b style="min-width:60px">${b.studentName}</b><span>${stu?.school||''}</span><span style="color:#6b7280">${stu?.grade||''}</span><span style="color:#6b7280">${stu?.studentPhone||''}</span></div>`;}).join('')}</div>`).join('');
+  /* 인쇄: 일정(날짜→시간) 순으로 정렬 */
+  const printSorted=[...S.bookings].sort((a,b)=>{
+    if((a.date||'')!==(b.date||''))return (a.date||'').localeCompare(b.date||'');
+    return (a.slot||'').localeCompare(b.slot||'');
+  });
+  const byDate={};printSorted.forEach(b=>{if(!byDate[b.date])byDate[b.date]={date:b.date,label:b.dateLabel,items:[]};byDate[b.date].items.push(b);});
+  const printHtml=Object.values(byDate).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(g=>`<div style="margin-bottom:20px"><p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:8px">${g.label}</p>${g.items.map(b=>{const stu=S.students.find(s=>s._docId===b.studentId);return `<div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><b style="color:#1C64F2;min-width:48px">${b.slot}</b><b style="min-width:60px">${b.studentName}</b><span>${stu?.school||''}</span><span style="color:#6b7280">${stu?.grade||''}</span><span style="color:#6b7280">${stu?.studentPhone||''}</span></div>`;}).join('')}</div>`).join('');
   const adminDisabled=bookingAdminDisabled();
   const disableCard=S.user.type==='admin'?`<div class="card np" style="margin-bottom:14px;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:${adminDisabled?'#fef2f2':'#f9fafb'};border:1px solid ${adminDisabled?'#fecaca':'#e5e7eb'}">
     <div style="flex:1;min-width:200px"><p style="font-size:13px;font-weight:700;margin-bottom:2px">학생 예약 ${adminDisabled?'<span style="color:#dc2626">비활성화됨</span>':'<span style="color:#16a34a">활성화됨</span>'}</p>
       <p style="font-size:11px;color:#6b7280">${adminDisabled?'학생들이 예약 화면에서 "예약 기간이 아닙니다" 안내를 보게 됩니다.':'예약 기간 설정에 따라 학생들이 예약할 수 있습니다.'}</p></div>
     <button class="btn ${adminDisabled?'bp':'bd'} bsm" onclick="toggleBookingDisabled()">${adminDisabled?'예약 활성화':'예약 비활성화'}</button>
   </div>`:'';
-  _('adminC').innerHTML=`<div class="sh np"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bg">예약</span>예약 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(예약 ${sorted.length}건 · 미예약 ${unbooked.length}명)</span></span>
+  _('adminC').innerHTML=`<div class="sh np"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bg">예약</span>예약 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(예약 ${S.bookings.length}건 · 미예약 ${unbooked.length}명)</span></span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
     ${disableCard}
-    <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${sorted.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
-    <div class="card np" style="padding:0;margin-bottom:24px"><div class="tw tw-cards"><table>
-      <thead><tr><th>날짜</th><th>시간</th><th>학생명</th><th>학교</th><th>학년</th><th>좌석</th><th>연락처</th>${getExams().map(ex=>`<th>${ex.name.replace(/\s*모의.*$/,'')}</th>`).join('')}<th>질문</th><th>관리</th></tr></thead>
-      <tbody>${rows||`<tr class="empty-row"><td colspan="${9+getExams().length}" class="empty">예약 내역이 없습니다.</td></tr>`}</tbody>
-    </table></div></div>
+    <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${S.bookings.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
+    <div class="card np" style="margin-bottom:24px">${slotGridHtml}</div>
     ${renderRequestsSection()}
     <div class="sh np" style="margin-top:24px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx br">미예약</span>예약하지 않은 학생 <span style="font-size:13px;font-weight:400;color:#6b7280">(${unbooked.length}명)</span></span></div>
     <div class="card np" style="padding:0"><div class="tw tw-cards"><table>
       <thead><tr><th>좌석</th><th>이름</th><th>학교</th><th>학년</th><th>학생 연락처</th><th>보호자 연락처</th><th>관리</th></tr></thead>
       <tbody>${unbookedRows||'<tr class="empty-row"><td colspan="7" class="empty">미예약 학생이 없습니다. 🎉</td></tr>'}</tbody>
     </table></div></div>`;}
+function adminBookSelDate(id){S.adminBookSelDate=id;renderAdminBookings();}
 
 function renderRequestsSection(){
   const pending=S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
