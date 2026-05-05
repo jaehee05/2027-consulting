@@ -191,8 +191,8 @@ tr:last-child td{border-bottom:none}
   .card{padding:14px;border-radius:var(--radius-xl)}
   .modal{padding:18px;border-radius:var(--radius-card);max-width:100%}
   .overlay{padding:10px}
-  .tabs{gap:0;position:sticky;top:48px;background:var(--surface);z-index:50}
-  .tab{padding:8px 12px;font-size:12px}
+  .tabs{gap:0;position:sticky;top:48px;background:var(--surface);z-index:50;flex-wrap:wrap;overflow-x:visible;white-space:normal}
+  .tab{padding:8px 10px;font-size:12px;flex:0 0 auto}
   .frow{grid-template-columns:1fr}
   .sh{flex-direction:column;align-items:flex-start;gap:10px}
   .btn{font-size:13px;height:38px}.bsm{height:32px;padding:0 12px;font-size:12px}
@@ -2793,6 +2793,36 @@ async function doBulk(){
 function renderAdminBookings(){
   const bookedIds=new Set(S.bookings.map(b=>b.studentId));
   const unbooked=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
+  /* 중복 예약 검사: 학생당 다중 예약 / 같은 슬롯 다중 예약 */
+  const byStu={},bySlot={};
+  S.bookings.forEach(b=>{
+    (byStu[b.studentId]=byStu[b.studentId]||[]).push(b);
+    const k=(b.date||'')+'|'+(b.slot||'');
+    (bySlot[k]=bySlot[k]||[]).push(b);
+  });
+  const dupStuGroups=Object.values(byStu).filter(arr=>arr.length>1);
+  const dupSlotGroups=Object.values(bySlot).filter(arr=>arr.length>1);
+  const dupCount=dupStuGroups.length+dupSlotGroups.length;
+  let dupCard='';
+  if(dupCount>0){
+    const stuLines=dupStuGroups.map(arr=>{
+      const name=arr[0].studentName||'(이름없음)';
+      const items=arr.map(b=>`<button class="btn bs bsm" style="margin:2px" onclick="openBookDetail('${b._docId}')">${b.dateLabel} ${b.slot}</button>`).join('');
+      return `<div style="padding:8px 0;border-bottom:1px dashed #fecaca"><p style="font-size:12px;font-weight:600;margin-bottom:4px"><span class="bx br" style="font-size:10px;margin-right:6px">중복</span>${name} 학생이 ${arr.length}건 예약됨</p><div style="display:flex;flex-wrap:wrap">${items}</div></div>`;
+    }).join('');
+    const slotLines=dupSlotGroups.map(arr=>{
+      const items=arr.map(b=>`<button class="btn bs bsm" style="margin:2px" onclick="openBookDetail('${b._docId}')">${b.studentName||'?'}</button>`).join('');
+      return `<div style="padding:8px 0;border-bottom:1px dashed #fecaca"><p style="font-size:12px;font-weight:600;margin-bottom:4px"><span class="bx br" style="font-size:10px;margin-right:6px">중복</span>${arr[0].dateLabel} ${arr[0].slot} 시간에 ${arr.length}명 예약됨</p><div style="display:flex;flex-wrap:wrap">${items}</div></div>`;
+    }).join('');
+    dupCard=`<div class="card np" style="margin-bottom:14px;padding:14px;background:#fef2f2;border:1px solid #fecaca">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:16px">⚠️</span>
+        <p style="font-size:13px;font-weight:700;color:#991b1b">중복 예약 감지됨 (${dupCount}건)</p>
+      </div>
+      <p style="font-size:11px;color:#991b1b;margin-bottom:8px">아래 버튼을 눌러 상세 확인 후 정리해주세요.</p>
+      ${stuLines}${slotLines}
+    </div>`;
+  }
   /* 버튼형 뷰: 학생용처럼 날짜 탭 + 슬롯 버튼. 클릭 시 예약자 상세 */
   const dates=(S.schedule.dates||[]).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const availDates=dates.filter(d=>(d.slots||[]).length>0);
@@ -2810,7 +2840,7 @@ function renderAdminBookings(){
       if(b){
         return `<button class="sb sl" style="display:flex;flex-direction:column;gap:2px;height:auto;padding:10px 8px" onclick="openBookDetail('${b._docId}')" title="${b.studentName} (${b.dateLabel} ${slot})"><span style="font-size:13px;font-weight:700">${slot}</span><span style="font-size:11px;font-weight:600;opacity:.95">${b.studentName}</span></button>`;
       }
-      return `<button class="sb" style="display:flex;flex-direction:column;gap:2px;height:auto;padding:10px 8px;color:#9ca3af" onclick="toast('비어있는 시간대입니다.','info')" title="${sel.label} ${slot} (예약자 없음)"><span style="font-size:13px;font-weight:700">${slot}</span><span style="font-size:11px">비어있음</span></button>`;
+      return `<button class="sb" style="display:flex;flex-direction:column;gap:2px;height:auto;padding:10px 8px;color:#9ca3af" onclick="toast('비어있는 시간대입니다.','info',{id:'emptySlot'})" title="${sel.label} ${slot} (예약자 없음)"><span style="font-size:13px;font-weight:700">${slot}</span><span style="font-size:11px">비어있음</span></button>`;
     }).join('');
     const bookedCnt=S.bookings.filter(b=>b.date===sel.date).length;
     slotGridHtml=`<div class="dtabs">${dtabsHtml}</div><div style="background:#f9fafb;border-radius:10px;padding:14px"><p style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">${sel.label} 시간대별 예약 현황 <span style="font-weight:500;color:#9ca3af">· 예약 ${bookedCnt} / 전체 ${sortedSlots.length}</span></p><div class="sg">${slotBtns||'<p style="font-size:13px;color:#9ca3af">시간대가 등록되지 않았습니다.</p>'}</div><p style="font-size:11px;color:#9ca3af;margin-top:10px">예약된 시간 버튼을 누르면 학생 상세 정보를 볼 수 있습니다.</p></div>`;
@@ -2841,6 +2871,7 @@ function renderAdminBookings(){
   </div>`:'';
   _('adminC').innerHTML=`<div class="sh np"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span class="bx bg">예약</span>예약 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(예약 ${S.bookings.length}건 · 미예약 ${unbooked.length}명)</span></span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
+    ${dupCard}
     ${disableCard}
     <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${S.bookings.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
     <div class="card np" style="margin-bottom:24px">${slotGridHtml}</div>
@@ -3565,8 +3596,10 @@ const TOAST_ICONS={info:'',success:'✓',error:'!',warn:'!'};
  *   kind : 'info'|'success'|'error'|'warn' (기본 'info')
  *   opts : { duration: ms (기본 2400, 0이면 무한), dismissible: bool (기본 true) }
  */
+const _toastById={};
 function toast(msg,kind='info',opts={}){
   const wrap=_('toastWrap');if(!wrap||!msg)return;
+  if(opts.id&&_toastById[opts.id]){try{_toastById[opts.id]();}catch(_){}delete _toastById[opts.id];}
   const dur=opts.duration!==undefined?opts.duration:(kind==='error'?4200:2400);
   const dismissible=opts.dismissible!==false;
   const el=document.createElement('div');
@@ -3577,12 +3610,13 @@ function toast(msg,kind='info',opts={}){
   wrap.appendChild(el);
   requestAnimationFrame(()=>el.classList.add('show'));
   let t=null;
-  const dismiss=()=>{if(t){clearTimeout(t);t=null;}el.classList.remove('show');setTimeout(()=>el.remove(),250);};
+  const dismiss=()=>{if(t){clearTimeout(t);t=null;}el.classList.remove('show');setTimeout(()=>el.remove(),250);if(opts.id&&_toastById[opts.id]===dismiss)delete _toastById[opts.id];};
   if(dur>0)t=setTimeout(dismiss,dur);
   if(dismissible){
     const x=el.querySelector('.t-x');
     if(x)x.addEventListener('click',dismiss);
   }
+  if(opts.id)_toastById[opts.id]=dismiss;
   return dismiss;
 }
 
