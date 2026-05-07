@@ -111,6 +111,7 @@ tr:last-child td{border-bottom:none}
 .bx{display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--radius-pill);font-size:11px;font-weight:600}
 .bb{background:#dbeafe;color:var(--primary-text)}.bg{background:var(--success-soft);color:var(--success)}
 .br{background:var(--danger-soft);color:var(--danger)}.bgr{background:var(--gray-300);color:var(--gray-700)}
+.bx.bpk{background:#fce7f3;color:#be185d}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal{background:var(--surface);border-radius:var(--radius-modal);padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-modal)}
 .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
@@ -1258,7 +1259,8 @@ function examScoreCardHtml(exam,stu){
   let body='';
   if(hasSc)body=examScoreTblHtml(exam,sc);
   else if(!open)body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${exam.scoreStart?`<br><span style="font-size:12px">기간: ${exam.scoreStart} ~ ${exam.scoreEnd||'무기한'}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
-  return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px">${badge}<p style="font-size:15px;font-weight:700">${exam.name} 성적</p></div>${editBtn||startBtn}</div>${pNote}${body}</div>`;}
+  const provChip=exam.provisional?'<span class="bx bpk">가채점</span>':'';
+  return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${badge}<p style="font-size:15px;font-weight:700">${exam.name} 성적</p>${provChip}</div>${editBtn||startBtn}</div>${pNote}${body}</div>`;}
 
 function stuGradeGraphCardHtml(stu){
   if(!stu)return '';
@@ -2531,7 +2533,7 @@ function renderAdminExams(){
     const open=isExamOpen(ex);const gcCount=ex.gradeCuts?Object.keys(ex.gradeCuts).length:0;const ecCount=ex.estGradeCuts?Object.keys(ex.estGradeCuts).length:0;
     return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px"><p style="font-size:15px;font-weight:700">${ex.name}</p>${open?'<span class="bx bg">입력 가능</span>':'<span class="bx bgr">마감</span>'}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><p style="font-size:15px;font-weight:700">${ex.name}</p>${open?'<span class="bx bg">입력 가능</span>':'<span class="bx bgr">마감</span>'}${ex.provisional?'<span class="bx bpk">가채점</span>':''}</div>
         <div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openEditExam('${ex.id}')">수정</button><button class="btn bd bsm" onclick="deleteExam('${ex.id}')">삭제</button></div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#6b7280">
@@ -2563,9 +2565,10 @@ function openAddExam(){
     <div class="fg"><label class="fl">시험명</label><input class="fi" id="exName" placeholder="예: 3월 모의고사"></div>
     <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date"></div>
     <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date"></div></div>
-    <div style="display:flex;gap:16px;margin-bottom:14px">
+    <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2"> 제2외국어/한문 포함</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2"> 과학탐구 II 포함</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exProvisional"> 가채점 표시</label>
     </div>
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveExamForm()">추가</button></div>`;openModal();}
@@ -2577,9 +2580,10 @@ function openEditExam(examId){
     <div class="fg"><label class="fl">시험명</label><input class="fi" id="exName" value="${ex.name}"></div>
     <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date" value="${ex.scoreStart||''}"></div>
     <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date" value="${ex.scoreEnd||''}"></div></div>
-    <div style="display:flex;gap:16px;margin-bottom:14px">
+    <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2" ${ex.hasLang2?'checked':''}> 제2외국어/한문 포함</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2" ${ex.hasScienceII?'checked':''}> 과학탐구 II 포함</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exProvisional" ${ex.provisional?'checked':''}> 가채점 표시</label>
     </div>
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveExamForm()">저장</button></div>`;openModal();}
@@ -2587,7 +2591,7 @@ function openEditExam(examId){
 async function saveExamForm(){
   const name=_('exName')?.value.trim();if(!name){showErr('mErr','시험명을 입력하세요.');return;}
   const examId=_('exId')?.value||('exam_'+uid());
-  const examData={id:examId,name,scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',hasLang2:_('exLang2')?.checked||false,hasScienceII:_('exSci2')?.checked||false};
+  const examData={id:examId,name,scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',hasLang2:_('exLang2')?.checked||false,hasScienceII:_('exSci2')?.checked||false,provisional:_('exProvisional')?.checked||false};
   if(!S.config.exams)S.config.exams=[];
   const idx=S.config.exams.findIndex(e=>e.id===examId);
   if(idx>=0){examData.gradeCuts=S.config.exams[idx].gradeCuts||{};examData.estGradeCuts=S.config.exams[idx].estGradeCuts||{};S.config.exams[idx]=examData;}
