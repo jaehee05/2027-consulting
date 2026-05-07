@@ -3504,7 +3504,7 @@ const ALIMTALK_EVENTS=[
   ['adminNotifyAdminChangeApproved','[관리자] 관리자 변경 요청 학생 승인','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
   ['adminNotifyAdminChangeRejected','[관리자] 관리자 변경 요청 학생 거절','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot}']
 ];
-const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft} ${consultingName} ${bookingDeadline}';
+const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft} ${consultingName} ${bookingDeadline} ${footer}';
 async function ppurioCall(action,payload){
   if(!PPURIO_ADMIN_URL||PPURIO_ADMIN_URL==='REPLACE_AFTER_DEPLOY')throw new Error('PPURIO_ADMIN_URL이 설정되지 않았습니다. 배포 후 index.html 상단의 상수를 교체하세요.');
   const adminDoc=await db.collection('admins').doc(S.user.id).get();
@@ -3552,6 +3552,7 @@ async function renderAdminAlimtalk(){
       </div>
       <div class="fg"><label class="fl">API 키 ${cfg.hasApiKey?`<span style="font-size:11px;color:#9ca3af;font-weight:400">(저장됨: ${cfg.apiKeyMasked} — 비워두면 유지)</span>`:''}</label><input class="fi" id="at_apikey" type="password" value="" placeholder="${cfg.hasApiKey?'변경할 때만 입력':'연동 개발 인증키'}" autocomplete="new-password"></div>
       <div class="fg"><label class="fl">관리자 수신번호 <span style="font-size:11px;color:#9ca3af;font-weight:400">(쉼표/공백 구분, 관리자용 알림톡이 모두에게 발송됨)</span></label><input class="fi" id="at_admin_phones" value="${((cfg.adminPhones||[]).join(', ')).replace(/"/g,'&quot;')}" placeholder="01012345678, 01098765432"></div>
+      <div class="fg"><label class="fl">학생 알림톡 푸터 <span style="font-size:11px;color:#9ca3af;font-weight:400">(템플릿의 <code>\${footer}</code> / <code>[*8*]</code> 자리에 자동 삽입)</span></label><textarea class="fi" id="at_footer" rows="3" style="height:auto;padding:10px 12px;resize:vertical" placeholder="예) 문의: 010-0000-0000 · 2027 멘토링">${(cfg.footer||'').replace(/</g,'&lt;')}</textarea></div>
       <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="at_enabled" ${cfg.enabled!==false?'checked':''}> <span>알림톡 자동 발송 활성화</span></label></div>
     </div>
     <div class="card" style="background:#f9fafb;margin-bottom:12px">
@@ -3599,6 +3600,7 @@ function collectAlimtalkPayload(){
     senderProfile:_('at_sender').value.trim(),
     apiKey:_('at_apikey').value.trim(),
     adminPhones,
+    footer:(_('at_footer')?.value||''),
     templates
   };
 }

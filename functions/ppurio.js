@@ -78,9 +78,10 @@ async function sendAlimtalk(eventKey, ctx) {
     return { skipped: "no-phone" };
   }
 
+  const mergedCtx = { footer: settings.footer || "", ...ctx };
   const changeWord = {};
   for (const [k, v] of Object.entries(tmpl.changeWord || {})) {
-    changeWord[k] = substitute(v, ctx);
+    changeWord[k] = substitute(v, mergedCtx);
   }
 
   const token = await getToken(settings);

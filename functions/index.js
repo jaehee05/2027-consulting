@@ -249,6 +249,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         apiKeyMasked,
         hasApiKey: !!d.apiKey,
         adminPhones: Array.isArray(d.adminPhones) ? d.adminPhones : [],
+        footer: d.footer || "",
         templates: d.templates || {},
       });
     }
@@ -268,6 +269,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         senderProfile: p.senderProfile || "",
         templates: p.templates || {},
         adminPhones,
+        footer: String(p.footer || ""),
         apiKey: p.apiKey || existing.apiKey || "",
         updatedAt: Date.now(),
         updatedBy: adminId,
