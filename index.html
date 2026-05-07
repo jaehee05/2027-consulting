@@ -124,6 +124,7 @@ tr:last-child td{border-bottom:none}
 .stcard .sval{font-size:20px;font-weight:800}
 .sc-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .sc-tbl td{border:1px solid var(--gray-300);text-align:center;vertical-align:middle;height:32px;padding:2px 4px}
+.sc-tbl tr:last-child td{border-bottom:1px solid var(--gray-300)}
 .sc-tbl .hd{background:var(--gray-100);font-size:11px;font-weight:600;color:var(--gray-700)}
 .sc-tbl .rh{background:var(--gray-50);font-size:11px;font-weight:600;color:var(--gray-700);width:13%}
 .sw-wrap{min-height:420px;display:flex;flex-direction:column;justify-content:space-between}
@@ -1243,7 +1244,7 @@ function examScoreTblHtml(exam,sc){if(!sc)return '';
   const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw,sc.lang2GradeOverride):'';
   const noCuts=!Object.keys(exam.gradeCuts||{}).length&&!Object.keys(exam.estGradeCuts||{}).length;
   const gradeRow=noCuts
-    ?`<tr><td class="rh" style="font-size:10px;color:#f59e0b;font-weight:700">예상등급</td><td colspan="${hasL2?7:6}" style="text-align:center;color:#f59e0b;font-weight:600;font-size:12px">예상 등급컷 산출중입니다.</td></tr>`
+    ?`<tr><td class="rh" style="font-size:10px;color:#f59e0b;font-weight:700">예상등급</td><td colspan="${hasL2?7:6}" style="text-align:center;color:#f59e0b;font-weight:600;font-size:11px">예상 등급컷 산출중입니다.</td></tr>`
     :`<tr><td class="rh" style="font-size:10px;${hasAnyEstGrade(exam)?'color:#f59e0b;font-weight:700':''}">${hasAnyEstGrade(exam)?'예상등급':'등급'}</td>${hg}${kg}${mg}${eg}${e1g}${e2g}${l2g}</tr>`;
   return `<div style="overflow-x:auto"><table class="sc-tbl">
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
