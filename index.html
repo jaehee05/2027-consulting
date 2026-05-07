@@ -122,7 +122,7 @@ tr:last-child td{border-bottom:none}
 .stcard{background:var(--gray-50);border-radius:var(--radius-lg);padding:14px}
 .stcard .slabel{font-size:11px;font-weight:600;color:var(--gray-500);margin-bottom:4px}
 .stcard .sval{font-size:20px;font-weight:800}
-.sc-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.sc-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
 .sc-tbl td{border:1px solid var(--gray-300);text-align:center;vertical-align:middle;height:32px;padding:2px 4px}
 .sc-tbl tr:last-child td{border-bottom:1px solid var(--gray-300)}
 .sc-tbl .hd{background:var(--gray-100);font-size:11px;font-weight:600;color:var(--gray-700)}
@@ -1213,6 +1213,11 @@ function cutDiffChips(raw,cuts){
   if(grade>=2){const upperCut=Number(cuts[grade-2]);const gap=r-upperCut;upper=`<span style="display:inline-block;background:#fee2e2;color:#dc2626;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;vertical-align:middle;white-space:nowrap">${gap}</span>`;}
   return {cur,upper};
 }
+function scTblColgroup(hasL2){
+  const cols=hasL2?7:6;
+  const dataPct=((100-13)/cols).toFixed(3);
+  return `<colgroup><col style="width:13%">${Array.from({length:cols},()=>`<col style="width:${dataPct}%">`).join('')}</colgroup>`;
+}
 function rawWithDiff(raw,cuts){
   if(!raw&&raw!==0)return '—';
   const {cur,upper}=cutDiffChips(raw,cuts);
@@ -1230,6 +1235,7 @@ function examScoreTblFull(exam,sc){if(!sc)return '';
   const erD=rawWithDiff(sc.engRaw,gca.eng),e1rD=rawWithDiff(sc.exp1Raw,gc[sc.exp1Subj]),e2rD=rawWithDiff(sc.exp2Raw,gc[sc.exp2Subj]);
   const gradeLabel=hasAnyEstGrade(exam)?'예상등급':'등급';
   return `<div style="overflow-x:auto"><table class="sc-tbl">
+  ${scTblColgroup(hasL2)}
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
   <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${krD}</td><td class="vl">${mrD}</td><td class="vl">${erD}</td><td class="vl">${e1rD}</td><td class="vl">${e2rD}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
@@ -1253,6 +1259,7 @@ function examScoreTblHtml(exam,sc){if(!sc)return '';
     ?`<tr><td class="rh" style="font-size:10px;color:#f59e0b;font-weight:700">예상등급</td><td colspan="${hasL2?7:6}" style="text-align:center;color:#f59e0b;font-weight:600;font-size:11px">예상 등급컷 산출중입니다.</td></tr>`
     :`<tr><td class="rh" style="font-size:10px;${hasAnyEstGrade(exam)?'color:#f59e0b;font-weight:700':''}">${hasAnyEstGrade(exam)?'예상등급':'등급'}</td>${hg}${kg}${mg}${eg}${e1g}${e2g}${l2g}</tr>`;
   return `<div style="overflow-x:auto"><table class="sc-tbl">
+  ${scTblColgroup(hasL2)}
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
   ${subjRow}
   ${rawRow}
