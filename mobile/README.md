@@ -1,4 +1,4 @@
-# 2027 컨설팅 Mobile (Capacitor)
+# 2027 멘토링 Mobile (Capacitor)
 
 기존 웹앱(`../index.html`) 을 iOS/Android 네이티브 앱으로 래핑하는 Capacitor 프로젝트.
 

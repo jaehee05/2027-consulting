@@ -324,7 +324,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
       const consultingName = String(payload?.consultingName || "").trim();
       const bookingDeadline = String(payload?.bookingDeadline || "").trim();
       if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });
-      if (!consultingName || !bookingDeadline) return res.status(400).json({ error: "컨설팅명과 마감일이 필요합니다." });
+      if (!consultingName || !bookingDeadline) return res.status(400).json({ error: "멘토링명과 마감일이 필요합니다." });
       const results = [];
       for (const id of ids) {
         const snap = await admin.firestore().doc(`students/${id}`).get();
@@ -361,7 +361,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
       const consultingName = String(payload?.consultingName || "").trim();
       const bookingDeadline = String(payload?.bookingDeadline || "").trim();
       if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });
-      if (!consultingName || !bookingDeadline) return res.status(400).json({ error: "컨설팅명과 예약 마감일이 필요합니다." });
+      if (!consultingName || !bookingDeadline) return res.status(400).json({ error: "멘토링명과 예약 마감일이 필요합니다." });
       const results = [];
       let alreadyBooked = 0;
       for (const id of ids) {
@@ -464,7 +464,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         examName: "6월 모의평가",
         scoreDeadline: "2026-06-20",
         daysLeft: "3",
-        consultingName: "6월 모의평가 컨설팅",
+        consultingName: "6월 모의평가 멘토링",
         bookingDeadline: "5월 30일 (금)",
       });
       return res.json({ ok: true, result });

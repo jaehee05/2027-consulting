@@ -1,7 +1,7 @@
 {
   "name": "consulting2027-mobile",
   "version": "1.0.0",
-  "description": "2027 컨설팅 iOS/Android 앱 (Capacitor 래퍼)",
+  "description": "2027 멘토링 iOS/Android 앱 (Capacitor 래퍼)",
   "private": true,
   "scripts": {
     "build": "bash ./build.sh",

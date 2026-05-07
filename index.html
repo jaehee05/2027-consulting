@@ -399,7 +399,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <!-- 학생 뷰 -->
 <div id="vStu" class="hidden">
   <div class="topbar">
-    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="stuChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">컨설팅</span></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="stuChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">멘토링</span></div>
     <div class="tr"><span class="uname" id="stuUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page" style="max-width:660px"><div id="stuC"></div></div>
@@ -408,7 +408,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <!-- 관리자/뷰어 뷰 -->
 <div id="vAdmin" class="hidden">
   <div class="topbar np">
-    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="adminChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">컨설팅 관리</span><span class="trole" id="adminRoleLabel"></span></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="adminChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">멘토링 관리</span><span class="trole" id="adminRoleLabel"></span></div>
     <div class="tr"><span class="uname" id="adminUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page">
@@ -464,9 +464,9 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   <div class="modal" style="max-width:420px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
       <span class="bx bb">안내</span>
-      <p style="font-size:16px;font-weight:700">컨설팅 안내</p>
+      <p style="font-size:16px;font-weight:700">멘토링 안내</p>
     </div>
-    <p style="font-size:14px;line-height:1.6;color:var(--gray-700);margin-bottom:20px">합격공간 관리형 독서실에서 진행하는 컨설팅입니다.</p>
+    <p style="font-size:14px;line-height:1.6;color:var(--gray-700);margin-bottom:20px">합격공간 관리형 독서실에서 진행하는 멘토링입니다.</p>
     <div style="display:flex;gap:8px">
       <button class="btn bs" style="flex:1" onclick="dismissNoticeForever()">다시 보지 않기</button>
       <button class="btn bp" style="flex:1" onclick="closeNotice()">확인</button>
@@ -674,7 +674,7 @@ function updateAdminTabs(){
   if(!S.user||S.user.type==='student')return;
   const el=_('adminTabs');if(!el)return;
   const isAdmin=S.user.type==='admin';
-  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','컨설팅'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['bookings','예약 현황']];
+  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['bookings','예약 현황']];
   const n=pendingReqCountForAdmin();
   el.innerHTML=tabs.map(([id,label])=>{
     const badge=(id==='bookings'&&n>0)?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${n}</span>`:'';
@@ -1288,7 +1288,7 @@ function stuConsultNotesCardHtml(stu){
   const tabsHtml=visibleExams.length>1?'<div class="dtabs" style="margin-bottom:10px">'+visibleExams.map((ex,i)=>`<button class="dt ${i===tabIdx?'on':''}" onclick="S.stuConsultTab=${i};renderStu()">${escapeHtml(ex.name)}</button>`).join('')+'</div>':`<p style="font-size:12px;color:#6b7280;margin-bottom:8px">${escapeHtml(selEx.name)}</p>`;
   const note=stu.consultNotes[selEx.id].note;
   return `<div class="card" style="margin-bottom:12px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bg">컨설팅</span><p style="font-size:15px;font-weight:700">컨설팅 내용</p></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bg">멘토링</span><p style="font-size:15px;font-weight:700">멘토링 내용</p></div>
     ${tabsHtml}
     <div style="font-size:13px;line-height:1.6;color:#374151;background:#f9fafb;border-radius:8px;padding:12px;white-space:pre-wrap">${escapeHtml(note)}</div>
   </div>`;
@@ -1347,7 +1347,7 @@ function showBookForm(isChange){
   </div>
   <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:12px">
     <svg viewBox="0 0 512 512" fill="#f87171" style="width:12px;height:12px;flex-shrink:0;margin-top:3px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
-    <p style="font-size:12px;color:#9ca3af;line-height:1.45">컨설팅 이전에 퇴원할 경우, 예약은 자동으로 취소됩니다.</p>
+    <p style="font-size:12px;color:#9ca3af;line-height:1.45">멘토링 이전에 퇴원할 경우, 예약은 자동으로 취소됩니다.</p>
   </div>
   <div class="dtabs">${dtabs}</div>
   <div style="background:#f9fafb;border-radius:10px;padding:14px"><p style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">${sel.label} 예약 가능 시간</p><div class="sg">${slots||'<p style="font-size:13px;color:#9ca3af">예약 가능한 시간이 없습니다.</p>'}</div></div>
@@ -1506,7 +1506,7 @@ async function setTab(tab){
   else if(tab==='alimtalk')renderAdminAlimtalk();
 }
 
-/* ── ADMIN: 컨설팅 ── */
+/* ── ADMIN: 멘토링 ── */
 function _consultNoteState(s){
   const hasLegacy=s.consultNote&&s.consultNote.trim();
   let hasAny=!!hasLegacy,hasVisible=false;
@@ -1574,7 +1574,7 @@ function renderAdminConsult(){
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminConsult()">${l}</button>`).join('');
   const examHeaders=cExams.map(ex=>`<th title="${escapeHtml(ex.name)}">${ex.name.replace(/\s*모의.*$/,'')}</th>`).join('');
   _('adminC').innerHTML=`<style>#adminC .consult-tbl tbody tr:hover{background:#f9fafb}</style>
-  <div class="sh"><span class="shtitle">컨설팅 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
+  <div class="sh"><span class="shtitle">멘토링 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
   ${summaryHtml}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table class="consult-tbl">
@@ -1843,7 +1843,7 @@ function consultMemoCardHtml(stu){
 function consultNotesEditorHtml(stu){
   const cExams=getExams();
   if(!cExams.length){
-    return `<div class="card"><p style="font-size:13px;font-weight:700;margin-bottom:8px">컨설팅 내용</p>
+    return `<div class="card"><p style="font-size:13px;font-weight:700;margin-bottom:8px">멘토링 내용</p>
       <p style="font-size:12px;color:#9ca3af">시험을 먼저 등록해주세요.</p>
     </div>`;
   }
@@ -1858,9 +1858,9 @@ function consultNotesEditorHtml(stu){
     return `<button class="dt ${i===tabIdx?'on':''}" onclick="switchConsultNoteTab(${i})">${escapeHtml(ex.name)}${dot}</button>`;
   }).join('');
   return `<div class="card">
-    <p style="font-size:13px;font-weight:700;margin-bottom:10px">컨설팅 내용</p>
+    <p style="font-size:13px;font-weight:700;margin-bottom:10px">멘토링 내용</p>
     <div class="dtabs" style="margin-bottom:10px">${tabs}</div>
-    <textarea class="fi ta" id="consultInput" rows="8" placeholder="${escapeHtml(selExam.name)} 컨설팅 내용을 기록하세요...">${escapeHtml(cur.note||'')}</textarea>
+    <textarea class="fi ta" id="consultInput" rows="8" placeholder="${escapeHtml(selExam.name)} 멘토링 내용을 기록하세요...">${escapeHtml(cur.note||'')}</textarea>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:10px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;user-select:none">
         <input type="checkbox" id="consultVisible" ${cur.visible?'checked':''} onchange="toggleConsultVisible('${stu._docId}','${selExam.id}',this.checked)" style="width:16px;height:16px;cursor:pointer">
@@ -2148,7 +2148,7 @@ function toggleStuSelectAll(checked){
 }
 const ALIMTALK_MODES={
   accountInfo:{title:'계정 정보 안내',icon:'🔑',desc:'로그인 ID와 초기 비밀번호 안내',send:'sendAccountInfoBulk'},
-  bookingStarted:{title:'예약 시작 안내',icon:'📅',desc:'컨설팅 예약 시작 공지',send:'sendBookingStartedBulk'},
+  bookingStarted:{title:'예약 시작 안내',icon:'📅',desc:'멘토링 예약 시작 공지',send:'sendBookingStartedBulk'},
   bookingReminder:{title:'예약 미완료 안내',icon:'⏰',desc:'아직 예약 안 한 학생 독촉',send:'sendBookingReminderBulk'}
 };
 function openAlimtalkSheet(){
@@ -2161,7 +2161,7 @@ function openAlimtalkSheet(){
     <p class="msub">발송할 종류를 선택한 뒤, 학생 카드를 탭해서 수신자를 고르세요.</p>
     <div class="sheet-list">
       ${item('🔑','계정 정보 안내','로그인 ID와 초기 비밀번호 안내',`enterAlimtalkMode('accountInfo')`)}
-      ${item('📅','예약 시작 안내','컨설팅 예약 시작 공지',`enterAlimtalkMode('bookingStarted')`)}
+      ${item('📅','예약 시작 안내','멘토링 예약 시작 공지',`enterAlimtalkMode('bookingStarted')`)}
       ${item('⏰','예약 미완료 안내','아직 예약 안 한 학생 독촉',`enterAlimtalkMode('bookingReminder')`)}
       ${item('📊','성적 미입력 안내','시험별 성적 미입력 학생 (개별 선택)','openScoreReminderModal()')}
     </div>
@@ -2230,7 +2230,7 @@ function sendBookingStartedBulk(){
   renderModal({
     title:'예약 시작 안내 발송',
     sub:`선택 ${ids.length}명 · 예약 여부와 무관하게 전원 발송됩니다.`,
-    body:`<div class="fg"><label class="fl">컨설팅명</label><input class="fi" id="bsConsulting" value="${defName.replace(/"/g,'&quot;')}" placeholder="예) 6월 모의평가 컨설팅"></div>
+    body:`<div class="fg"><label class="fl">멘토링명</label><input class="fi" id="bsConsulting" value="${defName.replace(/"/g,'&quot;')}" placeholder="예) 6월 모의평가 멘토링"></div>
     <div class="fg"><label class="fl">마감일</label><input class="fi" id="bsDeadline" type="date" value="${defDeadline.replace(/"/g,'&quot;')}"></div>
     <div class="fg" style="background:var(--gray-50);border-radius:var(--radius-md);padding:10px;margin-bottom:14px"><p style="font-size:11px;color:var(--gray-500);margin-bottom:4px">대상 학생 (${ids.length}명)</p><p style="font-size:12px;word-break:keep-all">${preview}</p></div>
     <div class="ferr" id="mErr"></div>`,
@@ -2244,7 +2244,7 @@ async function submitBookingStartedBulk(){
   const consultingName=_('bsConsulting').value.trim();
   const deadlineYmd=_('bsDeadline').value;
   const bookingDeadline=fmtDeadlineKR(deadlineYmd);
-  if(!consultingName||!bookingDeadline){showErr('mErr','컨설팅명과 마감일을 모두 입력해주세요.');return;}
+  if(!consultingName||!bookingDeadline){showErr('mErr','멘토링명과 마감일을 모두 입력해주세요.');return;}
   localStorage.setItem('consultingName',consultingName);
   localStorage.setItem('bookingDeadline',deadlineYmd);
   const ids=Array.from(S.stuSelected);
@@ -2274,7 +2274,7 @@ function sendBookingReminderBulk(){
   renderModal({
     title:'예약 미완료 안내 발송',
     sub:`선택 ${ids.length}명 · 이미 예약한 학생은 서버에서 자동 제외됩니다.`,
-    body:`<div class="fg"><label class="fl">컨설팅명</label><input class="fi" id="brConsulting" value="${defName.replace(/"/g,'&quot;')}" placeholder="예) 6월 모의평가 컨설팅"></div>
+    body:`<div class="fg"><label class="fl">멘토링명</label><input class="fi" id="brConsulting" value="${defName.replace(/"/g,'&quot;')}" placeholder="예) 6월 모의평가 멘토링"></div>
     <div class="fg"><label class="fl">예약 마감일</label><input class="fi" id="brDeadline" type="date" value="${defDeadline.replace(/"/g,'&quot;')}"></div>
     <div class="fg" style="background:var(--gray-50);border-radius:var(--radius-md);padding:10px;margin-bottom:14px"><p style="font-size:11px;color:var(--gray-500);margin-bottom:4px">대상 학생 (${ids.length}명)</p><p style="font-size:12px;word-break:keep-all">${preview}</p></div>
     <div class="ferr" id="mErr"></div>`,
@@ -2288,7 +2288,7 @@ async function submitBookingReminderBulk(){
   const consultingName=_('brConsulting').value.trim();
   const deadlineYmd=_('brDeadline').value;
   const bookingDeadline=fmtDeadlineKR(deadlineYmd);
-  if(!consultingName||!bookingDeadline){showErr('mErr','컨설팅명과 예약 마감일을 모두 입력해주세요.');return;}
+  if(!consultingName||!bookingDeadline){showErr('mErr','멘토링명과 예약 마감일을 모두 입력해주세요.');return;}
   localStorage.setItem('consultingName',consultingName);
   localStorage.setItem('bookingDeadline',deadlineYmd);
   const ids=Array.from(S.stuSelected);
@@ -2911,7 +2911,7 @@ function renderAdminBookings(){
     ${statsCard}
     ${dupCard}
     ${disableCard}
-    <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 컨설팅 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${S.bookings.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
+    <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 멘토링 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${S.bookings.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
     ${slotGridHtml}
     ${renderRequestsSection()}
     <div class="sh np" style="margin-top:24px;margin-bottom:14px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#fef3c7;color:#b45309;border-radius:6px;font-size:12px">⏳</span>예약하지 않은 학생 <span style="font-size:12px;font-weight:500;color:#9ca3af">${unbooked.length}명</span></span></div>
@@ -3494,8 +3494,8 @@ const ALIMTALK_EVENTS=[
   ['adminChangeApproved','[학생] 관리자 변경 요청 학생 승인(확인)','${name} ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
   ['adminChangeRejected','[학생] 관리자 변경 요청 학생 거절(확인)','${name} ${currentDateLabel} ${currentSlot}'],
   ['scoreInputReminder','[학생] 성적 미입력 안내','${name} ${examName} 기한 ${scoreDeadline} D-${daysLeft}'],
-  ['bookingReminder','[학생] 예약 미완료 안내','${name} 컨설팅:${consultingName} 마감:${bookingDeadline}'],
-  ['bookingStarted','[학생] 예약 시작 안내','${name} 컨설팅:${consultingName} 마감:${bookingDeadline}'],
+  ['bookingReminder','[학생] 예약 미완료 안내','${name} 멘토링:${consultingName} 마감:${bookingDeadline}'],
+  ['bookingStarted','[학생] 예약 시작 안내','${name} 멘토링:${consultingName} 마감:${bookingDeadline}'],
   ['accountCreated','[학생] 초기 계정 안내','${name} ID:${accountId} PW:${accountPw}'],
   ['adminAccountCreated','[관리자] 관리자 계정 안내 (수동)','${name} ID:${accountId} PW:${accountPw}'],
   ['adminNotifyBooking','[관리자] 학생 예약 완료','${name}(${grade}/${school}) ${dateLabel} ${slot}'],
@@ -3767,7 +3767,7 @@ function enterHome(){
   }
   if(cards){
     const items=[
-      {ico:'🗓️',color:'green',title:'컨설팅',desc:'성적 기반 컨설팅을<br>진행합니다.',onclick:'goConsulting()'},
+      {ico:'🗓️',color:'green',title:'멘토링',desc:'성적 기반 멘토링을<br>진행합니다.',onclick:'goConsulting()'},
     ];
     const isStu=S.user?.type==='student';
     const isAdmin=S.user?.type==='admin';
@@ -3845,7 +3845,7 @@ function renderMyPage(){
     </div>
     <div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">컨설팅 예약</p>
+        <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">멘토링 예약</p>
         <p style="font-size:13px;font-weight:600">${myBooking?escapeHtml(myBooking.dateLabel||'')+' '+escapeHtml(myBooking.slot||''):'예약 없음'}</p></div>
         <button class="btn bp bsm" onclick="goConsulting()">바로가기</button>
       </div>
