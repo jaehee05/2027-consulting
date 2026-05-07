@@ -86,7 +86,7 @@ exports.onBookingCreate = onDocumentCreated("bookings/{id}", async (e) => {
     const s = await loadStudent(b.studentId);
     if (s?.isTest) return;
     const ctx = baseCtx(s, b, null);
-    await safeSend("bookingComplete", ctx);
+    if (!s?.notifyExcluded) await safeSend("bookingComplete", ctx);
     await safeSendAdmins("adminNotifyBooking", ctx);
   } catch (err) {
     console.error("onBookingCreate 실패:", err);
@@ -99,14 +99,15 @@ exports.onRequestCreate = onDocumentCreated("requests/{id}", async (e) => {
     const s = await loadStudent(r.studentId);
     if (s?.isTest) return;
     const ctx = baseCtx(s, null, r);
+    const stuOk = !s?.notifyExcluded;
     if (r.type === "change") {
-      await safeSend("changeRequest", ctx);
+      if (stuOk) await safeSend("changeRequest", ctx);
       await safeSendAdmins("adminNotifyChangeRequest", ctx);
     } else if (r.type === "cancel") {
-      await safeSend("cancelRequest", ctx);
+      if (stuOk) await safeSend("cancelRequest", ctx);
       await safeSendAdmins("adminNotifyCancelRequest", ctx);
     } else if (r.type === "admin_change") {
-      await safeSend("adminChangeRequest", ctx);
+      if (stuOk) await safeSend("adminChangeRequest", ctx);
     }
   } catch (err) {
     console.error("onRequestCreate 실패:", err);
@@ -122,21 +123,22 @@ exports.onRequestUpdate = onDocumentUpdated("requests/{id}", async (e) => {
     const s = await loadStudent(after.studentId);
     if (s?.isTest) return;
     const ctx = baseCtx(s, null, after);
+    const stuOk = !s?.notifyExcluded;
 
     if (after.type === "change" && after.status === "approved") {
-      await safeSend("changeApproved", ctx);
+      if (stuOk) await safeSend("changeApproved", ctx);
     } else if (after.type === "change" && after.status === "rejected") {
-      await safeSend("changeRejected", ctx);
+      if (stuOk) await safeSend("changeRejected", ctx);
     } else if (after.type === "cancel" && after.status === "approved") {
-      await safeSend("cancelApproved", ctx);
+      if (stuOk) await safeSend("cancelApproved", ctx);
     } else if (after.type === "cancel" && after.status === "rejected") {
-      await safeSend("cancelRejected", ctx);
+      if (stuOk) await safeSend("cancelRejected", ctx);
     } else if (after.type === "admin_change" && after.status === "accepted") {
       // 학생이 관리자 변경 요청을 수락 (상태명은 'accepted')
-      await safeSend("adminChangeApproved", ctx);
+      if (stuOk) await safeSend("adminChangeApproved", ctx);
       await safeSendAdmins("adminNotifyAdminChangeApproved", ctx);
     } else if (after.type === "admin_change" && after.status === "rejected") {
-      await safeSend("adminChangeRejected", ctx);
+      if (stuOk) await safeSend("adminChangeRejected", ctx);
       await safeSendAdmins("adminNotifyAdminChangeRejected", ctx);
     }
   } catch (err) {
@@ -297,6 +299,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        if (s.notifyExcluded) { results.push({ id, name: s.name, ok: false, skipped: "notify-excluded" }); continue; }
         const phone = String(notifyPhone(s)).replace(/\D/g, "");
         if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
         try {
@@ -333,6 +336,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        if (s.notifyExcluded) { results.push({ id, name: s.name, ok: false, skipped: "notify-excluded" }); continue; }
         const phones = notifyPhonesBoth(s);
         if (phones.length === 0) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
         for (const { phone, role } of phones) {
@@ -371,6 +375,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        if (s.notifyExcluded) { results.push({ id, name: s.name, ok: false, skipped: "notify-excluded" }); continue; }
         const phone = String(notifyPhone(s)).replace(/\D/g, "");
         if (phone.length < 9) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
         // 이미 예약한 학생은 제외
@@ -425,6 +430,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
         const s = snap.data();
         if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        if (s.notifyExcluded) { results.push({ id, name: s.name, ok: false, skipped: "notify-excluded" }); continue; }
         const phones = notifyPhonesBoth(s);
         if (phones.length === 0) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
         for (const { phone, role } of phones) {
