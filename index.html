@@ -2895,7 +2895,7 @@ function renderAdminBookings(){
       if(b){
         return `<button class="adm-slot filled" onclick="openBookDetail('${b._docId}')" title="${b.studentName} (${b.dateLabel} ${slot})"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">${b.studentName||''}</span></button>`;
       }
-      return `<button class="adm-slot vacant" onclick="toast('비어있는 시간대입니다.','info',{id:'emptySlot'})" title="${sel.label} ${slot} (예약자 없음)"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">비어있음</span></button>`;
+      return `<button class="adm-slot vacant" onclick="openAssignSlotModal('${sel.id}','${slot}')" title="${sel.label} ${slot} (클릭하여 학생 배정)"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">비어있음</span></button>`;
     }).join('');
     const bookedCnt=S.bookings.filter(b=>b.date===sel.date).length;
     slotGridHtml=`<div class="card np" style="padding:18px;margin-bottom:24px">
@@ -2905,7 +2905,7 @@ function renderAdminBookings(){
       </div>
       <div class="dtabs">${dtabsHtml}</div>
       <div class="sg" style="margin-top:6px">${slotBtns||'<p style="font-size:13px;color:#9ca3af">시간대가 등록되지 않았습니다.</p>'}</div>
-      <p style="font-size:11px;color:#9ca3af;margin-top:14px;display:flex;align-items:center;gap:6px"><span>💡</span>예약된 시간 버튼을 누르면 학생 상세 정보를 볼 수 있습니다.</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:14px;display:flex;align-items:center;gap:6px"><span>💡</span>예약된 슬롯은 학생 상세, 비어있는 슬롯은 학생 배정 화면이 열립니다.</p>
     </div>`;
   }else{
     slotGridHtml=`<div class="card np" style="padding:32px;text-align:center;margin-bottom:24px"><p style="font-size:32px;margin-bottom:10px">📅</p><p style="font-size:14px;font-weight:700;color:#374151;margin-bottom:4px">등록된 일정이 없습니다</p><p style="font-size:12px;color:#9ca3af">'일정 관리' 탭에서 먼저 일정을 추가하세요.</p></div>`;
@@ -3334,6 +3334,89 @@ async function saveNewBookForStu(){
     S.adminSel=null;closeModal();renderAdminBookings();
   }catch(e){toast('예약 등록 실패: '+e.message,'error');}
   showLoad(false);}
+
+function openAssignSlotModal(dateId,slot){
+  const date=(S.schedule.dates||[]).find(d=>d.id===dateId);if(!date)return;
+  const taken=S.bookings.find(b=>b.date===date.date&&b.slot===slot);
+  if(taken){toast('이미 예약된 시간입니다.','warn');renderAdminBookings();return;}
+  S.assignSlotKey=dateId+'|'+slot;
+  S.assignSlotQuery='';
+  _renderAssignSlotModal();
+  openModal();
+}
+
+function _renderAssignSlotModal(){
+  if(!S.assignSlotKey)return;
+  const [dateId,slot]=S.assignSlotKey.split('|');
+  const date=(S.schedule.dates||[]).find(d=>d.id===dateId);if(!date){closeModal();return;}
+  const bookedIds=new Set(S.bookings.map(b=>b.studentId));
+  const q=(S.assignSlotQuery||'').trim().toLowerCase();
+  const list=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
+  const filtered=q?list.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.school||'').toLowerCase().includes(q)||String(s.seat||'').includes(q)):list;
+  const rows=filtered.map(s=>{
+    const gradeBx=s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg';
+    return `<button type="button" onclick="assignStuToSlot('${dateId}','${slot}','${s._docId}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s;margin-bottom:6px" onmouseover="this.style.background='#f9fafb';this.style.borderColor='#1C64F2'" onmouseout="this.style.background='#fff';this.style.borderColor='#e5e7eb'">
+      <span style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 6px;border-radius:8px;background:#eff6ff;color:#1C64F2;font-weight:700;font-size:13px">${s.seat||'—'}</span>
+      <span style="flex:1;min-width:0">
+        <span style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:#111827"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</span><span class="bx ${gradeBx}" style="font-size:10px;flex-shrink:0">${s.grade}</span></span>
+        <span style="display:block;font-size:11px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.school||''}${s.studentPhone?' · '+s.studentPhone:''}</span>
+      </span>
+      <span style="font-size:11px;color:#1C64F2;font-weight:600;flex-shrink:0">배정 →</span>
+    </button>`;
+  }).join('');
+  const empty=list.length===0
+    ?'<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">미예약 학생이 없습니다. 🎉</div>'
+    :(filtered.length===0?`<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">"${escapeHtml(q)}" 검색 결과가 없습니다.</div>`:'');
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 배정</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px"><b style="color:#1C64F2">${date.label} ${slot}</b> 슬롯에 배정할 학생을 선택하세요.</p>
+    <input class="fi" id="assignSlotSearch" placeholder="이름·학교·좌석 검색" value="${escapeHtml(S.assignSlotQuery||'')}" oninput="S.assignSlotQuery=this.value;_renderAssignSlotList()" style="margin-bottom:10px">
+    <div id="assignSlotList" style="max-height:55vh;overflow-y:auto;margin:0 -4px;padding:0 4px">${rows}${empty}</div>
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button></div>`;
+  setTimeout(()=>{const el=_('assignSlotSearch');if(el){el.focus();const v=el.value;el.value='';el.value=v;}},50);
+}
+
+function _renderAssignSlotList(){
+  if(!S.assignSlotKey)return;
+  const [dateId,slot]=S.assignSlotKey.split('|');
+  const bookedIds=new Set(S.bookings.map(b=>b.studentId));
+  const q=(S.assignSlotQuery||'').trim().toLowerCase();
+  const list=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
+  const filtered=q?list.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.school||'').toLowerCase().includes(q)||String(s.seat||'').includes(q)):list;
+  const cont=_('assignSlotList');if(!cont)return;
+  const rows=filtered.map(s=>{
+    const gradeBx=s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg';
+    return `<button type="button" onclick="assignStuToSlot('${dateId}','${slot}','${s._docId}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s;margin-bottom:6px" onmouseover="this.style.background='#f9fafb';this.style.borderColor='#1C64F2'" onmouseout="this.style.background='#fff';this.style.borderColor='#e5e7eb'">
+      <span style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 6px;border-radius:8px;background:#eff6ff;color:#1C64F2;font-weight:700;font-size:13px">${s.seat||'—'}</span>
+      <span style="flex:1;min-width:0">
+        <span style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:#111827"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</span><span class="bx ${gradeBx}" style="font-size:10px;flex-shrink:0">${s.grade}</span></span>
+        <span style="display:block;font-size:11px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.school||''}${s.studentPhone?' · '+s.studentPhone:''}</span>
+      </span>
+      <span style="font-size:11px;color:#1C64F2;font-weight:600;flex-shrink:0">배정 →</span>
+    </button>`;
+  }).join('');
+  const empty=list.length===0
+    ?'<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">미예약 학생이 없습니다. 🎉</div>'
+    :(filtered.length===0?`<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">검색 결과가 없습니다.</div>`:'');
+  cont.innerHTML=rows+empty;
+}
+
+async function assignStuToSlot(dateId,slot,stuDocId){
+  const date=(S.schedule.dates||[]).find(d=>d.id===dateId);if(!date)return;
+  const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
+  if(S.bookings.some(b=>b.studentId===stuDocId)){toast(`${stu.name} 학생은 이미 예약되어 있습니다.`,'warn');return;}
+  if(S.bookings.some(b=>b.date===date.date&&b.slot===slot)){toast('해당 시간이 방금 예약되었습니다.','warn');closeModal();renderAdminBookings();return;}
+  if(!(await confirmDialog({title:'예약 배정',message:`${stu.name} 학생을 ${date.label} ${slot}에 배정하시겠습니까?`,confirmLabel:'배정'})))return;
+  showLoad(true);
+  try{
+    const bookData={studentId:stuDocId,studentName:stu.name,date:date.date,dateLabel:date.label,slot,question:''};
+    const docRef=await db.collection('bookings').add(bookData);
+    bookData._docId=docRef.id;S.bookings.push(bookData);
+    S.assignSlotKey=null;S.assignSlotQuery='';
+    closeModal();renderAdminBookings();
+    toast(`${stu.name} 학생을 ${date.label} ${slot}에 배정했습니다.`,'success');
+  }catch(e){toast('예약 배정 실패: '+e.message,'error');}
+  showLoad(false);
+}
 
 /* ── ADMIN: 계정 관리 ── */
 function roleLabel(r){return r==='admin'?'ADMIN':r==='test'?'TEST':'OP';}
