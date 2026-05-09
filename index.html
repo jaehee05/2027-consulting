@@ -2829,8 +2829,9 @@ async function doBulk(){
 function renderAdminBookings(){
   const bookedIds=new Set(S.bookings.map(b=>b.studentId));
   const unbooked=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
-  const totalSlots=(S.schedule.dates||[]).reduce((s,d)=>s+((d.slots||[]).length),0);
-  const utilization=totalSlots?Math.round(S.bookings.length/totalSlots*100):0;
+  const totalStu=realStu().length;
+  const bookedStu=realStu().filter(s=>bookedIds.has(s._docId)).length;
+  const utilization=totalStu?Math.round(bookedStu/totalStu*100):0;
   /* 중복 예약 검사 */
   const byStu={},bySlot={};
   S.bookings.forEach(b=>{
@@ -2871,9 +2872,9 @@ function renderAdminBookings(){
       <p style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:4px;letter-spacing:-.2px">미예약</p>
       <p style="font-size:22px;font-weight:800;color:#78350f;line-height:1.1">${unbooked.length}<span style="font-size:13px;font-weight:600;color:#d97706;margin-left:3px">명</span></p>
     </div>
-    <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:14px;padding:14px 14px 12px" title="등록된 시간 슬롯 중 예약된 비율 (예약 ${S.bookings.length} / 전체 ${totalSlots})">
+    <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:14px;padding:14px 14px 12px" title="전체 학생 중 예약한 학생 비율 (예약 ${bookedStu}명 / 전체 ${totalStu}명)">
       <p style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:4px;letter-spacing:-.2px">예약률</p>
-      <p style="font-size:22px;font-weight:800;color:#14532d;line-height:1.1">${utilization}<span style="font-size:13px;font-weight:600;color:#16a34a;margin-left:3px">%</span></p>
+      <p style="font-size:22px;font-weight:800;color:#14532d;line-height:1.1">${bookedStu}<span style="font-size:13px;font-weight:600;color:#16a34a;margin-left:3px">/${totalStu}명 · ${utilization}%</span></p>
     </div>
   </div>`;
   /* 버튼형 뷰: 날짜 탭 + 슬롯 버튼 */
