@@ -1624,18 +1624,18 @@ function getGradeSubjects(stu){
   }
   function _hasCuts(ex,subj){return !!(ex.gradeCuts&&ex.gradeCuts[subj]||ex.estGradeCuts&&ex.estGradeCuts[subj]);}
   function _hasAbsCuts(type){const gc=S.config.gradeCuts;return !!(gc&&gc.abs&&gc.abs[type]);}
-  if(korSet.size>1){for(const subj of korSet)subjects.push({key:'kor_'+subj,label:subj,getGrade:(ex,sc)=>sc?.korSubj===subj?(sc.korGradeOverride||sc.korGrade||getExamGrade(ex,sc.korSubj,sc.korRaw)):'',isEst:(ex,sc)=>sc?.korSubj===subj&&!sc.korGradeOverride&&!sc.korGrade&&isEstGrade(ex,sc.korSubj),hasCuts:(ex,sc)=>sc?.korSubj===subj&&(_hasCuts(ex,subj)||!!sc?.korGradeOverride)});}
-  else subjects.push({key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGradeOverride||sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw),isEst:(ex,sc)=>!sc?.korGradeOverride&&!sc?.korGrade&&isEstGrade(ex,sc?.korSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.korSubj)||!!sc?.korGradeOverride});
-  if(matSet.size>1){for(const subj of matSet)subjects.push({key:'mat_'+subj,label:subj,getGrade:(ex,sc)=>sc?.matSubj===subj?(sc.matGradeOverride||sc.matGrade||getExamGrade(ex,sc.matSubj,sc.matRaw)):'',isEst:(ex,sc)=>sc?.matSubj===subj&&!sc.matGradeOverride&&!sc.matGrade&&isEstGrade(ex,sc.matSubj),hasCuts:(ex,sc)=>sc?.matSubj===subj&&(_hasCuts(ex,subj)||!!sc?.matGradeOverride)});}
-  else subjects.push({key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGradeOverride||sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw),isEst:(ex,sc)=>!sc?.matGradeOverride&&!sc?.matGrade&&isEstGrade(ex,sc?.matSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.matSubj)||!!sc?.matGradeOverride});
+  if(korSet.size>1){for(const subj of korSet)subjects.push({key:'kor_'+subj,label:subj,getGrade:(ex,sc)=>sc?.korSubj===subj?(sc.korGradeOverride||sc.korGrade||getExamGrade(ex,sc.korSubj,sc.korRaw)):'',isEst:(ex,sc)=>sc?.korSubj===subj&&!sc.korGradeOverride&&isEstGrade(ex,sc.korSubj),hasCuts:(ex,sc)=>sc?.korSubj===subj&&(_hasCuts(ex,subj)||!!sc?.korGradeOverride)});}
+  else subjects.push({key:'kor',label:'국어',getGrade:(ex,sc)=>sc?.korGradeOverride||sc?.korGrade||getExamGrade(ex,sc?.korSubj,sc?.korRaw),isEst:(ex,sc)=>!sc?.korGradeOverride&&isEstGrade(ex,sc?.korSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.korSubj)||!!sc?.korGradeOverride});
+  if(matSet.size>1){for(const subj of matSet)subjects.push({key:'mat_'+subj,label:subj,getGrade:(ex,sc)=>sc?.matSubj===subj?(sc.matGradeOverride||sc.matGrade||getExamGrade(ex,sc.matSubj,sc.matRaw)):'',isEst:(ex,sc)=>sc?.matSubj===subj&&!sc.matGradeOverride&&isEstGrade(ex,sc.matSubj),hasCuts:(ex,sc)=>sc?.matSubj===subj&&(_hasCuts(ex,subj)||!!sc?.matGradeOverride)});}
+  else subjects.push({key:'mat',label:'수학',getGrade:(ex,sc)=>sc?.matGradeOverride||sc?.matGrade||getExamGrade(ex,sc?.matSubj,sc?.matRaw),isEst:(ex,sc)=>!sc?.matGradeOverride&&isEstGrade(ex,sc?.matSubj),hasCuts:(ex,sc)=>_hasCuts(ex,sc?.matSubj)||!!sc?.matGradeOverride});
   subjects.push({key:'eng',label:'영어',getGrade:(ex,sc)=>sc?.engGradeOverride||sc?.engGrade||getAbsGrade('eng',sc?.engRaw),isEst:()=>false,hasCuts:(ex,sc)=>_hasAbsCuts('eng')||!!sc?.engGradeOverride});
   subjects.push({key:'his',label:'한국사',getGrade:(ex,sc)=>sc?.hisGradeOverride||sc?.hisGrade||getAbsGrade('his',sc?.hisRaw),isEst:()=>false,hasCuts:(ex,sc)=>_hasAbsCuts('his')||!!sc?.hisGradeOverride});
   if(expSet.size){for(const subj of expSet)subjects.push({key:'exp_'+subj,label:subj,getGrade:(ex,sc)=>{
     if(sc?.exp1Subj===subj)return sc.exp1GradeOverride||sc.exp1Grade||getExamGrade(ex,sc.exp1Subj,sc.exp1Raw);
     if(sc?.exp2Subj===subj)return sc.exp2GradeOverride||sc.exp2Grade||getExamGrade(ex,sc.exp2Subj,sc.exp2Raw);return '';
   },isEst:(ex,sc)=>{
-    if(sc?.exp1Subj===subj&&!sc.exp1GradeOverride&&!sc.exp1Grade)return isEstGrade(ex,subj);
-    if(sc?.exp2Subj===subj&&!sc.exp2GradeOverride&&!sc.exp2Grade)return isEstGrade(ex,subj);return false;
+    if(sc?.exp1Subj===subj&&!sc.exp1GradeOverride)return isEstGrade(ex,subj);
+    if(sc?.exp2Subj===subj&&!sc.exp2GradeOverride)return isEstGrade(ex,subj);return false;
   },hasCuts:(ex,sc)=>{
     if(sc?.exp1Subj===subj)return _hasCuts(ex,subj)||!!sc?.exp1GradeOverride;
     if(sc?.exp2Subj===subj)return _hasCuts(ex,subj)||!!sc?.exp2GradeOverride;return false;
