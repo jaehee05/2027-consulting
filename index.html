@@ -774,7 +774,10 @@ async function loadAdmins(){
   S.admins=snap.docs.map(d=>({_docId:d.id,...d.data()}));
 }
 function realStu(){return S.students.filter(s=>!s.isTest&&!s.withdrawn);}
+function bookableStu(){return realStu().filter(s=>!s.consultExcluded);}
 function withdrawnStu(){return S.students.filter(s=>!s.isTest&&s.withdrawn);}
+function isNoShow(b){return b&&b.attendance==='noshow';}
+function activeBookingFor(stuId){return S.bookings.find(b=>b.studentId===stuId&&!isNoShow(b));}
 async function saveScheduleToDb(){await db.collection('schedule').doc('main').set(S.schedule);}
 
 /* ── AUTH ── */
@@ -946,7 +949,7 @@ async function createFirstAdmin(){
 
 /* ── STUDENT ── */
 function renderStu(){
-  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);
+  const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
   const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
   const consultCard=myStu?stuConsultNotesCardHtml(myStu):'';
@@ -1340,7 +1343,7 @@ async function saveExamScore(examId){
 }
 
 async function saveQuestion(){
-  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));if(!myB)return;
   const q=_('sk-q')?.value||'';
   showLoad(true);
   try{
@@ -1356,7 +1359,7 @@ function showBookForm(isChange){
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
   if(!avail.length){c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 가능한 일정이 없습니다</p><p style="color:#6b7280;font-size:13px">관리자가 일정을 등록하면 예약할 수 있어요.</p></div>`;return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
-  const sel=avail.find(d=>d.id===S.selDate),taken=S.bookings.filter(b=>b.date===sel.date).map(b=>b.slot),myB=S.bookings.find(b=>b.studentId===S.studentDocId);
+  const sel=avail.find(d=>d.id===S.selDate),taken=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).map(b=>b.slot),myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const dtabs=avail.map(d=>`<button class="dt ${d.id===S.selDate?'on':''}" onclick="selDate('${d.id}')">${d.label}</button>`).join('');
   const slots=sel.slots.map(slot=>{const isTaken=taken.includes(slot),isMine=myB&&myB.date===sel.date&&myB.slot===slot;return `<button class="sb ${isTaken?(isMine?'mn':'bk'):''}" ${isTaken&&!isMine?'disabled':''} onclick="${isTaken&&!isMine?'':'bookSlot(\''+sel.id+'\',\''+slot+'\')'}">${slot}</button>`;}).join('');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bb">${isChange?'예약 변경':'신규 예약'}</span><p style="font-size:15px;font-weight:700">상담 예약</p></div>
@@ -1374,7 +1377,7 @@ function showBookForm(isChange){
   ${isChange?'<div style="margin-top:12px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}
   </div>`;}
 
-function selDate(id){S.selDate=id;const myB=S.bookings.find(b=>b.studentId===S.studentDocId);showBookForm(!!myB);}
+function selDate(id){S.selDate=id;const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));showBookForm(!!myB);}
 
 async function bookSlot(dateId,slot){
   if(!isBookingOpen()){toast('예약 기간이 아닙니다.','warn');renderStu();return;}
@@ -1382,7 +1385,7 @@ async function bookSlot(dateId,slot){
   if(!(await confirmDialog({title:'예약 확인',message:`${d.label} ${slot}에 예약하시겠습니까?`,confirmLabel:'예약'})))return;
   showLoad(true);
   try{
-    const myB=S.bookings.find(b=>b.studentId===S.studentDocId);
+    const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
     if(myB){await db.collection('bookings').doc(myB._docId).delete();S.bookings=S.bookings.filter(b=>b.studentId!==S.studentDocId);}
     const newBook={studentId:S.studentDocId,studentName:S.user.name,date:d.date,dateLabel:d.label,slot,createdAt:Date.now()};
     const ref=await db.collection('bookings').add(newBook);
@@ -1442,14 +1445,14 @@ async function stuSubmitRejectAdminChange(reqId){
 
 async function cancelMyBook(){
   if(!(await confirmDialog({title:'예약 취소',message:'예약을 취소하시겠습니까?',confirmLabel:'취소하기',kind:'danger'})))return;
-  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));if(!myB)return;
   showLoad(true);
   try{await db.collection('bookings').doc(myB._docId).delete();S.bookings=S.bookings.filter(b=>b.studentId!==S.studentDocId);renderStu();}
   catch(e){toast('취소 실패: '+e.message,'error');}
   showLoad(false);}
 
 function requestCancelBook(){
-  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));if(!myB)return;
   const c=_('stuC');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx br">예약 취소 요청</span><p style="font-size:15px;font-weight:700">예약 취소</p></div>
   <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px"><b>${myB.dateLabel} ${myB.slot}</b> 예약을 취소 요청합니다.</p></div>
@@ -1460,7 +1463,7 @@ function requestCancelBook(){
 async function submitCancelRequest(){
   const reason=_('cancelReason')?.value?.trim();
   if(!reason){toast('취소 사유를 입력해주세요.','warn');return;}
-  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));if(!myB)return;
   showLoad(true);
   try{
     const req={type:'cancel',bookingId:myB._docId,studentId:S.studentDocId,studentName:S.user.name,reason,currentDate:myB.date,currentDateLabel:myB.dateLabel,currentSlot:myB.slot,status:'pending',createdAt:Date.now()};
@@ -1471,7 +1474,7 @@ async function submitCancelRequest(){
   showLoad(false);}
 
 function showChangeRequestForm(){
-  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));if(!myB)return;
   if(!isBookingOpen()){const pl=bookPeriodLabel();toast('예약 기간이 아닙니다.'+(pl?'\n예약 가능 기간: '+pl:''),'warn',{duration:4000});return;}
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
   if(!avail.length){toast('예약 가능한 일정이 없습니다.','warn');return;}
@@ -1479,10 +1482,10 @@ function showChangeRequestForm(){
   S.adminSel=null;renderChangeForm();}
 
 function renderChangeForm(){
-  const c=_('stuC'),myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  const c=_('stuC'),myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));if(!myB)return;
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
   const sel=avail.find(d=>d.id===S.selDate);if(!sel)return;
-  const taken=S.bookings.filter(b=>b.date===sel.date).map(b=>b.slot);
+  const taken=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).map(b=>b.slot);
   const dtabs=avail.map(d=>`<button class="dt ${d.id===S.selDate?'on':''}" onclick="S.selDate='${d.id}';S.adminSel=null;renderChangeForm()">${d.label}</button>`).join('');
   const slots=sel.slots.map(slot=>{const isTaken=taken.includes(slot),isMine=myB.date===sel.date&&myB.slot===slot,isSel=S.adminSel===sel.id+'|'+slot;return `<button class="sb ${isTaken?(isMine?'mn':'bk'):isSel?'sl':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'pickChangeSlot(\''+sel.id+'\',\''+slot+'\',this)'}">${slot}${isMine?' (현재)':''}</button>`;}).join('');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bb">예약 변경 요청</span><p style="font-size:15px;font-weight:700">예약 변경</p></div>
@@ -1500,7 +1503,7 @@ async function submitChangeRequest(){
   if(!S.adminSel){toast('변경할 시간을 선택하세요.','warn');return;}
   const reason=_('changeReason')?.value?.trim();
   if(!reason){toast('변경 사유를 입력해주세요.','warn');return;}
-  const myB=S.bookings.find(b=>b.studentId===S.studentDocId);if(!myB)return;
+  const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));if(!myB)return;
   const [dateId,slot]=S.adminSel.split('|'),date=S.schedule.dates.find(d=>d.id===dateId);if(!date)return;
   showLoad(true);
   try{
@@ -2082,7 +2085,7 @@ function renderAdminStudents(){
     <td data-label="" class="cell-hide" style="text-align:center;width:36px">${cb}</td>
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
-    <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}</span></td>
+    <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}${s.consultExcluded?' <span class="bx" style="background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:600" title="컨설팅 제외 학생">컨설팅 제외</span>':''}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}${s.consultExcluded?'<span class="bx" style="background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:600">제외</span>':''}</span></td>
     <td data-label="학교">${s.school}</td>
     <td data-label="학생 연락처">${stuPhone}</td>
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
@@ -2467,9 +2470,13 @@ function openStuModal(docId){
       <input type="checkbox" id="snp" ${noStu?'checked':''} onchange="onToggleNoStuPhone(this.checked)" style="width:14px;height:14px;cursor:pointer">
       <span>학생 연락처 없음 <span style="color:#9ca3af">(체크 시 알림톡·계정 정보를 보호자 연락처로 발송)</span></span>
     </label>
-    ${isAdmin?`<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;margin-top:-6px;margin-bottom:14px;cursor:pointer;user-select:none">
+    ${isAdmin?`<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;margin-top:-6px;margin-bottom:8px;cursor:pointer;user-select:none">
       <input type="checkbox" id="snotify" ${s?.notifyExcluded?'checked':''} style="width:14px;height:14px;cursor:pointer">
       <span>알림톡 제외 <span style="color:#9ca3af">(체크 시 이 학생에게는 어떤 알림톡도 발송되지 않음)</span></span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;margin-bottom:14px;cursor:pointer;user-select:none">
+      <input type="checkbox" id="sconsult" ${s?.consultExcluded?'checked':''} style="width:14px;height:14px;cursor:pointer">
+      <span>컨설팅 제외 <span style="color:#9ca3af">(체크 시 예약 현황의 미예약·예약률 집계에서 제외)</span></span>
     </label>`:''}
     <div class="fg"><label class="fl">좌석 번호 (선택)</label><select class="fi fsel" id="sseat"><option value="">미배정</option>${Array.from({length:70},(_,i)=>`<option value="${i+1}" ${s?.seat==i+1?'selected':''}>${i+1}번</option>`).join('')}</select></div>
     <div id="aprev" style="background:#f9fafb;border-radius:10px;padding:10px 12px;margin-bottom:14px;${s?'':'display:none'}">
@@ -2501,6 +2508,7 @@ async function saveStu(docId){
   const name=_('sn').value.trim(),grade=_('sg').value,school=fmtSchool(_('ss').value),gphone=fmtPhone(_('sgp').value),seat=_('sseat').value?Number(_('sseat').value):'';
   const noStu=!!_('snp')?.checked;
   const notifyExcluded=!!_('snotify')?.checked;
+  const consultExcluded=!!_('sconsult')?.checked;
   const phone=noStu?'':fmtPhone(_('sp').value);
   if(!name||!school||!gphone){showErr('mErr','필수 항목을 모두 입력하세요.');return;}
   if(!noStu&&!phone){showErr('mErr','학생 연락처를 입력하거나 "학생 연락처 없음"을 체크하세요.');return;}
@@ -2515,10 +2523,10 @@ async function saveStu(docId){
   showLoad(true);
   try{
     if(docId){
-      await db.collection('students').doc(docId).update({name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,notifyExcluded});
-      const s=S.students.find(x=>x._docId===docId);if(s)Object.assign(s,{name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,notifyExcluded});
+      await db.collection('students').doc(docId).update({name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,notifyExcluded,consultExcluded});
+      const s=S.students.find(x=>x._docId===docId);if(s)Object.assign(s,{name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,notifyExcluded,consultExcluded});
     }else{
-      const data={name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,accountPw:initPw(acctPhone),isFirstLogin:true,notifyExcluded};
+      const data={name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,accountPw:initPw(acctPhone),isFirstLogin:true,notifyExcluded,consultExcluded};
       const ref=await db.collection('students').add(data);S.students.push({_docId:ref.id,...data});
     }
     closeModal();renderAdminStudents();
@@ -2827,10 +2835,12 @@ async function doBulk(){
 
 /* ── ADMIN: 예약 현황 ── */
 function renderAdminBookings(){
-  const bookedIds=new Set(S.bookings.map(b=>b.studentId));
-  const unbooked=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
-  const totalStu=realStu().length;
-  const bookedStu=realStu().filter(s=>bookedIds.has(s._docId)).length;
+  const bookedIds=new Set(S.bookings.filter(b=>!isNoShow(b)).map(b=>b.studentId));
+  const noshowList=S.bookings.filter(isNoShow).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.slot||'').localeCompare(b.slot||''));
+  const noshowIds=new Set(noshowList.map(b=>b.studentId));
+  const unbooked=bookableStu().filter(s=>!bookedIds.has(s._docId)&&!noshowIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
+  const totalStu=bookableStu().length;
+  const bookedStu=bookableStu().filter(s=>bookedIds.has(s._docId)).length;
   const utilization=totalStu?Math.round(bookedStu/totalStu*100):0;
   /* 중복 예약 검사 */
   const byStu={},bySlot={};
@@ -2866,7 +2876,7 @@ function renderAdminBookings(){
   const statsCard=`<div class="np" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
     <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:14px;padding:14px 14px 12px">
       <p style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px;letter-spacing:-.2px">예약 완료</p>
-      <p style="font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.1">${S.bookings.length}<span style="font-size:13px;font-weight:600;color:#3b82f6;margin-left:3px">건</span></p>
+      <p style="font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.1">${S.bookings.filter(b=>!isNoShow(b)).length}<span style="font-size:13px;font-weight:600;color:#3b82f6;margin-left:3px">건</span></p>
     </div>
     <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:14px;padding:14px 14px 12px">
       <p style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:4px;letter-spacing:-.2px">미예약</p>
@@ -2883,7 +2893,7 @@ function renderAdminBookings(){
   if(!S.adminBookSelDate||!availDates.find(d=>d.id===S.adminBookSelDate))S.adminBookSelDate=availDates[0]?.id||null;
   const sel=availDates.find(d=>d.id===S.adminBookSelDate);
   const dtabsHtml=availDates.map(d=>{
-    const cnt=S.bookings.filter(b=>b.date===d.date).length;
+    const cnt=S.bookings.filter(b=>b.date===d.date&&!isNoShow(b)).length;
     const tot=(d.slots||[]).length;
     return `<button class="dt ${d.id===S.adminBookSelDate?'on':''}" onclick="adminBookSelDate('${d.id}')">${d.label} <span style="font-size:11px;opacity:.75">(${cnt}/${tot})</span></button>`;
   }).join('');
@@ -2891,13 +2901,14 @@ function renderAdminBookings(){
   if(sel){
     const sortedSlots=[...(sel.slots||[])].sort((a,b)=>a.localeCompare(b));
     const slotBtns=sortedSlots.map(slot=>{
-      const b=S.bookings.find(x=>x.date===sel.date&&x.slot===slot);
+      const b=S.bookings.find(x=>x.date===sel.date&&x.slot===slot&&!isNoShow(x));
       if(b){
-        return `<button class="adm-slot filled" onclick="openBookDetail('${b._docId}')" title="${b.studentName} (${b.dateLabel} ${slot})"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">${b.studentName||''}</span></button>`;
+        const att=b.attendance==='attended'?'<span style="display:inline-block;margin-left:4px;color:#16a34a;font-weight:700" title="출석 확인됨">✓</span>':'';
+        return `<button class="adm-slot filled" onclick="openBookDetail('${b._docId}')" title="${b.studentName} (${b.dateLabel} ${slot})"><span class="adm-slot-time">${slot}${att}</span><span class="adm-slot-name">${b.studentName||''}</span></button>`;
       }
       return `<button class="adm-slot vacant" onclick="openAssignSlotModal('${sel.id}','${slot}')" title="${sel.label} ${slot} (클릭하여 학생 배정)"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">비어있음</span></button>`;
     }).join('');
-    const bookedCnt=S.bookings.filter(b=>b.date===sel.date).length;
+    const bookedCnt=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).length;
     slotGridHtml=`<div class="card np" style="padding:18px;margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
         <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#eff6ff;border-radius:6px">📅</span>시간대별 예약</p>
@@ -2919,8 +2930,25 @@ function renderAdminBookings(){
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
     <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:5px;justify-content:flex-end"><button class="btn bs bsm" onclick="openStuDetail('${s._docId}')">상세</button><button class="btn bp bsm" onclick="openNewBookForStu('${s._docId}')">예약</button></div></td>
   </tr>`).join('');
-  /* 인쇄: 일정(날짜→시간) 순으로 정렬 */
-  const printSorted=[...S.bookings].sort((a,b)=>{
+  const noshowRows=noshowList.map(b=>{
+    const stu=S.students.find(s=>s._docId===b.studentId);
+    return `<tr>
+      <td data-label="" class="cell-head"><span>${b.studentName}</span><span class="head-meta"><span class="bx" style="background:#fee2e2;color:#991b1b;font-size:10px">결석</span></span></td>
+      <td data-label="원래 예약" style="text-align:center;font-size:12px"><b style="color:#991b1b">${b.dateLabel||'?'} ${b.slot||''}</b></td>
+      <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td>
+      <td data-label="학교">${stu?.school||'—'}</td>
+      <td data-label="학년" class="cell-hide"><span class="bx ${stu?.grade==='고3'?'br':stu?.grade==='고2'?'bb':'bg'}">${stu?.grade||'—'}</span></td>
+      <td data-label="연락처">${stu?(stu.noStudentPhone?stu.guardianPhone:stu.studentPhone):'—'}</td>
+      <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button><button class="btn bp bsm" onclick="openAdminBook('${b._docId}')">재배정</button><button class="btn bs bsm" onclick="setBookAttendance('${b._docId}','')" title="결석 처리 취소">↩</button></div></td>
+    </tr>`;}).join('');
+  const noshowSection=noshowList.length?`<div class="sh np" style="margin-top:24px;margin-bottom:14px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#fee2e2;color:#991b1b;border-radius:6px;font-size:12px">🚫</span>결석 처리된 학생 <span style="font-size:12px;font-weight:500;color:#9ca3af">${noshowList.length}명</span></span></div>
+    <p style="font-size:11px;color:#9ca3af;margin:-6px 0 10px 4px">원래 예약된 슬롯은 비어있는 상태로 돌아가며, 빈 슬롯에서 이 학생을 다시 배정할 수 있습니다.</p>
+    <div class="card np" style="padding:0;margin-bottom:24px"><div class="tw tw-cards"><table>
+      <thead><tr><th>학생</th><th>원래 예약</th><th>좌석</th><th>학교</th><th>학년</th><th>연락처</th><th>관리</th></tr></thead>
+      <tbody>${noshowRows}</tbody>
+    </table></div></div>`:'';
+  /* 인쇄: 일정(날짜→시간) 순으로 정렬 (결석 제외) */
+  const printSorted=S.bookings.filter(b=>!isNoShow(b)).sort((a,b)=>{
     if((a.date||'')!==(b.date||''))return (a.date||'').localeCompare(b.date||'');
     return (a.slot||'').localeCompare(b.slot||'');
   });
@@ -2940,9 +2968,10 @@ function renderAdminBookings(){
     ${statsCard}
     ${dupCard}
     ${disableCard}
-    <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 멘토링 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${S.bookings.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
+    <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 멘토링 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${printSorted.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
     ${slotGridHtml}
     ${renderRequestsSection()}
+    ${noshowSection}
     <div class="sh np" style="margin-top:24px;margin-bottom:14px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#fef3c7;color:#b45309;border-radius:6px;font-size:12px">⏳</span>예약하지 않은 학생 <span style="font-size:12px;font-weight:500;color:#9ca3af">${unbooked.length}명</span></span></div>
     <div class="card np" style="padding:0"><div class="tw tw-cards"><table>
       <thead><tr><th>좌석</th><th>이름</th><th>학교</th><th>학년</th><th>학생 연락처</th><th>보호자 연락처</th><th>관리</th></tr></thead>
@@ -3095,12 +3124,27 @@ function openBookDetail(docId){
     return `<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 10px"><p style="font-size:14px;font-weight:700">${ex.name} 성적</p>${btns}</div>
     ${hasSc?examScoreTblHtml(ex,sc):'<p style="font-size:13px;color:#9ca3af;padding:12px;background:#f9fafb;border-radius:8px;text-align:center;margin-bottom:14px">입력된 성적이 없습니다.</p>'}`;
   }).join('');
+  const attBtn=(val,label,kind)=>{
+    const cur=b.attendance===val||(!val&&!b.attendance);
+    const colors=cur
+      ?(val==='attended'?'background:#dcfce7;border-color:#16a34a;color:#15803d'
+        :val==='noshow'?'background:#fee2e2;border-color:#dc2626;color:#991b1b'
+        :'background:#e5e7eb;border-color:#9ca3af;color:#374151')
+      :'background:#fff;border-color:#e5e7eb;color:#6b7280';
+    return `<button type="button" onclick="setBookAttendance('${docId}','${val||''}')" style="flex:1;padding:8px 10px;border:1.5px solid;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;${colors}">${label}${cur?' ✓':''}</button>`;
+  };
+  const attLabel=b.attendance==='attended'?'<span class="bx" style="background:#dcfce7;color:#15803d;font-size:10px;margin-left:6px">출석</span>':b.attendance==='noshow'?'<span class="bx" style="background:#fee2e2;color:#991b1b;font-size:10px;margin-left:6px">결석</span>':'';
+  const attSection=isAdmin?`<div style="margin:14px 0 4px"><p style="font-size:14px;font-weight:700;margin-bottom:8px">출석 확인</p>
+    <div style="display:flex;gap:6px">${attBtn('attended','출석','ok')}${attBtn('noshow','결석','no')}${attBtn('','미정','none')}</div>
+    <p style="font-size:11px;color:#9ca3af;margin-top:6px">결석 처리 시 슬롯이 비워지고 학생은 '결석 처리된 학생' 목록으로 이동합니다.</p>
+  </div>`:'';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">예약 상세 정보</p>
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${b.studentName}</p></div>
+      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${b.studentName}${attLabel}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">예약 일시</p><p style="font-weight:700;font-size:14px">${b.dateLabel} ${b.slot}</p></div>
       ${stu?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div><div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':stu.studentPhone}</p></div>${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}`:''}
     </div></div>
+    ${attSection}
     ${examSections}
     <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px"><p style="font-size:14px;font-weight:700">질문 & 고민</p>${isAdmin&&b.question?`<button class="btn bd bsm" onclick="adminDelQuestion('${docId}')">고민 삭제</button>`:''}</div>
     <div style="background:#f9fafb;border-radius:10px;padding:12px;min-height:60px"><p style="font-size:13px;color:${b.question?'#111827':'#9ca3af'};white-space:pre-wrap;line-height:1.6">${b.question||'입력된 내용이 없습니다.'}</p></div>
@@ -3201,7 +3245,7 @@ function openAdminBook(docId){
 
 function renderAdminSlots(){
   const docId=_('abid')?.value,dateId=_('abDate')?.value,date=S.schedule.dates.find(d=>d.id===dateId),cont=_('abSlots');if(!date||!cont)return;
-  const booking=S.bookings.find(b=>b._docId===docId),taken=S.bookings.filter(b=>b.date===date.date&&b._docId!==docId).map(b=>b.slot);
+  const booking=S.bookings.find(b=>b._docId===docId),taken=S.bookings.filter(b=>b.date===date.date&&b._docId!==docId&&!isNoShow(b)).map(b=>b.slot);
   cont.innerHTML=date.slots.map(slot=>{const isTaken=taken.includes(slot),isCur=booking?.date===date.date&&booking?.slot===slot,isSel=S.adminSel===dateId+'|'+slot;return `<button class="sb ${isTaken?'bk':isSel?'sl':isCur?'mn':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'adminPickSlot(\''+dateId+'\',\''+slot+'\',this)'}">${slot}</button>`;}).join('')||'<p style="font-size:13px;color:#9ca3af">슬롯 없음</p>';}
 
 function adminPickSlot(dateId,slot,btn){S.adminSel=dateId+'|'+slot;btn.closest('.sg').querySelectorAll('.sb').forEach(b=>{if(!b.classList.contains('bk')&&!b.classList.contains('mn'))b.classList.remove('sl');});btn.classList.add('sl');}
@@ -3210,8 +3254,13 @@ async function saveAdminBook(){
   if(!S.adminSel){toast('시간을 선택하세요.','warn');return;}
   const [dateId,slot]=S.adminSel.split('|'),date=S.schedule.dates.find(d=>d.id===dateId),b=S.bookings.find(x=>x._docId===_('abid').value);
   if(!b||!date)return;showLoad(true);
-  try{await db.collection('bookings').doc(b._docId).update({date:date.date,dateLabel:date.label,slot});b.date=date.date;b.dateLabel=date.label;b.slot=slot;closeModal();S.adminSel=null;renderAdminBookings();}
-  catch(e){toast('변경 실패: '+e.message,'error');}showLoad(false);}
+  try{
+    const upd={date:date.date,dateLabel:date.label,slot};
+    if(b.attendance)upd.attendance=firebase.firestore.FieldValue.delete();
+    await db.collection('bookings').doc(b._docId).update(upd);
+    b.date=date.date;b.dateLabel=date.label;b.slot=slot;delete b.attendance;
+    closeModal();S.adminSel=null;renderAdminBookings();
+  }catch(e){toast('변경 실패: '+e.message,'error');}showLoad(false);}
 
 /* ── ADMIN: 예약 변경 요청 보내기 ── */
 function openAdminChangeReq(bookingId){
@@ -3319,7 +3368,7 @@ function openNewBookForStu(stuDocId){
 
 function renderNewBookSlots(){
   const dateId=_('nbDate')?.value,date=S.schedule.dates.find(d=>d.id===dateId),cont=_('nbSlots');if(!date||!cont)return;
-  const taken=S.bookings.filter(b=>b.date===date.date).map(b=>b.slot);
+  const taken=S.bookings.filter(b=>b.date===date.date&&!isNoShow(b)).map(b=>b.slot);
   cont.innerHTML=date.slots.map(slot=>{const isTaken=taken.includes(slot),isSel=S.adminSel===dateId+'|'+slot;return `<button class="sb ${isTaken?'bk':isSel?'sl':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'adminPickSlot(\''+dateId+'\',\''+slot+'\',this)'}">${slot}</button>`;}).join('')||'<p style="font-size:13px;color:#9ca3af">슬롯 없음</p>';}
 
 async function saveNewBookForStu(){
@@ -3345,30 +3394,45 @@ function openAssignSlotModal(dateId,slot){
   openModal();
 }
 
+function _assignSlotRowHtml(s,dateId,slot,isNoShowStu){
+  const gradeBx=s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg';
+  const noshowChip=isNoShowStu?'<span class="bx" style="background:#fee2e2;color:#991b1b;font-size:9px;flex-shrink:0">결석 재배정</span>':'';
+  return `<button type="button" onclick="assignStuToSlot('${dateId}','${slot}','${s._docId}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid ${isNoShowStu?'#fecaca':'#e5e7eb'};border-radius:10px;background:${isNoShowStu?'#fef2f2':'#fff'};cursor:pointer;font-family:inherit;text-align:left;transition:.15s;margin-bottom:6px" onmouseover="this.style.background='${isNoShowStu?'#fee2e2':'#f9fafb'}';this.style.borderColor='#1C64F2'" onmouseout="this.style.background='${isNoShowStu?'#fef2f2':'#fff'}';this.style.borderColor='${isNoShowStu?'#fecaca':'#e5e7eb'}'">
+    <span style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 6px;border-radius:8px;background:#eff6ff;color:#1C64F2;font-weight:700;font-size:13px">${s.seat||'—'}</span>
+    <span style="flex:1;min-width:0">
+      <span style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:#111827"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</span><span class="bx ${gradeBx}" style="font-size:10px;flex-shrink:0">${s.grade}</span>${noshowChip}</span>
+      <span style="display:block;font-size:11px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.school||''}${s.studentPhone?' · '+s.studentPhone:''}</span>
+    </span>
+    <span style="font-size:11px;color:#1C64F2;font-weight:600;flex-shrink:0">배정 →</span>
+  </button>`;
+}
+
+function _assignSlotCandidates(){
+  const bookedIds=new Set(S.bookings.filter(b=>!isNoShow(b)).map(b=>b.studentId));
+  const noshowIds=new Set(S.bookings.filter(isNoShow).map(b=>b.studentId));
+  return bookableStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>{
+    const an=noshowIds.has(a._docId)?0:1,bn=noshowIds.has(b._docId)?0:1;
+    if(an!==bn)return an-bn;
+    return (a.seat||999)-(b.seat||999);
+  }).map(s=>({s,isNoShowStu:noshowIds.has(s._docId)}));
+}
+
 function _renderAssignSlotModal(){
   if(!S.assignSlotKey)return;
   const [dateId,slot]=S.assignSlotKey.split('|');
   const date=(S.schedule.dates||[]).find(d=>d.id===dateId);if(!date){closeModal();return;}
-  const bookedIds=new Set(S.bookings.map(b=>b.studentId));
   const q=(S.assignSlotQuery||'').trim().toLowerCase();
-  const list=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
-  const filtered=q?list.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.school||'').toLowerCase().includes(q)||String(s.seat||'').includes(q)):list;
-  const rows=filtered.map(s=>{
-    const gradeBx=s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg';
-    return `<button type="button" onclick="assignStuToSlot('${dateId}','${slot}','${s._docId}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s;margin-bottom:6px" onmouseover="this.style.background='#f9fafb';this.style.borderColor='#1C64F2'" onmouseout="this.style.background='#fff';this.style.borderColor='#e5e7eb'">
-      <span style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 6px;border-radius:8px;background:#eff6ff;color:#1C64F2;font-weight:700;font-size:13px">${s.seat||'—'}</span>
-      <span style="flex:1;min-width:0">
-        <span style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:#111827"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</span><span class="bx ${gradeBx}" style="font-size:10px;flex-shrink:0">${s.grade}</span></span>
-        <span style="display:block;font-size:11px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.school||''}${s.studentPhone?' · '+s.studentPhone:''}</span>
-      </span>
-      <span style="font-size:11px;color:#1C64F2;font-weight:600;flex-shrink:0">배정 →</span>
-    </button>`;
-  }).join('');
+  const list=_assignSlotCandidates();
+  const filtered=q?list.filter(({s})=>(s.name||'').toLowerCase().includes(q)||(s.school||'').toLowerCase().includes(q)||String(s.seat||'').includes(q)):list;
+  const rows=filtered.map(({s,isNoShowStu})=>_assignSlotRowHtml(s,dateId,slot,isNoShowStu)).join('');
   const empty=list.length===0
-    ?'<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">미예약 학생이 없습니다. 🎉</div>'
+    ?'<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">배정 가능한 학생이 없습니다. 🎉</div>'
     :(filtered.length===0?`<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">"${escapeHtml(q)}" 검색 결과가 없습니다.</div>`:'');
+  const noshowCount=list.filter(x=>x.isNoShowStu).length;
+  const noshowHint=noshowCount?`<p style="font-size:11px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;margin-bottom:10px">🚫 결석 처리된 학생 ${noshowCount}명이 목록 상단에 표시됩니다. 선택 시 기존 예약이 이 슬롯으로 이동됩니다.</p>`:'';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 배정</p>
     <p style="font-size:13px;color:#6b7280;margin-bottom:12px"><b style="color:#1C64F2">${date.label} ${slot}</b> 슬롯에 배정할 학생을 선택하세요.</p>
+    ${noshowHint}
     <input class="fi" id="assignSlotSearch" placeholder="이름·학교·좌석 검색" value="${escapeHtml(S.assignSlotQuery||'')}" oninput="S.assignSlotQuery=this.value;_renderAssignSlotList()" style="margin-bottom:10px">
     <div id="assignSlotList" style="max-height:55vh;overflow-y:auto;margin:0 -4px;padding:0 4px">${rows}${empty}</div>
     <div style="display:flex;gap:8px;margin-top:14px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button></div>`;
@@ -3378,24 +3442,13 @@ function _renderAssignSlotModal(){
 function _renderAssignSlotList(){
   if(!S.assignSlotKey)return;
   const [dateId,slot]=S.assignSlotKey.split('|');
-  const bookedIds=new Set(S.bookings.map(b=>b.studentId));
   const q=(S.assignSlotQuery||'').trim().toLowerCase();
-  const list=realStu().filter(s=>!bookedIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
-  const filtered=q?list.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.school||'').toLowerCase().includes(q)||String(s.seat||'').includes(q)):list;
+  const list=_assignSlotCandidates();
+  const filtered=q?list.filter(({s})=>(s.name||'').toLowerCase().includes(q)||(s.school||'').toLowerCase().includes(q)||String(s.seat||'').includes(q)):list;
   const cont=_('assignSlotList');if(!cont)return;
-  const rows=filtered.map(s=>{
-    const gradeBx=s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg';
-    return `<button type="button" onclick="assignStuToSlot('${dateId}','${slot}','${s._docId}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s;margin-bottom:6px" onmouseover="this.style.background='#f9fafb';this.style.borderColor='#1C64F2'" onmouseout="this.style.background='#fff';this.style.borderColor='#e5e7eb'">
-      <span style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 6px;border-radius:8px;background:#eff6ff;color:#1C64F2;font-weight:700;font-size:13px">${s.seat||'—'}</span>
-      <span style="flex:1;min-width:0">
-        <span style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:#111827"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</span><span class="bx ${gradeBx}" style="font-size:10px;flex-shrink:0">${s.grade}</span></span>
-        <span style="display:block;font-size:11px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.school||''}${s.studentPhone?' · '+s.studentPhone:''}</span>
-      </span>
-      <span style="font-size:11px;color:#1C64F2;font-weight:600;flex-shrink:0">배정 →</span>
-    </button>`;
-  }).join('');
+  const rows=filtered.map(({s,isNoShowStu})=>_assignSlotRowHtml(s,dateId,slot,isNoShowStu)).join('');
   const empty=list.length===0
-    ?'<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">미예약 학생이 없습니다. 🎉</div>'
+    ?'<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">배정 가능한 학생이 없습니다. 🎉</div>'
     :(filtered.length===0?`<div style="padding:30px 12px;text-align:center;color:#9ca3af;font-size:13px">검색 결과가 없습니다.</div>`:'');
   cont.innerHTML=rows+empty;
 }
@@ -3403,18 +3456,48 @@ function _renderAssignSlotList(){
 async function assignStuToSlot(dateId,slot,stuDocId){
   const date=(S.schedule.dates||[]).find(d=>d.id===dateId);if(!date)return;
   const stu=S.students.find(x=>x._docId===stuDocId);if(!stu)return;
-  if(S.bookings.some(b=>b.studentId===stuDocId)){toast(`${stu.name} 학생은 이미 예약되어 있습니다.`,'warn');return;}
-  if(S.bookings.some(b=>b.date===date.date&&b.slot===slot)){toast('해당 시간이 방금 예약되었습니다.','warn');closeModal();renderAdminBookings();return;}
-  if(!(await confirmDialog({title:'예약 배정',message:`${stu.name} 학생을 ${date.label} ${slot}에 배정하시겠습니까?`,confirmLabel:'배정'})))return;
+  const existingActive=S.bookings.find(b=>b.studentId===stuDocId&&!isNoShow(b));
+  if(existingActive){toast(`${stu.name} 학생은 이미 ${existingActive.dateLabel} ${existingActive.slot}에 예약되어 있습니다.`,'warn');return;}
+  if(S.bookings.some(b=>b.date===date.date&&b.slot===slot&&!isNoShow(b))){toast('해당 시간이 방금 예약되었습니다.','warn');closeModal();renderAdminBookings();return;}
+  const existingNoshow=S.bookings.find(b=>b.studentId===stuDocId&&isNoShow(b));
+  const action=existingNoshow?'재배정':'배정';
+  if(!(await confirmDialog({title:`예약 ${action}`,message:`${stu.name} 학생을 ${date.label} ${slot}에 ${action}하시겠습니까?${existingNoshow?`\n(기존 결석 처리된 ${existingNoshow.dateLabel} ${existingNoshow.slot} 예약을 이 슬롯으로 이동합니다.)`:''}`,confirmLabel:action})))return;
   showLoad(true);
   try{
-    const bookData={studentId:stuDocId,studentName:stu.name,date:date.date,dateLabel:date.label,slot,question:''};
-    const docRef=await db.collection('bookings').add(bookData);
-    bookData._docId=docRef.id;S.bookings.push(bookData);
+    if(existingNoshow){
+      await db.collection('bookings').doc(existingNoshow._docId).update({date:date.date,dateLabel:date.label,slot,attendance:firebase.firestore.FieldValue.delete()});
+      Object.assign(existingNoshow,{date:date.date,dateLabel:date.label,slot});delete existingNoshow.attendance;
+    }else{
+      const bookData={studentId:stuDocId,studentName:stu.name,date:date.date,dateLabel:date.label,slot,question:''};
+      const docRef=await db.collection('bookings').add(bookData);
+      bookData._docId=docRef.id;S.bookings.push(bookData);
+    }
     S.assignSlotKey=null;S.assignSlotQuery='';
     closeModal();renderAdminBookings();
-    toast(`${stu.name} 학생을 ${date.label} ${slot}에 배정했습니다.`,'success');
-  }catch(e){toast('예약 배정 실패: '+e.message,'error');}
+    toast(`${stu.name} 학생을 ${date.label} ${slot}에 ${action}했습니다.`,'success');
+  }catch(e){toast(`예약 ${action} 실패: `+e.message,'error');}
+  showLoad(false);
+}
+
+async function setBookAttendance(docId,status){
+  const b=S.bookings.find(x=>x._docId===docId);if(!b)return;
+  const label=status==='attended'?'출석':status==='noshow'?'결석':'미정';
+  const prev=b.attendance==='attended'?'출석':b.attendance==='noshow'?'결석':'미정';
+  if(prev===label)return;
+  if(status==='noshow'&&!(await confirmDialog({title:'결석 처리',message:`${b.studentName} 학생을 결석 처리하시겠습니까?\n원래 슬롯(${b.dateLabel} ${b.slot})은 비어있는 상태로 돌아가며, 빈 시간에서 다시 배정할 수 있습니다.`,confirmLabel:'결석 처리',kind:'danger'})))return;
+  showLoad(true);
+  try{
+    if(status){
+      await db.collection('bookings').doc(docId).update({attendance:status});
+      b.attendance=status;
+    }else{
+      await db.collection('bookings').doc(docId).update({attendance:firebase.firestore.FieldValue.delete()});
+      delete b.attendance;
+    }
+    if(!_('mOv').classList.contains('hidden'))closeModal();
+    renderAdminBookings();
+    toast(`${b.studentName} 학생을 ${label} 처리했습니다.`,'success');
+  }catch(e){toast('출석 처리 실패: '+e.message,'error');}
   showLoad(false);
 }
 
@@ -3927,7 +4010,7 @@ function classStatusLabel(status){
 function renderMyPage(){
   const stu=S.students.find(x=>x._docId===S.studentDocId);
   if(!stu){_('myC').innerHTML='<div class="card"><p>학생 정보를 찾을 수 없습니다.</p></div>';return;}
-  const myBooking=S.bookings.find(b=>b.studentId===S.studentDocId);
+  const myBooking=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const classSt=classroomStatusOf(stu);
   _('myC').innerHTML=`
     <div class="card" style="margin-bottom:12px">
