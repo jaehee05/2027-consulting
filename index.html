@@ -1389,7 +1389,13 @@ async function bookSlot(dateId,slot){
     if(myB){await db.collection('bookings').doc(myB._docId).delete();S.bookings=S.bookings.filter(b=>b.studentId!==S.studentDocId);}
     const newBook={studentId:S.studentDocId,studentName:S.user.name,date:d.date,dateLabel:d.label,slot,createdAt:Date.now()};
     const ref=await db.collection('bookings').add(newBook);
-    S.bookings.push({_docId:ref.id,...newBook});renderStu();
+    S.bookings.push({_docId:ref.id,...newBook});
+    const stu=S.students.find(x=>x._docId===S.studentDocId);
+    if(stu&&stu.consultExcluded){
+      await db.collection('students').doc(S.studentDocId).update({consultExcluded:false});
+      stu.consultExcluded=false;
+    }
+    renderStu();
   }catch(e){toast('예약 실패: '+e.message,'error');}
   showLoad(false);
 }
