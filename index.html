@@ -2404,7 +2404,7 @@ async function sendScoreReminderBulk(){
 /* ── ADMIN: 학생 성적 ── */
 function renderAdminScores(){
   const gradeOrder={'고3':0,'고2':1,'고1':2};
-  const baseStu=realStu();
+  const baseStu=bookableStu();
   const sorted=[...baseStu].sort((a,b)=>{
     if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
