@@ -1545,7 +1545,7 @@ const _NA_DOT='<span style="color:#d1d5db;font-size:20px;line-height:1;font-weig
 
 function renderAdminConsult(){
   if(S.consultStuId){renderConsultDetail();return;}
-  const baseStu=realStu();
+  const baseStu=bookableStu();
   const bookingByStu={};
   for(const bk of S.bookings){if(bk.studentId&&!bookingByStu[bk.studentId])bookingByStu[bk.studentId]=bk;}
   const sorted=[...baseStu].sort((a,b)=>{
