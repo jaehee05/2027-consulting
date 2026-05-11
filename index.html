@@ -608,16 +608,18 @@ function gcAllRel(exam){return gcRelGroups(exam).flatMap(([,s])=>s);}
 function calcGrade(raw,cuts){
   if(!cuts||!cuts.length||raw===''||raw===undefined||raw===null)return '';
   const r=Number(raw);if(isNaN(r))return '';
-  for(let i=0;i<cuts.length;i++){if(r>=Number(cuts[i]))return String(i+1);}
+  for(let i=0;i<cuts.length;i++){const c=cuts[i];if(c===''||c==null)continue;const nc=Number(c);if(isNaN(nc))continue;if(r>=nc)return String(i+1);}
   return '9';
 }
 function ecGetLoHi(e){return Array.isArray(e)?[e[0],e[1]]:[e.lo,e.hi];}
+// 한쪽만 입력된 경우 반대편으로 미러링해서 단일 임계값처럼 동작시킨다.
+function ecNorm(e){let [lo,hi]=ecGetLoHi(e);const lE=(lo===''||lo==null),hE=(hi===''||hi==null);if(lE&&hE)return[NaN,NaN];if(lE)lo=hi;if(hE)hi=lo;return[Number(lo),Number(hi)];}
 function calcEstGrade(raw,estCuts){
   if(!estCuts||!estCuts.length||raw===''||raw===undefined||raw===null)return '';
   const r=Number(raw);if(isNaN(r))return '';
   let best=9,worst=9;
-  for(let i=0;i<estCuts.length;i++){const [lo,hi]=ecGetLoHi(estCuts[i]);if(lo===''&&hi==='')continue;const nlo=Number(lo),nhi=Number(hi);if(r>=nhi){best=Math.min(best,i+1);worst=Math.min(worst,i+1);break;}else if(r>=nlo){best=Math.min(best,i+1);break;}}
-  if(worst===9){for(let i=0;i<estCuts.length;i++){const [,hi]=ecGetLoHi(estCuts[i]);if(hi===''||hi===undefined)continue;if(r>=Number(hi)){worst=i+1;break;}}}
+  for(let i=0;i<estCuts.length;i++){const [nlo,nhi]=ecNorm(estCuts[i]);if(isNaN(nlo)||isNaN(nhi))continue;if(r>=nhi){best=Math.min(best,i+1);worst=Math.min(worst,i+1);break;}else if(r>=nlo){best=Math.min(best,i+1);break;}}
+  if(worst===9){for(let i=0;i<estCuts.length;i++){const [,nhi]=ecNorm(estCuts[i]);if(isNaN(nhi))continue;if(r>=nhi){worst=i+1;break;}}}
   if(best===worst)return String(best);
   return best+'-'+worst;
 }
