@@ -403,6 +403,53 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
       return res.json({ ok: true, sent, failed, alreadyBooked, results });
     }
 
+    if (action === "sendConsultUpcoming") {
+      const ids = Array.isArray(payload?.studentIds) ? payload.studentIds.filter(Boolean) : [];
+      if (ids.length === 0) return res.status(400).json({ error: "studentIds 가 비어있습니다." });
+      const today = todayStrKST();
+      const results = [];
+      let noBooking = 0;
+      let pastBooking = 0;
+      for (const id of ids) {
+        const snap = await admin.firestore().doc(`students/${id}`).get();
+        if (!snap.exists) { results.push({ id, ok: false, skipped: "not-found" }); continue; }
+        const s = snap.data();
+        if (s.isTest) { results.push({ id, name: s.name, ok: false, skipped: "test-account" }); continue; }
+        if (s.notifyExcluded) { results.push({ id, name: s.name, ok: false, skipped: "notify-excluded" }); continue; }
+        const bookingSnap = await admin.firestore().collection("bookings")
+          .where("studentId", "==", id).limit(1).get();
+        if (bookingSnap.empty) { noBooking += 1; results.push({ id, name: s.name, ok: false, skipped: "no-booking" }); continue; }
+        const b = bookingSnap.docs[0].data();
+        const bookingDate = String(b.date || "");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) { results.push({ id, name: s.name, ok: false, skipped: "invalid-booking-date" }); continue; }
+        const daysLeft = daysBetween(today, bookingDate);
+        if (daysLeft < 0) { pastBooking += 1; results.push({ id, name: s.name, ok: false, skipped: "past-booking" }); continue; }
+        const phones = notifyPhonesBoth(s);
+        if (phones.length === 0) { results.push({ id, name: s.name, ok: false, skipped: "no-phone" }); continue; }
+        for (const { phone, role } of phones) {
+          try {
+            const r = await sendAlimtalk("consultUpcoming", {
+              phone,
+              name: s.name || "",
+              school: s.school || "",
+              grade: s.grade || "",
+              seat: s.seat ?? "",
+              dateLabel: b.dateLabel || "",
+              slot: b.slot || "",
+              daysLeft: String(daysLeft),
+            });
+            results.push({ id, name: s.name, role, phone, ok: true, result: r });
+          } catch (err) {
+            console.error(`[consultUpcoming] ${s.name}(${id}/${role}) 발송 실패:`, err);
+            results.push({ id, name: s.name, role, phone, ok: false, error: String(err.message || err) });
+          }
+        }
+      }
+      const sent = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok && r.skipped !== "no-booking" && r.skipped !== "past-booking").length;
+      return res.json({ ok: true, sent, failed, noBooking, pastBooking, results });
+    }
+
     if (action === "sendAdminAccountInfo") {
       const targetAdminId = String(payload?.adminAccountId || "").trim();
       const phoneRaw = String(payload?.phone || "").replace(/\D/g, "");

@@ -2180,7 +2180,8 @@ function toggleStuSelectAll(checked){
 const ALIMTALK_MODES={
   accountInfo:{title:'계정 정보 안내',icon:'🔑',desc:'로그인 ID와 초기 비밀번호 안내',send:'sendAccountInfoBulk'},
   bookingStarted:{title:'예약 시작 안내',icon:'📅',desc:'멘토링 예약 시작 공지',send:'sendBookingStartedBulk'},
-  bookingReminder:{title:'예약 미완료 안내',icon:'⏰',desc:'아직 예약 안 한 학생 독촉',send:'sendBookingReminderBulk'}
+  bookingReminder:{title:'예약 미완료 안내',icon:'⏰',desc:'아직 예약 안 한 학생 독촉',send:'sendBookingReminderBulk'},
+  consultUpcoming:{title:'멘토링 일정 안내',icon:'🔔',desc:'예약일 임박 학생에게 D-day 안내',send:'sendConsultUpcomingBulk'}
 };
 function openAlimtalkSheet(){
   const item=(icon,title,desc,onclick)=>`<button class="sheet-item" onclick="closeModal();${onclick}">
@@ -2194,6 +2195,7 @@ function openAlimtalkSheet(){
       ${item('🔑','계정 정보 안내','로그인 ID와 초기 비밀번호 안내',`enterAlimtalkMode('accountInfo')`)}
       ${item('📅','예약 시작 안내','멘토링 예약 시작 공지',`enterAlimtalkMode('bookingStarted')`)}
       ${item('⏰','예약 미완료 안내','아직 예약 안 한 학생 독촉',`enterAlimtalkMode('bookingReminder')`)}
+      ${item('🔔','멘토링 일정 안내','예약일 임박 학생에게 D-day 안내',`enterAlimtalkMode('consultUpcoming')`)}
       ${item('📊','성적 미입력 안내','시험별 성적 미입력 학생 (개별 선택)','openScoreReminderModal()')}
     </div>
     <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">닫기</button></div>`;
@@ -2235,6 +2237,27 @@ async function sendAccountInfoBulk(){
       msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
     }
     toast(msg,r.failed>0?'warn':'success',{duration:5000});
+    S.stuSelected.clear();
+    S.alimtalkMode=null;
+    renderAdminStudents();
+  }catch(e){toast('발송 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function sendConsultUpcomingBulk(){
+  const ids=Array.from(S.stuSelected);
+  if(ids.length===0){toast('발송할 학생을 선택해주세요.','warn');return;}
+  const names=ids.map(id=>S.students.find(s=>s._docId===id)?.name).filter(Boolean);
+  if(!(await confirmDialog({title:'멘토링 일정 안내 발송',message:`선택한 ${ids.length}명에게 멘토링 일정 안내(D-day) 알림톡을 발송하시겠습니까?\n\n예약이 없거나 이미 지난 학생은 자동 제외됩니다.\n\n${names.slice(0,10).join(', ')}${names.length>10?` 외 ${names.length-10}명`:''}`,confirmLabel:'발송'})))return;
+  showLoad(true);
+  try{
+    const r=await ppurioCall('sendConsultUpcoming',{studentIds:ids});
+    const fails=(r.results||[]).filter(x=>!x.ok&&x.skipped!=='no-booking'&&x.skipped!=='past-booking');
+    let msg=`발송 완료: 성공 ${r.sent}건 / 제외(예약없음) ${r.noBooking||0}건 / 제외(지난 예약) ${r.pastBooking||0}건 / 실패 ${fails.length}건`;
+    if(fails.length>0){
+      const detail=fails.slice(0,10).map(f=>`• ${f.name||f.id}${f.role==='guardian'?'(보호자)':f.role==='student'?'(학생)':''}: ${f.skipped||f.error}`).join('\n');
+      msg+='\n\n[실패 상세]\n'+detail+(fails.length>10?`\n… 외 ${fails.length-10}건`:'');
+    }
+    toast(msg,fails.length>0?'warn':'success',{duration:5000});
     S.stuSelected.clear();
     S.alimtalkMode=null;
     renderAdminStudents();
@@ -3696,6 +3719,7 @@ const ALIMTALK_EVENTS=[
   ['adminChangeRequest','[학생] 관리자 발 예약 변경 요청','${name} ${currentDateLabel} ${currentSlot} / ${offeredSlots}'],
   ['adminChangeApproved','[학생] 관리자 변경 요청 학생 승인(확인)','${name} ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
   ['adminChangeRejected','[학생] 관리자 변경 요청 학생 거절(확인)','${name} ${currentDateLabel} ${currentSlot}'],
+  ['consultUpcoming','[학생] 멘토링 일정 안내','${name} ${dateLabel} ${slot} D-${daysLeft}'],
   ['scoreInputReminder','[학생] 성적 미입력 안내','${name} ${examName} 기한 ${scoreDeadline} D-${daysLeft}'],
   ['bookingReminder','[학생] 예약 미완료 안내','${name} 멘토링:${consultingName} 마감:${bookingDeadline}'],
   ['bookingStarted','[학생] 예약 시작 안내','${name} 멘토링:${consultingName} 마감:${bookingDeadline}'],
