@@ -4732,19 +4732,25 @@ window.addEventListener('popstate',function(e){
     banner.innerHTML='<span>🔔 새 버전이 배포되었습니다. 새 기능을 사용하려면 페이지를 새로고침해 주세요.</span><button type="button" style="background:#fff;color:#1C64F2;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">새로고침</button>';
     banner.querySelector('button').addEventListener('click',function(){location.reload();});
     document.body.appendChild(banner);
+    console.log('[verCheck] new version detected — banner shown');
   }
   function check(){
     if(banner||!initialMark)return;
     readMark().then(function(cur){
-      if(cur&&cur!==initialMark)showBanner();
+      if(cur&&cur!==initialMark){
+        console.log('[verCheck] mark changed:', initialMark, '→', cur);
+        showBanner();
+      }
     });
   }
   function init(){
     readMark().then(function(m){
-      if(!m)return;
+      if(!m){console.log('[verCheck] no marker headers from server — disabled');return;}
       initialMark=m;
-      setInterval(check, 3*60*1000);
+      console.log('[verCheck] initial mark:', m, '— polling every 60s');
+      setInterval(check, 60*1000);
       document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
+      window.addEventListener('focus',check);
     });
   }
   if(document.readyState==='complete')init();
