@@ -573,6 +573,13 @@ function bookPeriodStatus(){
   }
   return{kind:'open'};
 }
+// 선택 모드: 관리자가 활성으로 표시한 슬롯만 학생이 예약 가능. 전체 모드(기본): 모든 빈 슬롯이 예약 가능.
+function isSelectiveBookingMode(){return !!S.schedule?.selectiveMode;}
+function isSlotActive(dateId,slot){
+  if(!isSelectiveBookingMode())return true;
+  const list=S.schedule?.activeSlots?.[dateId];
+  return Array.isArray(list)&&list.includes(slot);
+}
 let _bookCountdownTimer=null;
 function clearBookCountdown(){if(_bookCountdownTimer){clearInterval(_bookCountdownTimer);_bookCountdownTimer=null;}}
 function startBookCountdown(startAt){
@@ -1363,7 +1370,8 @@ function showBookForm(isChange){
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
   const sel=avail.find(d=>d.id===S.selDate),taken=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).map(b=>b.slot),myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const dtabs=avail.map(d=>`<button class="dt ${d.id===S.selDate?'on':''}" onclick="selDate('${d.id}')">${d.label}</button>`).join('');
-  const slots=sel.slots.map(slot=>{const isTaken=taken.includes(slot),isMine=myB&&myB.date===sel.date&&myB.slot===slot;return `<button class="sb ${isTaken?(isMine?'mn':'bk'):''}" ${isTaken&&!isMine?'disabled':''} onclick="${isTaken&&!isMine?'':'bookSlot(\''+sel.id+'\',\''+slot+'\')'}">${slot}</button>`;}).join('');
+  // 선택 모드에서 비활성 슬롯은 이미 예약된 것처럼 회색·비활성으로 표시한다.
+  const slots=sel.slots.map(slot=>{const isMine=myB&&myB.date===sel.date&&myB.slot===slot;const isTaken=taken.includes(slot)||(!isMine&&!isSlotActive(sel.id,slot));return `<button class="sb ${isTaken?(isMine?'mn':'bk'):''}" ${isTaken&&!isMine?'disabled':''} onclick="${isTaken&&!isMine?'':'bookSlot(\''+sel.id+'\',\''+slot+'\')'}">${slot}</button>`;}).join('');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bb">${isChange?'예약 변경':'신규 예약'}</span><p style="font-size:15px;font-weight:700">상담 예약</p></div>
   <p style="font-size:13px;color:#6b7280;margin-bottom:6px">날짜를 선택하고 원하는 시간을 클릭하세요.</p>
   <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:3px">
@@ -1384,6 +1392,7 @@ function selDate(id){S.selDate=id;const myB=S.bookings.find(b=>b.studentId===S.s
 async function bookSlot(dateId,slot){
   if(!isBookingOpen()){toast('예약 기간이 아닙니다.','warn');renderStu();return;}
   const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
+  if(!isSlotActive(dateId,slot)){toast('해당 시간은 현재 예약 가능 상태가 아닙니다.','warn');showBookForm(false);return;}
   if(!(await confirmDialog({title:'예약 확인',message:`${d.label} ${slot}에 예약하시겠습니까?`,confirmLabel:'예약'})))return;
   showLoad(true);
   try{
@@ -1495,7 +1504,8 @@ function renderChangeForm(){
   const sel=avail.find(d=>d.id===S.selDate);if(!sel)return;
   const taken=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).map(b=>b.slot);
   const dtabs=avail.map(d=>`<button class="dt ${d.id===S.selDate?'on':''}" onclick="S.selDate='${d.id}';S.adminSel=null;renderChangeForm()">${d.label}</button>`).join('');
-  const slots=sel.slots.map(slot=>{const isTaken=taken.includes(slot),isMine=myB.date===sel.date&&myB.slot===slot,isSel=S.adminSel===sel.id+'|'+slot;return `<button class="sb ${isTaken?(isMine?'mn':'bk'):isSel?'sl':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'pickChangeSlot(\''+sel.id+'\',\''+slot+'\',this)'}">${slot}${isMine?' (현재)':''}</button>`;}).join('');
+  // 선택 모드에서 비활성 슬롯은 이미 예약된 것처럼 회색·비활성으로 표시한다. (현재 본인 예약은 예외)
+  const slots=sel.slots.map(slot=>{const isMine=myB.date===sel.date&&myB.slot===slot;const isTaken=taken.includes(slot)||(!isMine&&!isSlotActive(sel.id,slot));const isSel=S.adminSel===sel.id+'|'+slot;return `<button class="sb ${isTaken?(isMine?'mn':'bk'):isSel?'sl':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'pickChangeSlot(\''+sel.id+'\',\''+slot+'\',this)'}">${slot}${isMine?' (현재)':''}</button>`;}).join('');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bb">예약 변경 요청</span><p style="font-size:15px;font-weight:700">예약 변경</p></div>
   <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px">현재 예약: <b>${myB.dateLabel} ${myB.slot}</b></p></div>
   <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">⚠️ 예약 변경은 관리자의 승인이 필요합니다.</p></div>
@@ -2757,11 +2767,34 @@ function renderAdminSchedule(){
     </div>
     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn bp bsm" style="flex:1" onclick="saveBookPeriod()">저장</button><button class="btn bs bsm" style="flex:1" onclick="clearBookPeriod()">기간 해제</button></div>
   </div>`;
+  const sel=isSelectiveBookingMode();
+  const modeStatus=sel?'<span class="bx bg">선택 모드</span>':'<span class="bx bgr">전체 모드</span>';
+  const modeCard=`<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><p style="font-size:15px;font-weight:700">예약 가능 시간 모드</p>${modeStatus}</div>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:12px">전체 모드: 등록된 모든 빈 시간을 학생이 예약할 수 있습니다.<br>선택 모드: 관리자가 <b>활성</b>으로 표시한 시간만 학생이 예약할 수 있습니다. (예약 완료 이후 잔여 시간을 선별적으로 열 때 사용)</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn ${!sel?'bp':'bs'} bsm" style="flex:1" onclick="setSelectiveBookingMode(false)">전체 모드</button>
+      <button class="btn ${sel?'bp':'bs'} bsm" style="flex:1" onclick="setSelectiveBookingMode(true)">선택 모드</button>
+    </div>
+  </div>`;
   const datesHtml=S.schedule.dates.map(d=>{
-    const slotHtml=d.slots.map(sl=>`<span style="display:inline-flex;align-items:center;gap:3px;background:#f3f4f6;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;margin:2px">${sl}<button onclick="rmSlot('${d.id}','${sl}')" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0;margin-left:2px">×</button></span>`).join('');
+    const slotHtml=d.slots.map(sl=>{
+      if(sel){
+        const active=isSlotActive(d.id,sl);
+        const bg=active?'#dcfce7':'#f3f4f6';
+        const bd=active?'#86efac':'#e5e7eb';
+        const fg=active?'#15803d':'#6b7280';
+        const badge=`<span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;background:${active?'#16a34a':'#9ca3af'};color:#fff">${active?'활성':'비활성'}</span>`;
+        return `<span style="display:inline-flex;align-items:center;gap:5px;background:${bg};border:1px solid ${bd};border-radius:6px;padding:3px 6px 3px 8px;font-size:12px;font-weight:600;margin:2px;color:${fg};cursor:pointer" onclick="toggleSlotActive('${d.id}','${sl}')" title="클릭하여 활성/비활성 전환">${sl}${badge}<button onclick="event.stopPropagation();rmSlot('${d.id}','${sl}')" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0;margin-left:2px">×</button></span>`;
+      }
+      return `<span style="display:inline-flex;align-items:center;gap:3px;background:#f3f4f6;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600;margin:2px">${sl}<button onclick="rmSlot('${d.id}','${sl}')" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;line-height:1;padding:0;margin-left:2px">×</button></span>`;
+    }).join('');
+    const activeCount=sel?(S.schedule?.activeSlots?.[d.id]||[]).filter(s=>d.slots.includes(s)).length:0;
+    const activeSummary=sel?`<span style="font-size:11px;color:#16a34a;font-weight:700;margin-left:4px">활성 ${activeCount}/${d.slots.length}</span>`:'';
+    const bulkActiveBtns=sel?`<button class="btn bs bsm" style="height:36px" onclick="setAllSlotsActive('${d.id}',true)">전부 활성</button><button class="btn bs bsm" style="height:36px" onclick="setAllSlotsActive('${d.id}',false)">전부 비활성</button>`:'';
     return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="display:flex;align-items:center;gap:8px"><p style="font-size:15px;font-weight:700">${d.label}</p><span style="font-size:11px;color:#9ca3af">${d.date}</span><button class="btn bs bsm" onclick="editDate('${d.id}')">수정</button></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><p style="font-size:15px;font-weight:700">${d.label}</p><span style="font-size:11px;color:#9ca3af">${d.date}</span>${activeSummary}<button class="btn bs bsm" onclick="editDate('${d.id}')">수정</button></div>
         <button class="btn bd bsm" onclick="rmDate('${d.id}')">삭제</button>
       </div>
       <div style="min-height:30px;margin-bottom:12px">${slotHtml||'<span style="font-size:12px;color:#9ca3af">등록된 시간이 없습니다.</span>'}</div>
@@ -2769,9 +2802,42 @@ function renderAdminSchedule(){
         <div class="fg" style="margin:0"><label class="fl">시간 직접 추가</label><input class="fi" id="at-${d.id}" type="time" style="width:130px;height:36px"></div>
         <button class="btn bs bsm" style="height:36px" onclick="addSlot('${d.id}')">추가</button>
         <button class="btn bp bsm" style="height:36px" onclick="openBulk('${d.id}')">일괄 추가 (30분)</button>
+        ${bulkActiveBtns}
       </div>
     </div>`;}).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">예약 일정 관리</span><button class="btn bp bsm" onclick="openAddDate()">+ 날짜 추가</button></div>${periodCard}${datesHtml||'<div class="card empty">등록된 날짜가 없습니다.</div>'}`;}
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">예약 일정 관리</span><button class="btn bp bsm" onclick="openAddDate()">+ 날짜 추가</button></div>${periodCard}${modeCard}${datesHtml||'<div class="card empty">등록된 날짜가 없습니다.</div>'}`;}
+
+async function setSelectiveBookingMode(on){
+  on=!!on;
+  if(!!S.schedule.selectiveMode===on){renderAdminSchedule();return;}
+  S.schedule.selectiveMode=on;
+  if(on&&!S.schedule.activeSlots)S.schedule.activeSlots={};
+  showLoad(true);
+  try{await saveScheduleToDb();renderAdminSchedule();toast(on?'선택 모드로 전환되었습니다. 활성으로 표시한 시간만 학생이 예약할 수 있습니다.':'전체 모드로 전환되었습니다.','success',{duration:3500});}
+  catch(e){toast('저장 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function toggleSlotActive(dateId,slot){
+  if(!S.schedule.activeSlots)S.schedule.activeSlots={};
+  if(!Array.isArray(S.schedule.activeSlots[dateId]))S.schedule.activeSlots[dateId]=[];
+  const list=S.schedule.activeSlots[dateId];
+  const idx=list.indexOf(slot);
+  if(idx>=0)list.splice(idx,1);else list.push(slot);
+  list.sort();
+  showLoad(true);
+  try{await saveScheduleToDb();renderAdminSchedule();}
+  catch(e){toast('저장 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function setAllSlotsActive(dateId,active){
+  const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
+  if(!S.schedule.activeSlots)S.schedule.activeSlots={};
+  S.schedule.activeSlots[dateId]=active?[...d.slots]:[];
+  showLoad(true);
+  try{await saveScheduleToDb();renderAdminSchedule();}
+  catch(e){toast('저장 실패: '+e.message,'error');}
+  showLoad(false);
+}
 
 async function saveBookPeriod(){
   const start=_('bkStart')?.value||'',end=_('bkEnd')?.value||'';
@@ -2828,6 +2894,7 @@ async function rmDate(id){
   const d=S.schedule.dates.find(x=>x.id===id);if(!d)return;
   if(!(await confirmDialog({title:'날짜 삭제',message:`'${d.label}'를 삭제하시겠습니까? 관련 예약도 삭제됩니다.`,confirmLabel:'삭제',kind:'danger'})))return;
   const related=S.bookings.filter(b=>b.date===d.date);S.schedule.dates=S.schedule.dates.filter(x=>x.id!==id);
+  if(S.schedule.activeSlots&&S.schedule.activeSlots[id])delete S.schedule.activeSlots[id];
   showLoad(true);try{await saveScheduleToDb();for(const b of related)await db.collection('bookings').doc(b._docId).delete();S.bookings=S.bookings.filter(b=>b.date!==d.date);renderAdminSchedule();}catch(e){toast('삭제 실패: '+e.message,'error');}showLoad(false);}
 
 async function addSlot(dateId){
@@ -2840,7 +2907,9 @@ async function rmSlot(dateId,slot){
   const d=S.schedule.dates.find(x=>x.id===dateId);if(!d)return;
   const bk=S.bookings.find(b=>b.date===d.date&&b.slot===slot);
   if(bk&&!(await confirmDialog({title:'시간대 삭제',message:`${slot}에 ${bk.studentName} 학생이 예약되어 있습니다. 삭제하시겠습니까?`,confirmLabel:'삭제',kind:'danger'})))return;
-  d.slots=d.slots.filter(s=>s!==slot);showLoad(true);
+  d.slots=d.slots.filter(s=>s!==slot);
+  if(S.schedule.activeSlots?.[dateId])S.schedule.activeSlots[dateId]=S.schedule.activeSlots[dateId].filter(s=>s!==slot);
+  showLoad(true);
   try{await saveScheduleToDb();if(bk){await db.collection('bookings').doc(bk._docId).delete();S.bookings=S.bookings.filter(b=>b._docId!==bk._docId);}renderAdminSchedule();}
   catch(e){toast('저장 실패: '+e.message,'error');}showLoad(false);}
 
