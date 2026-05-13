@@ -1413,7 +1413,7 @@ function qBoardHtml(booking,ctx){
   const commentsHtml=comments.length?comments.map(c=>{
     const isAdminCmt=c.role==='admin';
     const canDel=isAdmin||(isStudent&&c.role==='student');
-    const badge=isAdminCmt?'<span class="bx br" style="font-size:10px;font-weight:700">관리자</span>':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
+    const badge=isAdminCmt?'':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
     const name=c.name||(isAdminCmt?'관리자':studentName);
     const delBtn=canDel?`<button onclick="qbDelComment('${bid}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1" title="삭제">×</button>`:'';
     const accent=isAdminCmt?'#dc2626':'#3b82f6';
