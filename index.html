@@ -3260,7 +3260,7 @@ function renderAdminBookings(){
   /* 인쇄: 날짜별 시간대 박스 그리드 (예약 현황 화면과 동일한 .adm-slot 레이아웃) */
   const printSorted=S.bookings.filter(b=>!isNoShow(b));
   const printDates=dates.filter(d=>(d.slots||[]).length>0);
-  const printHtml=printDates.map(d=>{
+  const printGridHtml=printDates.map(d=>{
     const sortedSlots=[...(d.slots||[])].sort((a,b)=>a.localeCompare(b));
     const bookedCnt=S.bookings.filter(b=>b.date===d.date&&!isNoShow(b)).length;
     const cells=sortedSlots.map(slot=>{
@@ -3279,6 +3279,29 @@ function renderAdminBookings(){
       <div class="sg">${cells}</div>
     </div>`;
   }).join('');
+  const printUnbookedRows=unbooked.map(s=>`<tr style="border-bottom:1px solid #f0f0f0">
+    <td style="padding:6px 8px;text-align:center;font-weight:700;color:#1C64F2;width:48px">${s.seat||'—'}</td>
+    <td style="padding:6px 8px;font-weight:700">${escapeHtml(s.name||'')}</td>
+    <td style="padding:6px 8px">${escapeHtml(s.school||'')}</td>
+    <td style="padding:6px 8px;color:#6b7280;width:56px">${escapeHtml(s.grade||'')}</td>
+    <td style="padding:6px 8px;color:#374151">${escapeHtml(s.studentPhone||'')}</td>
+    <td style="padding:6px 8px;color:#6b7280">${escapeHtml(s.guardianPhone||'')}</td>
+  </tr>`).join('');
+  const printUnbookedHtml=unbooked.length?`<div style="margin-top:24px;page-break-inside:avoid">
+    <p style="font-size:14px;font-weight:700;border-bottom:2px solid #b45309;padding-bottom:6px;margin-bottom:10px;color:#78350f">미예약 학생 <span style="font-size:11px;font-weight:500;color:#9a3412;margin-left:6px">총 ${unbooked.length}명</span></p>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#fef3c7;color:#78350f">
+        <th style="padding:6px 8px;text-align:center;width:48px">좌석</th>
+        <th style="padding:6px 8px;text-align:left">이름</th>
+        <th style="padding:6px 8px;text-align:left">학교</th>
+        <th style="padding:6px 8px;text-align:left;width:56px">학년</th>
+        <th style="padding:6px 8px;text-align:left">학생 연락처</th>
+        <th style="padding:6px 8px;text-align:left">보호자 연락처</th>
+      </tr></thead>
+      <tbody>${printUnbookedRows}</tbody>
+    </table>
+  </div>`:'';
+  const printHtml=printGridHtml+printUnbookedHtml;
   const adminDisabled=bookingAdminDisabled();
   const disableCard=S.user.type==='admin'?`<div class="card np" style="margin-bottom:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:${adminDisabled?'linear-gradient(135deg,#fef2f2,#fee2e2)':'linear-gradient(135deg,#f9fafb,#f3f4f6)'};border:1px solid ${adminDisabled?'#fecaca':'#e5e7eb'}">
     <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:10px">
