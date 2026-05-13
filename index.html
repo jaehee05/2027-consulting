@@ -242,7 +242,7 @@ tr:last-child td{border-bottom:none}
   .mtitle{font-size:16px}
   .mactions{position:sticky;bottom:-18px;background:var(--surface);margin:8px -18px -18px;padding:14px 18px;border-top:1px solid var(--gray-200);z-index:5}
 }
-@media print{.np{display:none!important}.po{display:block!important}.topbar,.tabs{display:none!important}body{background:white}}
+@media print{.np{display:none!important}.po{display:block!important}.topbar,.tabs{display:none!important}body{background:white}.po,.po *{-webkit-print-color-adjust:exact;print-color-adjust:exact}.po .adm-slot{height:56px}}
 .po{display:none}
 code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;font-family:monospace}
 .empty{text-align:center;padding:36px 20px;color:var(--gray-400);font-size:13px}
@@ -3257,13 +3257,28 @@ function renderAdminBookings(){
       <thead><tr><th>학생</th><th>원래 예약</th><th>좌석</th><th>학교</th><th>학년</th><th>연락처</th><th>관리</th></tr></thead>
       <tbody>${noshowRows}</tbody>
     </table></div></div>`:'';
-  /* 인쇄: 일정(날짜→시간) 순으로 정렬 (결석 제외) */
-  const printSorted=S.bookings.filter(b=>!isNoShow(b)).sort((a,b)=>{
-    if((a.date||'')!==(b.date||''))return (a.date||'').localeCompare(b.date||'');
-    return (a.slot||'').localeCompare(b.slot||'');
-  });
-  const byDate={};printSorted.forEach(b=>{if(!byDate[b.date])byDate[b.date]={date:b.date,label:b.dateLabel,items:[]};byDate[b.date].items.push(b);});
-  const printHtml=Object.values(byDate).sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(g=>`<div style="margin-bottom:20px"><p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:8px">${g.label}</p>${g.items.map(b=>{const stu=S.students.find(s=>s._docId===b.studentId);return `<div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px"><b style="color:#1C64F2;min-width:48px">${b.slot}</b><b style="min-width:60px">${b.studentName}</b><span>${stu?.school||''}</span><span style="color:#6b7280">${stu?.grade||''}</span><span style="color:#6b7280">${stu?.studentPhone||''}</span></div>`;}).join('')}</div>`).join('');
+  /* 인쇄: 날짜별 시간대 박스 그리드 (예약 현황 화면과 동일한 .adm-slot 레이아웃) */
+  const printSorted=S.bookings.filter(b=>!isNoShow(b));
+  const printDates=dates.filter(d=>(d.slots||[]).length>0);
+  const printHtml=printDates.map(d=>{
+    const sortedSlots=[...(d.slots||[])].sort((a,b)=>a.localeCompare(b));
+    const bookedCnt=S.bookings.filter(b=>b.date===d.date&&!isNoShow(b)).length;
+    const cells=sortedSlots.map(slot=>{
+      const b=S.bookings.find(x=>x.date===d.date&&x.slot===slot&&!isNoShow(x));
+      if(b){
+        const att=b.attendance==='attended'?' ✓':'';
+        return `<div class="adm-slot filled" style="cursor:default"><span class="adm-slot-time">${slot}${att}</span><span class="adm-slot-name">${escapeHtml(b.studentName||'')}</span></div>`;
+      }
+      const slotActive=isSlotActive(d.id,slot);
+      const inactiveStyle=slotActive?'':'background:repeating-linear-gradient(135deg,#d1d5db 0,#d1d5db 8px,#9ca3af 8px,#9ca3af 16px);color:#1f2937;border-color:#6b7280;border-style:dashed';
+      const lbl=slotActive?'비어있음':'비활성';
+      return `<div class="adm-slot vacant" style="cursor:default;${inactiveStyle}"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">${lbl}</span></div>`;
+    }).join('');
+    return `<div style="margin-bottom:24px;page-break-inside:avoid">
+      <p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:10px">${d.label} <span style="font-size:11px;font-weight:500;color:#6b7280;margin-left:6px">예약 ${bookedCnt}/${sortedSlots.length}</span></p>
+      <div class="sg">${cells}</div>
+    </div>`;
+  }).join('');
   const adminDisabled=bookingAdminDisabled();
   const disableCard=S.user.type==='admin'?`<div class="card np" style="margin-bottom:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:${adminDisabled?'linear-gradient(135deg,#fef2f2,#fee2e2)':'linear-gradient(135deg,#f9fafb,#f3f4f6)'};border:1px solid ${adminDisabled?'#fecaca':'#e5e7eb'}">
     <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:10px">
