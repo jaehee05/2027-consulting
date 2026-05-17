@@ -1647,6 +1647,8 @@ function renderAdminNotices(){
   </div>`;
   _('adminC').innerHTML=summary+noticeBoardHtml();
 }
+// 액션 핸들러는 Firestore에만 쓰고, S.notices 갱신과 rerender는 onSnapshot 리스너에 일임한다.
+// 로컬에서 직접 push/update/filter 하면 리스너의 즉시 발화와 겹쳐 중복 항목이 생긴다.
 async function noticeCreate(){
   const t=_('nt-new-input');const body=(t?.value||'').trim();
   if(!body){toast('공지 내용을 입력하세요.','warn');return;}
@@ -1655,8 +1657,7 @@ async function noticeCreate(){
   const doc={body,pinned,createdAt:now,updatedAt:now,authorId:S.user?.id||'',authorName:S.user?.name||'관리자'};
   showLoad(true);
   try{
-    const ref=await db.collection('notices').add(doc);
-    S.notices.push({_docId:ref.id,...doc});
+    await db.collection('notices').add(doc);
     S.noticeComposerOpen=false;
     toast('공지가 등록되었습니다.','success');
     noticeRerender();
@@ -1667,11 +1668,9 @@ async function noticeSaveEdit(id){
   const t=_('nt-edit-input-'+id);const body=(t?.value||'').trim();
   if(!body){toast('공지 내용을 입력하세요.','warn');return;}
   const pinned=!!_('nt-edit-pin-'+id)?.checked;
-  const now=Date.now();
   showLoad(true);
   try{
-    await db.collection('notices').doc(id).update({body,pinned,updatedAt:now});
-    const n=S.notices.find(x=>x._docId===id);if(n){n.body=body;n.pinned=pinned;n.updatedAt=now;}
+    await db.collection('notices').doc(id).update({body,pinned,updatedAt:Date.now()});
     S.noticeEditId=null;
     noticeRerender();
   }catch(e){toast('저장 실패: '+e.message,'error');}
@@ -1682,7 +1681,6 @@ async function noticeDelete(id){
   showLoad(true);
   try{
     await db.collection('notices').doc(id).delete();
-    S.notices=S.notices.filter(n=>n._docId!==id);
     if(S.noticeEditId===id)S.noticeEditId=null;
     noticeRerender();
   }catch(e){toast('삭제 실패: '+e.message,'error');}
@@ -1690,12 +1688,9 @@ async function noticeDelete(id){
 }
 async function noticeTogglePin(id){
   const n=S.notices.find(x=>x._docId===id);if(!n)return;
-  const pinned=!n.pinned;
   showLoad(true);
   try{
-    await db.collection('notices').doc(id).update({pinned,updatedAt:Date.now()});
-    n.pinned=pinned;
-    noticeRerender();
+    await db.collection('notices').doc(id).update({pinned:!n.pinned,updatedAt:Date.now()});
   }catch(e){toast('변경 실패: '+e.message,'error');}
   showLoad(false);
 }
