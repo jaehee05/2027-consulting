@@ -672,7 +672,7 @@ function updateAdminTabs(){
   if(!S.user||S.user.type==='student')return;
   const el=_('adminTabs');if(!el)return;
   const isAdmin=S.user.type==='admin';
-  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['bookings','예약 현황']];
+  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['notices','공지사항'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['bookings','예약 현황']];
   const n=pendingReqCountForAdmin();
   el.innerHTML=tabs.map(([id,label])=>{
     const badge=(id==='bookings'&&n>0)?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${n}</span>`:'';
@@ -776,7 +776,7 @@ function startNoticesListener(){
     });
     _ntSeedDone=true;
     if(!changed)return;
-    if(isAdminUser&&S.tab==='bookings')renderAdminBookings();
+    if(isAdminUser&&S.tab==='notices')renderAdminNotices();
     if(isStudent)safeRerenderStu();
   },err=>{console.error('notices listener error',err);});
 }
@@ -1612,7 +1612,21 @@ function noticeStartEdit(id){S.noticeEditId=id;S.noticeComposerOpen=false;notice
 function noticeCancelEdit(){S.noticeEditId=null;noticeRerender();}
 function noticeRerender(){
   if(S.user?.type==='student')renderStu();
-  else if(S.tab==='bookings')renderAdminBookings();
+  else if(S.tab==='notices')renderAdminNotices();
+}
+function renderAdminNotices(){
+  const list=noticeSorted();
+  const summary=`<div class="np" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
+    <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:14px;padding:14px 14px 12px">
+      <p style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px;letter-spacing:-.2px">전체 공지</p>
+      <p style="font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.1">${list.length}<span style="font-size:13px;font-weight:600;color:#3b82f6;margin-left:3px">건</span></p>
+    </div>
+    <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:14px;padding:14px 14px 12px">
+      <p style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:4px;letter-spacing:-.2px">고정 공지</p>
+      <p style="font-size:22px;font-weight:800;color:#78350f;line-height:1.1">${list.filter(n=>n.pinned).length}<span style="font-size:13px;font-weight:600;color:#d97706;margin-left:3px">건</span></p>
+    </div>
+  </div>`;
+  _('adminC').innerHTML=summary+noticeBoardHtml('admin');
 }
 async function noticeCreate(){
   const t=_('nt-new-input');const body=(t?.value||'').trim();
@@ -1867,6 +1881,7 @@ async function setTab(tab){
   else if(tab==='exams')renderAdminExams();
   else if(tab==='schedule')renderAdminSchedule();
   else if(tab==='bookings')renderAdminBookings();
+  else if(tab==='notices')renderAdminNotices();
   else if(tab==='logins')renderAdminLogins();
   else if(tab==='accounts'){await loadAdmins();renderAdminAccounts();}
   else if(tab==='alimtalk')renderAdminAlimtalk();
@@ -3464,10 +3479,8 @@ function renderAdminBookings(){
     </div>
     <button class="btn ${adminDisabled?'bp':'bd'} bsm" onclick="toggleBookingDisabled()">${adminDisabled?'예약 활성화':'예약 비활성화'}</button>
   </div>`:'';
-  const noticeCard=noticeBoardHtml('admin');
   _('adminC').innerHTML=`<div class="sh np" style="margin-bottom:14px"><span class="shtitle" style="font-size:17px;font-weight:800">예약 현황</span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">↻ 새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
-    ${noticeCard}
     ${statsCard}
     ${dupCard}
     ${disableCard}
