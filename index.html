@@ -1750,10 +1750,9 @@ async function bookSlot(dateId,slot){
   showLoad(true);
   try{
     const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
-    if(myB){await db.collection('bookings').doc(myB._docId).delete();S.bookings=S.bookings.filter(b=>b.studentId!==S.studentDocId);}
+    if(myB)await db.collection('bookings').doc(myB._docId).delete();
     const newBook={studentId:S.studentDocId,studentName:S.user.name,date:d.date,dateLabel:d.label,slot,createdAt:Date.now()};
-    const ref=await db.collection('bookings').add(newBook);
-    S.bookings.push({_docId:ref.id,...newBook});
+    await db.collection('bookings').add(newBook);
     const stu=S.students.find(x=>x._docId===S.studentDocId);
     if(stu&&stu.consultExcluded){
       await db.collection('students').doc(S.studentDocId).update({consultExcluded:false});
@@ -3899,8 +3898,7 @@ async function saveNewBookForStu(){
   showLoad(true);
   try{
     const bookData={studentId:stuDocId,studentName:stu.name,date:date.date,dateLabel:date.label,slot,question:''};
-    const docRef=await db.collection('bookings').add(bookData);
-    bookData._docId=docRef.id;S.bookings.push(bookData);
+    await db.collection('bookings').add(bookData);
     S.adminSel=null;closeModal();renderAdminBookings();
   }catch(e){toast('예약 등록 실패: '+e.message,'error');}
   showLoad(false);}
@@ -4018,11 +4016,9 @@ async function assignStuToSlot(dateId,slot,stuDocId){
   try{
     if(existingNoshow){
       await db.collection('bookings').doc(existingNoshow._docId).update({date:date.date,dateLabel:date.label,slot,attendance:firebase.firestore.FieldValue.delete()});
-      Object.assign(existingNoshow,{date:date.date,dateLabel:date.label,slot});delete existingNoshow.attendance;
     }else{
       const bookData={studentId:stuDocId,studentName:stu.name,date:date.date,dateLabel:date.label,slot,question:''};
-      const docRef=await db.collection('bookings').add(bookData);
-      bookData._docId=docRef.id;S.bookings.push(bookData);
+      await db.collection('bookings').add(bookData);
     }
     S.assignSlotKey=null;S.assignSlotQuery='';
     closeModal();renderAdminBookings();
