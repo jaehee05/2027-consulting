@@ -310,6 +310,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -476,11 +477,15 @@ firebase.initializeApp({
   appId:"1:226684451545:web:2c495b64e538e31c0f1cc8"
 });
 const db = firebase.firestore();
+const auth = firebase.auth();
 
 // 뿌리오 알림톡 관리자용 Cloud Function URL.
 // `firebase deploy --only functions` 최초 배포 후 출력되는 URL로 교체하세요.
 // 예: https://ppurioadmin-xxxxxxxxxx-an.a.run.app
 const PPURIO_ADMIN_URL = 'https://ppurioadmin-tymdeyhn3q-du.a.run.app';
+// 인증/관리자 계정 CRUD용 Cloud Function URL.
+const LOGIN_URL = 'https://logintoken-tymdeyhn3q-du.a.run.app';
+const ADMIN_API_URL = 'https://asia-northeast3-consulting-dd53f.cloudfunctions.net/adminApi';
 
 const EXCL = ['12:00','12:30','18:00','18:30'];
 const DFLT_DATES = [
@@ -832,8 +837,13 @@ async function loadAll(){
   startNoticesListener();
 }
 async function loadAdmins(){
-  const snap=await db.collection('admins').get();
-  S.admins=snap.docs.map(d=>({_docId:d.id,...d.data()}));
+  try{
+    const r=await adminApiCall('list',null);
+    S.admins=(r.admins||[]);
+  }catch(e){
+    toast('관리자 목록을 불러오지 못했습니다: '+e.message,'error');
+    S.admins=[];
+  }
 }
 function realStu(){return S.students.filter(s=>!s.isTest&&!s.withdrawn);}
 function bookableStu(){return realStu().filter(s=>!s.consultExcluded);}
@@ -851,65 +861,64 @@ function saveSession(sess,keep){
 function clearSession(){sessionStorage.removeItem('session');localStorage.removeItem('session');}
 function readSession(){return localStorage.getItem('session')||sessionStorage.getItem('session');}
 
+// Firebase Auth 영속성 설정. keep=true면 IndexedDB 영속(브라우저 재시작 후에도 유지),
+// 아니면 세션 단위(탭 종료 시 사라짐).
+async function applyAuthPersistence(keep){
+  try{
+    await auth.setPersistence(keep?firebase.auth.Auth.Persistence.LOCAL:firebase.auth.Auth.Persistence.SESSION);
+  }catch(_){/* 영속성 설정 실패는 치명적이지 않음 */}
+}
+async function finishLoginWithToken(r,keep){
+  await applyAuthPersistence(keep);
+  await auth.signInWithCustomToken(r.token);
+  if(r.type==='student'){
+    S.user={type:'student',id:r.id,name:r.name,isTest:!!r.isTest};
+    S.studentDocId=r.studentDocId||null;
+    if(!r.isTest){
+      const _now=Date.now();
+      db.collection('students').doc(S.studentDocId).update({
+        lastLoginAt:_now,
+        loginCount:firebase.firestore.FieldValue.increment(1)
+      }).catch(()=>{});
+    }
+    await loadAll();
+    if(!r.isTest){
+      const _s=S.students.find(x=>x._docId===S.studentDocId);
+      if(_s){_s.lastLoginAt=Date.now();_s.loginCount=(_s.loginCount||0)+1;}
+    }
+    if(r.isFirstLogin){showLoad(false);showView('vCpw');return;}
+    _('stuUname').textContent=r.isTest?(r.name+' (테스트)'):(r.name+' 학생');
+    enterHome();
+    return;
+  }
+  // admin or viewer
+  S.user={type:r.type,id:r.id,name:r.name};
+  await loadAll();
+  _('adminUname').textContent=r.name;
+  _('adminRoleLabel').textContent=r.type==='admin'?'ADMIN':'OP';
+  enterHome();
+}
 async function doLogin(){
   const id=_('lId').value.trim(),pw=_('lPw').value,keep=_('lKeep').checked;
   hideErr('lErr');
   if(!id||!pw){showErr('lErr','아이디와 비밀번호를 입력하세요.');return;}
   showLoad(true);
   try{
-    const adminDoc=await db.collection('admins').doc(id).get();
-    if(adminDoc.exists){
-      const a=adminDoc.data();
-      if(a.password!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
-      if(a.role==='test'){
-        S.user={type:'student',isTest:true,id:a.id,name:a.name};
-        S.studentDocId=a.linkedStudentId;
-        saveSession({type:'student',isTest:true,id:a.id,name:a.name,studentDocId:a.linkedStudentId},keep);
-        await loadAll();
-        _('stuUname').textContent=a.name+' (테스트)';
-        enterHome();return;
-      }
-      if(a.role==='admin'&&a.pinCode){
-        S._pendingAdmin={a,keep};
-        showLoad(false);
-        hideErr('lPinErr');resetPinInput();
-        showView('vPin');
-        setTimeout(()=>{const el=_('lPin');if(el){el.focus();updatePinSlots();}},50);
-        return;
-      }
-      S.user={type:a.role,id:a.id,name:a.name};
-      saveSession({type:a.role,id:a.id,name:a.name},keep);
-      await loadAll();
-      _('adminUname').textContent=a.name;
-      _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
-      enterHome();return;
+    const r=await loginCall({id,password:pw});
+    if(r.needsPin){
+      S._pendingAdmin={id,password:pw,keep};
+      showLoad(false);
+      hideErr('lPinErr');resetPinInput();
+      showView('vPin');
+      setTimeout(()=>{const el=_('lPin');if(el){el.focus();updatePinSlots();}},50);
+      return;
     }
-    const stuQ=await db.collection('students').where('accountId','==',id).get();
-    if(!stuQ.empty){
-      const stuDoc=stuQ.docs[0],stu=stuDoc.data();
-      if(stu.accountPw!==pw){showLoad(false);showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');return;}
-      if(stu.withdrawn===true){
-        showLoad(false);
-        showWithdrawnNotice();
-        return;
-      }
-      S.user={type:'student',id,name:stu.name};
-      S.studentDocId=stuDoc.id;
-      saveSession({type:'student',id,name:stu.name,studentDocId:stuDoc.id},keep);
-      const _now=Date.now();
-      db.collection('students').doc(stuDoc.id).update({
-        lastLoginAt:_now,
-        loginCount:firebase.firestore.FieldValue.increment(1)
-      }).catch(()=>{});
-      await loadAll();
-      const _s=S.students.find(x=>x._docId===stuDoc.id);
-      if(_s){_s.lastLoginAt=_now;_s.loginCount=(_s.loginCount||0)+1;}
-      if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
-      _('stuUname').textContent=stu.name+' 학생';
-      enterHome();return;
-    }
-    showErr('lErr','아이디 또는 비밀번호가 올바르지 않습니다.');
-  }catch(e){showErr('lErr','오류: '+e.message);}
+    if(!r.token){showErr('lErr','로그인 응답이 올바르지 않습니다.');showLoad(false);return;}
+    await finishLoginWithToken(r,keep);
+  }catch(e){
+    if(e.status===403&&e.body?.withdrawn){showLoad(false);showWithdrawnNotice();return;}
+    showErr('lErr',e.message||'로그인에 실패했습니다.');
+  }
   showLoad(false);
 }
 
@@ -939,18 +948,17 @@ async function doPinVerify(){
   if(!/^\d{6}$/.test(pin)){showErr('lPinErr','6자리 숫자를 입력하세요.');return;}
   const pending=S._pendingAdmin;
   if(!pending){showErr('lPinErr','세션이 만료되었습니다. 다시 로그인하세요.');return;}
-  if(pin!==pending.a.pinCode){showErr('lPinErr','2차 비밀번호가 올바르지 않습니다.');return;}
   showLoad(true);
   try{
-    S.user={type:pending.a.role,id:pending.a.id,name:pending.a.name};
-    saveSession({type:pending.a.role,id:pending.a.id,name:pending.a.name},pending.keep);
-    await loadAll();
-    _('adminUname').textContent=pending.a.name;
-    _('adminRoleLabel').textContent=pending.a.role==='admin'?'ADMIN':'OP';
+    const r=await loginCall({id:pending.id,password:pending.password,pin});
+    if(!r.token){showErr('lPinErr','로그인 응답이 올바르지 않습니다.');showLoad(false);return;}
+    await finishLoginWithToken(r,pending.keep);
     S._pendingAdmin=null;
     resetPinInput();
-    enterHome();
-  }catch(e){showErr('lPinErr','오류: '+e.message);}
+  }catch(e){
+    if(e.body?.pinError)showErr('lPinErr','2차 비밀번호가 올바르지 않습니다.');
+    else showErr('lPinErr',e.message||'오류가 발생했습니다.');
+  }
   showLoad(false);
 }
 function cancelPin(){
@@ -979,7 +987,9 @@ function doLogout(){
   S.noticeEditId=null;S.noticeComposerOpen=false;
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
+  S._pendingAdmin=null;
   clearSession();
+  auth.signOut().catch(()=>{});
   _('lId').value='';_('lPw').value='';_('lKeep').checked=false;hideErr('lErr');
   try{history.replaceState({v:'vHome'},'',location.pathname+location.search);}catch(_){}
   _skipPush=true;try{enterHome();}finally{_skipPush=false;}
@@ -1007,9 +1017,9 @@ async function createFirstAdmin(){
   if(pw!==pw2){showErr('setupErr','비밀번호가 일치하지 않습니다.');return;}
   showLoad(true);
   try{
-    await db.collection('admins').doc(id).set({id,name,password:pw,role:'admin',createdAt:Date.now()});
+    await adminApiCall('initial',{id,name,password:pw});
     showLoad(false);toast('관리자 계정이 생성되었습니다.','success');showView('vLogin');
-  }catch(e){showLoad(false);showErr('setupErr','Firestore 오류: '+e.message);}
+  }catch(e){showLoad(false);showErr('setupErr',e.message||'관리자 생성 실패');}
 }
 
 /* ── STUDENT ── */
@@ -4060,10 +4070,10 @@ function renderAdminAccounts(){
     const canSend=a.role!=='test'&&a.phone&&a.phone.replace(/\D/g,'').length>=9;
     const sendBtn=a.role==='test'?'':`<button class="btn bs bsm" ${canSend?'':'disabled style="opacity:.5;cursor:not-allowed" title="연락처를 먼저 등록하세요"'} onclick="openSendAdminAccountInfo('${a.id}')">계정 안내</button>`;
     const isOwn=a.id===S.user.id;
-    const pinBtn=(isOwn&&a.role==='admin')?`<button class="btn bs bsm" onclick="openPinSettingsModal()">🔒 2차 ${a.pinCode?'변경':'설정'}</button>`:'';
+    const pinBtn=(isOwn&&a.role==='admin')?`<button class="btn bs bsm" onclick="openPinSettingsModal()">🔒 2차 ${a.pinSet?'변경':'설정'}</button>`:'';
     return `<tr>
     <td data-label="ID"><code>${a.id}</code></td>
-    <td data-label="" class="cell-head"><span style="font-weight:700">${a.name}</span><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span>${(isOwn&&a.role==='admin'&&a.pinCode)?'<span class="bx" style="background:#dcfce7;color:#166534;margin-left:4px" title="2차 비밀번호 설정됨">🔒</span>':''}</td>
+    <td data-label="" class="cell-head"><span style="font-weight:700">${a.name}</span><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span>${(isOwn&&a.role==='admin'&&a.pinSet)?'<span class="bx" style="background:#dcfce7;color:#166534;margin-left:4px" title="2차 비밀번호 설정됨">🔒</span>':''}</td>
     <td data-label="연락처" style="color:#6b7280;font-size:12px">${a.phone||'—'}</td>
     <td data-label="권한" class="cell-hide"><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span></td>
     <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end">${sendBtn}${pinBtn}<button class="btn bs bsm" onclick="openAcctModal('${a.id}')">수정</button>${!isOwn?`<button class="btn bd bsm" onclick="delAcct('${a.id}')">삭제</button>`:'<span style="font-size:11px;color:#9ca3af;padding:0 8px">본인</span>'}</div></td>
@@ -4097,33 +4107,36 @@ async function saveAcct(accId){
   const role=existing&&existing.role==='test'?'test':_('acrole').value;
   if(!name){showErr('mErr','이름을 입력하세요.');return;}
   if(accId){
-    const update={name,role,phone};if(pw){if(pw.length<6){showErr('mErr','비밀번호는 6자 이상이어야 합니다.');return;}update.password=pw;}
+    const fields={name,role,phone};if(pw){if(pw.length<6){showErr('mErr','비밀번호는 6자 이상이어야 합니다.');return;}fields.password=pw;}
     showLoad(true);
     try{
-      await db.collection('admins').doc(accId).update(update);
-      const a=S.admins.find(x=>x.id===accId);if(a)Object.assign(a,update);
+      await adminApiCall('update',{id:accId,fields});
       if(role==='test'&&existing.linkedStudentId){
         const stuUpdate={name:name+' (테스트)'};if(pw)stuUpdate.accountPw=pw;
         await db.collection('students').doc(existing.linkedStudentId).update(stuUpdate);
         const s=S.students.find(x=>x._docId===existing.linkedStudentId);if(s)Object.assign(s,stuUpdate);
       }
+      await loadAdmins();
       closeModal();renderAdminAccounts();
-    }catch(e){showErr('mErr','저장 실패: '+e.message);}
+    }catch(e){showErr('mErr','저장 실패: '+(e.message||e));}
     showLoad(false);
   }else{
     const id=_('acid').value.trim();if(!id){showErr('mErr','ID를 입력하세요.');return;}if(!pw||pw.length<6){showErr('mErr','비밀번호는 6자 이상이어야 합니다.');return;}
     showLoad(true);
     try{
-      const exists=await db.collection('admins').doc(id).get();if(exists.exists){showErr('mErr',`ID '${id}'가 이미 존재합니다.`);showLoad(false);return;}
-      const data={id,name,role,password:pw,phone,createdAt:Date.now()};
+      const exists=await adminApiCall('checkExists',{id});
+      if(exists.exists){showErr('mErr',`ID '${id}'가 이미 존재합니다.`);showLoad(false);return;}
+      let linkedStudentId=null;
       if(role==='test'){
         const stuData={name:name+' (테스트)',grade:'고3',school:'-',studentPhone:'-',guardianPhone:'-',seat:'',accountId:id,accountPw:pw,isFirstLogin:false,isTest:true,scores:{}};
         const stuRef=await db.collection('students').add(stuData);
-        data.linkedStudentId=stuRef.id;
+        linkedStudentId=stuRef.id;
         S.students.push({_docId:stuRef.id,...stuData});
       }
-      await db.collection('admins').doc(id).set(data);S.admins.push({_docId:id,...data});closeModal();renderAdminAccounts();
-    }catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);}
+      await adminApiCall('create',{id,name,role,password:pw,phone,linkedStudentId});
+      await loadAdmins();
+      closeModal();renderAdminAccounts();
+    }catch(e){showErr('mErr','저장 실패: '+(e.message||e));}showLoad(false);}
 }
 
 function openSendAdminAccountInfo(adminId){
@@ -4154,7 +4167,7 @@ async function submitSendAdminAccountInfo(adminId){
 function openPinSettingsModal(){
   const a=S.admins.find(x=>x.id===S.user.id);
   if(!a){toast('계정을 찾을 수 없습니다.','error');return;}
-  const has=!!a.pinCode;
+  const has=!!a.pinSet;
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">2차 비밀번호 ${has?'변경 / 해제':'설정'}</p>
     <p style="font-size:12px;color:#6b7280;margin-bottom:16px">관리자 로그인 시 추가로 입력하는 6자리 PIN입니다. 분실 시 다른 ADMIN이나 Firestore 직접 접근이 필요하니 신중히 설정하세요.</p>
     ${has?`<div class="fg"><label class="fl">현재 PIN</label><input class="fi" id="pinCur" type="password" inputmode="numeric" maxlength="6" placeholder="현재 6자리 PIN" oninput="this.value=this.value.replace(/\\D/g,'')"></div>`:''}
@@ -4170,40 +4183,35 @@ function openPinSettingsModal(){
 }
 async function saveMyPin(){
   const a=S.admins.find(x=>x.id===S.user.id);if(!a)return;
-  const has=!!a.pinCode;
+  const has=!!a.pinSet;
   const cur=has?_('pinCur').value.trim():'';
   const n1=_('pinNew').value.trim(),n2=_('pinNew2').value.trim();
   hideErr('mErr');
-  if(has&&cur!==a.pinCode){showErr('mErr','현재 PIN이 올바르지 않습니다.');return;}
   if(!/^\d{6}$/.test(n1)){showErr('mErr','새 PIN은 6자리 숫자여야 합니다.');return;}
   if(n1!==n2){showErr('mErr','새 PIN이 일치하지 않습니다.');return;}
   showLoad(true);
   try{
-    const now=Date.now();
-    await db.collection('admins').doc(a.id).update({pinCode:n1,pinSetAt:now});
-    a.pinCode=n1;a.pinSetAt=now;
+    await adminApiCall('setPin',{currentPin:cur,newPin:n1});
+    await loadAdmins();
     closeModal();toast('2차 비밀번호가 '+(has?'변경':'설정')+'되었습니다.','success');
     renderAdminAccounts();
-  }catch(e){showErr('mErr','저장 실패: '+e.message);}
+  }catch(e){showErr('mErr',e.message||'저장 실패');}
   showLoad(false);
 }
 async function removeMyPin(){
-  const a=S.admins.find(x=>x.id===S.user.id);if(!a||!a.pinCode)return;
+  const a=S.admins.find(x=>x.id===S.user.id);if(!a||!a.pinSet)return;
   const cur=_('pinCur').value.trim();
   hideErr('mErr');
-  if(cur!==a.pinCode){showErr('mErr','현재 PIN이 올바르지 않습니다.');return;}
+  if(!/^\d{6}$/.test(cur)){showErr('mErr','현재 PIN을 입력하세요.');return;}
   closeModal();
   if(!(await confirmDialog({title:'2차 비밀번호 해제',message:'정말 해제하시겠습니까? 다음 로그인부터 PIN 입력이 생략됩니다.',confirmLabel:'해제',kind:'danger'})))return;
   showLoad(true);
   try{
-    await db.collection('admins').doc(a.id).update({
-      pinCode:firebase.firestore.FieldValue.delete(),
-      pinSetAt:firebase.firestore.FieldValue.delete()
-    });
-    delete a.pinCode;delete a.pinSetAt;
+    await adminApiCall('removePin',{currentPin:cur});
+    await loadAdmins();
     toast('2차 비밀번호가 해제되었습니다.','success');
     renderAdminAccounts();
-  }catch(e){toast('해제 실패: '+e.message,'error');}
+  }catch(e){toast(e.message||'해제 실패','error');}
   showLoad(false);
 }
 
@@ -4213,8 +4221,7 @@ async function delAcct(id){
   if(!(await confirmDialog({title:'계정 삭제',message:`'${id}' 계정을 삭제하시겠습니까?${acc?.role==='test'?'\n(연결된 테스트 학생 데이터도 함께 삭제됩니다)':''}`,confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
   try{
-    await db.collection('admins').doc(id).delete();
-    S.admins=S.admins.filter(x=>x.id!==id);
+    await adminApiCall('delete',{id});
     if(acc?.role==='test'&&acc.linkedStudentId){
       const related=S.bookings.filter(b=>b.studentId===acc.linkedStudentId);
       for(const b of related)await db.collection('bookings').doc(b._docId).delete();
@@ -4222,8 +4229,9 @@ async function delAcct(id){
       S.students=S.students.filter(x=>x._docId!==acc.linkedStudentId);
       S.bookings=S.bookings.filter(b=>b.studentId!==acc.linkedStudentId);
     }
+    await loadAdmins();
     renderAdminAccounts();
-  }catch(e){toast('삭제 실패: '+e.message,'error');}
+  }catch(e){toast(e.message||'삭제 실패','error');}
   showLoad(false);}
 
 /* ── ADMIN: 알림톡 (뿌리오) ── */
@@ -4251,15 +4259,24 @@ const ALIMTALK_EVENTS=[
   ['adminNotifyAdminChangeRejected','[관리자] 관리자 변경 요청 학생 거절','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot}']
 ];
 const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft} ${consultingName} ${bookingDeadline} ${footer}';
+// Cloud Function 호출 시 사용할 인증 헤더. Firebase Auth ID 토큰을 Bearer로 넘김.
+async function authHeaders(){
+  const h={'Content-Type':'application/json'};
+  try{const t=await auth.currentUser?.getIdToken();if(t)h.Authorization='Bearer '+t;}catch(_){}
+  return h;
+}
+async function callFn(url,body,requireAuth){
+  if(!url||/REPLACE_AFTER_DEPLOY/.test(url))throw new Error('Cloud Function URL 미설정. 배포 후 index.html 상단 상수를 교체하세요.');
+  const headers=requireAuth?(await authHeaders()):{'Content-Type':'application/json'};
+  const res=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});
+  const json=await res.json().catch(()=>({}));
+  if(!res.ok){const err=new Error(json.error||`HTTP ${res.status}`);err.status=res.status;err.body=json;throw err;}
+  return json;
+}
+async function loginCall(payload){return callFn(LOGIN_URL,payload,false);}
+async function adminApiCall(action,payload){return callFn(ADMIN_API_URL,{action,payload},true);}
 async function ppurioCall(action,payload){
-  if(!PPURIO_ADMIN_URL||PPURIO_ADMIN_URL==='REPLACE_AFTER_DEPLOY')throw new Error('PPURIO_ADMIN_URL이 설정되지 않았습니다. 배포 후 index.html 상단의 상수를 교체하세요.');
-  const adminDoc=await db.collection('admins').doc(S.user.id).get();
-  if(!adminDoc.exists)throw new Error('관리자 계정을 찾을 수 없습니다.');
-  const adminPw=adminDoc.data().password;
-  const res=await fetch(PPURIO_ADMIN_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,adminId:S.user.id,adminPw,payload})});
-  const body=await res.json().catch(()=>({}));
-  if(!res.ok)throw new Error(body.error||`HTTP ${res.status}`);
-  return body;
+  return callFn(PPURIO_ADMIN_URL,{action,payload},true);
 }
 async function renderAdminAlimtalk(){
   if(S.user.type!=='admin'){_('adminC').innerHTML='<div class="card"><p>ADMIN 권한이 필요합니다.</p></div>';return;}
@@ -4953,11 +4970,51 @@ async function revokeClassAccess(studentId){
 }
 
 /* ── INIT ── */
+// Firebase Auth 상태가 첫 콜백을 줄 때까지 한 번만 기다린다.
+function waitForAuthState(){
+  return new Promise(resolve=>{
+    const unsub=auth.onAuthStateChanged(u=>{unsub();resolve(u);});
+  });
+}
 async function init(){
   showLoad(true);
   try{
-    const snap=await db.collection('admins').limit(1).get();
-    if(snap.empty){showLoad(false);showView('vSetup');return;}
+    const has=await adminApiCall('hasAny',null).catch(()=>null);
+    if(has&&!has.any){showLoad(false);showView('vSetup');return;}
+
+    // 1) Firebase Auth 영속 세션이 있으면 그 클레임으로 복원 (admin/viewer 우선, student는 fallback)
+    const fbUser=await waitForAuthState();
+    if(fbUser){
+      try{
+        const tr=await fbUser.getIdTokenResult(true);
+        const c=tr.claims||{};
+        if(c.role==='admin'||c.role==='viewer'){
+          S.user={type:c.role,id:c.loginId,name:c.name||''};
+          await loadAll();
+          _('adminUname').textContent=c.name||'';
+          _('adminRoleLabel').textContent=c.role==='admin'?'ADMIN':'OP';
+          showLoad(false);enterHome();return;
+        }
+        if(c.role==='student'){
+          const stuId=c.studentId||'';
+          if(stuId){
+            const stuDoc=await db.collection('students').doc(stuId).get();
+            if(stuDoc.exists){
+              const stu=stuDoc.data();
+              if(stu.withdrawn===true){await auth.signOut().catch(()=>{});clearSession();showLoad(false);showWithdrawnNotice();return;}
+              S.user={type:'student',id:c.loginId,name:stu.name,isTest:!!c.isTest};
+              S.studentDocId=stuId;
+              await loadAll();
+              if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
+              _('stuUname').textContent=(c.isTest||stu.isTest)?stu.name+' (테스트)':stu.name+' 학생';
+              showLoad(false);enterHome();return;
+            }
+          }
+        }
+      }catch(_){/* 토큰 만료 등은 무시하고 아래로 진행 */}
+    }
+
+    // 2) Firebase Auth 세션은 없지만 학생용 localStorage 세션이 있으면 복원 (구버전 호환).
     const saved=readSession();
     if(saved){
       const sess=JSON.parse(saved);
@@ -4972,19 +5029,10 @@ async function init(){
           _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
           showLoad(false);enterHome();return;
         }
-      }else{
-        const adminDoc=await db.collection('admins').doc(sess.id).get();
-        if(adminDoc.exists){
-          const a=adminDoc.data();
-          S.user={type:a.role,id:a.id,name:a.name};
-          await loadAll();
-          _('adminUname').textContent=a.name;
-          _('adminRoleLabel').textContent=a.role==='admin'?'ADMIN':'OP';
-          showLoad(false);enterHome();return;
-        }
       }
       clearSession();
     }
+
     try{
       const cfgSnap=await db.collection('config').doc('main').get();
       if(cfgSnap.exists)S.config={...S.config,...cfgSnap.data()};

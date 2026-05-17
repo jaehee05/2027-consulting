@@ -175,10 +175,50 @@ async function verifyAdmin(adminId, adminPw) {
   return a.password === adminPw;
 }
 
+// Firebase Auth ID token (Bearer) 검증. admin/viewer 클레임만 통과시킨다.
+// 반환값: 디코딩된 토큰 (role/loginId/name 포함) 또는 null.
+async function verifyAdminAuth(req) {
+  const auth = req.headers.authorization || "";
+  if (!auth.startsWith("Bearer ")) return null;
+  const idToken = auth.slice(7).trim();
+  if (!idToken) return null;
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    if (decoded.role !== "admin" && decoded.role !== "viewer") return null;
+    return decoded;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ppurioAdmin 등 기존 엔드포인트와의 호환을 위해 헤더 우선 / body fallback.
+async function verifyAdminAuthOrBody(req) {
+  const fromHeader = await verifyAdminAuth(req);
+  if (fromHeader) return { loginId: fromHeader.loginId, role: fromHeader.role };
+  const { adminId, adminPw } = req.body || {};
+  if (await verifyAdmin(adminId, adminPw)) return { loginId: adminId, role: "admin" };
+  return null;
+}
+
+// 클라이언트로 내려도 되는 admin 문서 필드(평문 password/pinCode 제외).
+function publicAdminFields(id, d) {
+  return {
+    _docId: id,
+    id,
+    name: d.name || "",
+    role: d.role || "",
+    phone: d.phone || "",
+    linkedStudentId: d.linkedStudentId || null,
+    pinSet: !!d.pinCode,
+    pinSetAt: d.pinSetAt || null,
+    createdAt: d.createdAt || null,
+  };
+}
+
 function setCors(res) {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 // 로그인 ID/PW 검증 후 Firebase Custom Token 발급.
@@ -188,7 +228,7 @@ exports.loginToken = onRequest(async (req, res) => {
   if (req.method === "OPTIONS") return res.status(204).send("");
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   try {
-    const { id, password } = req.body || {};
+    const { id, password, pin } = req.body || {};
     if (!id || !password) return res.status(400).json({ error: "id/password required" });
     const fs = admin.firestore();
 
@@ -196,6 +236,13 @@ exports.loginToken = onRequest(async (req, res) => {
     if (adminDoc.exists) {
       const a = adminDoc.data();
       if (a.password === password) {
+        // 2차 비밀번호 검사 (admin 역할 + pinCode 설정된 경우)
+        if (a.role === "admin" && a.pinCode) {
+          if (!pin) return res.json({ needsPin: true });
+          if (String(pin) !== String(a.pinCode)) {
+            return res.status(401).json({ error: "2차 비밀번호가 올바르지 않습니다.", pinError: true });
+          }
+        }
         if (a.role === "test") {
           const uid = `test_${id}`;
           const claims = { role: "student", isTest: true, name: a.name || "", loginId: id, studentId: a.linkedStudentId || "" };
@@ -214,6 +261,7 @@ exports.loginToken = onRequest(async (req, res) => {
       const stuDoc = stuQ.docs[0];
       const stu = stuDoc.data();
       if (stu.accountPw === password) {
+        if (stu.withdrawn === true) return res.status(403).json({ error: "withdrawn", withdrawn: true });
         const uid = `stu_${stuDoc.id}`;
         const claims = { role: "student", name: stu.name || "", loginId: id, studentId: stuDoc.id };
         const token = await admin.auth().createCustomToken(uid, claims);
@@ -228,16 +276,152 @@ exports.loginToken = onRequest(async (req, res) => {
   }
 });
 
+// 관리자 계정 CRUD 엔드포인트. admins 컬렉션 클라이언트 read/write 차단 후 모든 접근은 이 함수 경유.
+// 인증: Authorization: Bearer <Firebase ID Token>. role=admin/viewer 만 통과.
+// 일부 액션(hasAny, initial)은 부트스트랩 용도로 무인증 허용.
+exports.adminApi = onRequest(async (req, res) => {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  try {
+    const { action, payload } = req.body || {};
+    const fs = admin.firestore();
+
+    if (action === "hasAny") {
+      const snap = await fs.collection("admins").limit(1).get();
+      return res.json({ any: !snap.empty });
+    }
+
+    if (action === "initial") {
+      const snap = await fs.collection("admins").limit(1).get();
+      if (!snap.empty) return res.status(403).json({ error: "이미 관리자 계정이 존재합니다." });
+      const p = payload || {};
+      if (!p.id || !p.name || !p.password) return res.status(400).json({ error: "필수 필드 누락" });
+      if (String(p.password).length < 6) return res.status(400).json({ error: "비밀번호는 6자 이상" });
+      await fs.doc(`admins/${p.id}`).set({
+        id: p.id,
+        name: p.name,
+        password: p.password,
+        role: "admin",
+        createdAt: Date.now(),
+      });
+      return res.json({ ok: true });
+    }
+
+    // 이하 액션은 관리자 인증 필요
+    const me = await verifyAdminAuth(req);
+    if (!me) return res.status(401).json({ error: "관리자 인증 실패" });
+    const myId = me.loginId;
+    const isAdmin = me.role === "admin";
+
+    if (action === "list") {
+      const snap = await fs.collection("admins").get();
+      const list = snap.docs.map((d) => publicAdminFields(d.id, d.data()));
+      return res.json({ admins: list });
+    }
+
+    if (action === "checkExists") {
+      const id = payload?.id;
+      if (!id) return res.status(400).json({ error: "id required" });
+      const d = await fs.doc(`admins/${id}`).get();
+      return res.json({ exists: d.exists });
+    }
+
+    if (action === "create") {
+      if (!isAdmin) return res.status(403).json({ error: "ADMIN 권한 필요" });
+      const p = payload || {};
+      if (!p.id || !p.name || !p.password) return res.status(400).json({ error: "필수 필드 누락" });
+      if (String(p.password).length < 6) return res.status(400).json({ error: "비밀번호는 6자 이상" });
+      const existing = await fs.doc(`admins/${p.id}`).get();
+      if (existing.exists) return res.status(409).json({ error: `ID '${p.id}'가 이미 존재합니다.` });
+      const data = {
+        id: p.id,
+        name: p.name,
+        role: p.role || "viewer",
+        password: p.password,
+        phone: p.phone || "",
+        createdAt: Date.now(),
+      };
+      if (p.linkedStudentId) data.linkedStudentId = p.linkedStudentId;
+      await fs.doc(`admins/${p.id}`).set(data);
+      return res.json({ ok: true, admin: publicAdminFields(p.id, data) });
+    }
+
+    if (action === "update") {
+      const p = payload || {};
+      if (!p.id || !p.fields) return res.status(400).json({ error: "id/fields required" });
+      if (!isAdmin && p.id !== myId) return res.status(403).json({ error: "권한 없음" });
+      const allowed = {};
+      if ("name" in p.fields) allowed.name = String(p.fields.name || "");
+      if ("role" in p.fields && isAdmin) allowed.role = String(p.fields.role || "");
+      if ("phone" in p.fields) allowed.phone = String(p.fields.phone || "");
+      if ("password" in p.fields && p.fields.password) {
+        if (String(p.fields.password).length < 6) return res.status(400).json({ error: "비밀번호는 6자 이상" });
+        allowed.password = p.fields.password;
+      }
+      if (Object.keys(allowed).length === 0) return res.status(400).json({ error: "변경할 필드가 없습니다." });
+      await fs.doc(`admins/${p.id}`).update(allowed);
+      return res.json({ ok: true });
+    }
+
+    if (action === "delete") {
+      if (!isAdmin) return res.status(403).json({ error: "ADMIN 권한 필요" });
+      const p = payload || {};
+      if (!p.id) return res.status(400).json({ error: "id required" });
+      if (p.id === myId) return res.status(403).json({ error: "본인 계정은 삭제할 수 없습니다." });
+      await fs.doc(`admins/${p.id}`).delete();
+      return res.json({ ok: true });
+    }
+
+    if (action === "setPin") {
+      const p = payload || {};
+      if (!/^\d{6}$/.test(String(p.newPin || ""))) return res.status(400).json({ error: "새 PIN은 6자리 숫자여야 합니다." });
+      const myDoc = await fs.doc(`admins/${myId}`).get();
+      if (!myDoc.exists) return res.status(404).json({ error: "계정을 찾을 수 없습니다." });
+      const cur = myDoc.data();
+      if (cur.pinCode && String(cur.pinCode) !== String(p.currentPin || "")) {
+        return res.status(401).json({ error: "현재 PIN이 올바르지 않습니다." });
+      }
+      await fs.doc(`admins/${myId}`).update({ pinCode: String(p.newPin), pinSetAt: Date.now() });
+      return res.json({ ok: true });
+    }
+
+    if (action === "removePin") {
+      const p = payload || {};
+      const myDoc = await fs.doc(`admins/${myId}`).get();
+      if (!myDoc.exists) return res.status(404).json({ error: "계정을 찾을 수 없습니다." });
+      const cur = myDoc.data();
+      if (!cur.pinCode) return res.json({ ok: true });
+      if (String(cur.pinCode) !== String(p.currentPin || "")) {
+        return res.status(401).json({ error: "현재 PIN이 올바르지 않습니다." });
+      }
+      await fs.doc(`admins/${myId}`).update({
+        pinCode: admin.firestore.FieldValue.delete(),
+        pinSetAt: admin.firestore.FieldValue.delete(),
+      });
+      return res.json({ ok: true });
+    }
+
+    return res.status(400).json({ error: "Unknown action: " + action });
+  } catch (err) {
+    console.error("adminApi 오류:", err);
+    return res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
 exports.ppurioAdmin = onRequest(async (req, res) => {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(204).send("");
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
   try {
-    const { action, adminId, adminPw, payload } = req.body || {};
-    if (!(await verifyAdmin(adminId, adminPw))) {
+    const { action, adminId, payload } = req.body || {};
+    const authedAdmin = await verifyAdminAuthOrBody(req);
+    if (!authedAdmin) {
       return res.status(401).json({ error: "관리자 인증 실패" });
     }
+    const actingAdminId = authedAdmin.loginId || adminId;
 
     if (action === "get") {
       const snap = await admin.firestore().doc("settings/ppurio").get();
@@ -274,7 +458,7 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
         footer: String(p.footer || ""),
         apiKey: p.apiKey || existing.apiKey || "",
         updatedAt: Date.now(),
-        updatedBy: adminId,
+        updatedBy: actingAdminId,
       };
       await admin.firestore().doc("settings/ppurio").set(update);
       if (p.apiKey || p.ppurioAccount) {
