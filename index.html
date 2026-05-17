@@ -461,21 +461,6 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   <div class="modal" id="mCt"></div>
 </div>
 
-<!-- 홈 안내 팝업 -->
-<div id="noticeOv" class="overlay hidden" style="z-index:1500" onclick="if(event.target===this)closeNotice()">
-  <div class="modal" style="max-width:420px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <span class="bx bb">안내</span>
-      <p style="font-size:16px;font-weight:700">멘토링 안내</p>
-    </div>
-    <p style="font-size:14px;line-height:1.6;color:var(--gray-700);margin-bottom:20px">합격공간 관리형 독서실에서 진행하는 멘토링입니다.</p>
-    <div style="display:flex;gap:8px">
-      <button class="btn bs" style="flex:1" onclick="dismissNoticeForever()">다시 보지 않기</button>
-      <button class="btn bp" style="flex:1" onclick="closeNotice()">확인</button>
-    </div>
-  </div>
-</div>
-
 <!-- 토스트 -->
 <div id="toastWrap" aria-live="polite" aria-atomic="true"></div>
 
@@ -512,7 +497,8 @@ const S = {
   tab:null, selDate:null, adminSel:null, adminBookSelDate:null, adminSchedSelDate:null,
   editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), alimtalkMode:null, stuSubView:'active',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
-  consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0
+  consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0,
+  notices:[], noticeEditId:null, noticeComposerOpen:false
 };
 
 const _=id=>document.getElementById(id);
@@ -768,6 +754,34 @@ function startBookingsListener(){
 }
 function stopBookingsListener(){if(_bkListener){try{_bkListener();}catch(e){}_bkListener=null;}_bkSeedDone=false;}
 
+// 공지사항(notices) 실시간 동기화. 학생은 멘토링 페이지 상단, 관리자는 예약 현황 탭 상단에서 본다.
+let _ntListener=null,_ntSeedDone=false;
+function startNoticesListener(){
+  if(_ntListener){try{_ntListener();}catch(e){}_ntListener=null;}
+  _ntSeedDone=false;
+  _ntListener=db.collection('notices').onSnapshot(snap=>{
+    const isAdminUser=S.user&&S.user.type!=='student';
+    const isStudent=S.user&&S.user.type==='student';
+    let changed=false;
+    snap.docChanges().forEach(ch=>{
+      const d={_docId:ch.doc.id,...ch.doc.data()};
+      if(ch.type==='added'||ch.type==='modified'){
+        const idx=S.notices.findIndex(n=>n._docId===d._docId);
+        if(idx<0)S.notices.push(d);else S.notices[idx]=d;
+        if(_ntSeedDone)changed=true;
+      }else if(ch.type==='removed'){
+        S.notices=S.notices.filter(n=>n._docId!==d._docId);
+        if(_ntSeedDone)changed=true;
+      }
+    });
+    _ntSeedDone=true;
+    if(!changed)return;
+    if(isAdminUser&&S.tab==='bookings')renderAdminBookings();
+    if(isStudent)safeRerenderStu();
+  },err=>{console.error('notices listener error',err);});
+}
+function stopNoticesListener(){if(_ntListener){try{_ntListener();}catch(e){}_ntListener=null;}_ntSeedDone=false;}
+
 var _skipPush=false;
 function showView(id){
   ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy'].forEach(v=>{
@@ -780,14 +794,16 @@ function showView(id){
 async function loadAll(){
   showLoad(true);
   try{
-    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap]=await Promise.all([
+    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap]=await Promise.all([
       db.collection('students').get(),
       db.collection('schedule').doc('main').get(),
       db.collection('config').doc('main').get(),
       db.collection('bookings').get(),
       db.collection('requests').get(),
-      db.collection('lectures').get()
+      db.collection('lectures').get(),
+      db.collection('notices').get()
     ]);
+    S.notices=ntSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.lectures=lecSnap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0));
     S.students=stuSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.schedule=scSnap.exists?scSnap.data():{dates:JSON.parse(JSON.stringify(DFLT_DATES))};
@@ -811,6 +827,7 @@ async function loadAll(){
   showLoad(false);
   startRequestsListener();
   startBookingsListener();
+  startNoticesListener();
 }
 async function loadAdmins(){
   const snap=await db.collection('admins').get();
@@ -954,8 +971,10 @@ function showWithdrawnNotice(){
 function doLogout(){
   stopRequestsListener();
   stopBookingsListener();
+  stopNoticesListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
-  S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];
+  S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];
+  S.noticeEditId=null;S.noticeComposerOpen=false;
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   clearSession();
@@ -998,7 +1017,8 @@ function renderStu(){
   const examCards=getExams().map(ex=>examScoreCardHtml(ex,myStu)).join('');
   const consultCard=myStu?stuConsultNotesCardHtml(myStu):'';
   const graphCard=myStu?stuGradeGraphCardHtml(myStu):'';
-  if(myB){clearBookCountdown();_('stuC').innerHTML=bookCardHtml(myB)+qBoardHtml(myB,{role:'student'})+consultCard+graphCard+examCards;}
+  const noticeCard=S.notices.length?noticeBoardHtml('student'):'';
+  if(myB){clearBookCountdown();_('stuC').innerHTML=noticeCard+bookCardHtml(myB)+qBoardHtml(myB,{role:'student'})+consultCard+graphCard+examCards;}
   else if(myStu){
     const bOpen=isBookingOpen();
     const pl=bookPeriodLabel();
@@ -1023,10 +1043,12 @@ function renderStu(){
       }
       emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간일 경우, 아래에서 입력 가능합니다.</p></div>`;
     }
-    _('stuC').innerHTML=emptyCard+consultCard+graphCard+examCards;
+    _('stuC').innerHTML=noticeCard+emptyCard+consultCard+graphCard+examCards;
     if(!bOpen){const st=bookPeriodStatus();if(st.kind==='before')startBookCountdown(st.startAt);}
   }
-  else{clearBookCountdown();showBookForm(false);}
+  else{clearBookCountdown();showBookForm(false);
+    if(noticeCard)_('stuC').insertAdjacentHTML('afterbegin',noticeCard);
+  }
 }
 
 function bookCardHtml(b){
@@ -1512,6 +1534,137 @@ function qbRerenderFor(bid){
     const myB=S.bookings.find(b=>b._docId===bid);
     if(myB&&myB.studentId===S.consultStuId)renderConsultDetail();
   }
+}
+
+// 공지사항 게시판. 정렬: 고정(pinned) → 최신 createdAt 순. 작성/수정/삭제/고정은 관리자(ADMIN/OP)만.
+function noticeSorted(){
+  return [...S.notices].sort((a,b)=>{
+    const ap=a.pinned?1:0,bp=b.pinned?1:0;
+    if(ap!==bp)return bp-ap;
+    return (b.createdAt||0)-(a.createdAt||0);
+  });
+}
+function noticeBoardHtml(role){
+  const isAdmin=role==='admin';
+  const list=noticeSorted();
+  let composer='';
+  if(isAdmin){
+    const open=S.noticeComposerOpen||S.noticeEditId==='__new';
+    const draftId='nt-new-input';
+    composer=open?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:12px">
+      <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 공지 작성</p>
+      <textarea class="fi ta" id="${draftId}" rows="4" placeholder="학생들에게 안내할 공지 내용을 입력하세요"></textarea>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="nt-new-pin"> <span>상단 고정</span></label>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn bs bsm" style="flex:1" onclick="noticeCloseComposer()">취소</button>
+        <button class="btn bp bsm" style="flex:1" onclick="noticeCreate()">등록</button>
+      </div>
+    </div>`:`<button class="btn bp bsm" style="width:100%;margin-bottom:12px" onclick="noticeOpenComposer()">+ 공지 작성</button>`;
+  }
+  let itemsHtml='';
+  if(list.length){
+    itemsHtml=list.map(n=>{
+      const isEditing=isAdmin&&S.noticeEditId===n._docId;
+      const pinBadge=n.pinned?'<span class="bx bb" style="font-size:10px;font-weight:700;margin-right:6px">📌 고정</span>':'';
+      const ts=n.createdAt?qbFmtTs(n.createdAt):'';
+      const author=escapeHtml(n.authorName||'관리자');
+      const adminBtns=isAdmin?`<div style="display:flex;gap:4px;margin-left:auto">
+        <button class="btn bs bsm" style="font-size:11px;padding:3px 8px" onclick="noticeTogglePin('${n._docId}')">${n.pinned?'고정 해제':'고정'}</button>
+        <button class="btn bs bsm" style="font-size:11px;padding:3px 8px" onclick="noticeStartEdit('${n._docId}')">수정</button>
+        <button class="btn bd bsm" style="font-size:11px;padding:3px 8px" onclick="noticeDelete('${n._docId}')">삭제</button>
+      </div>`:'';
+      const accent=n.pinned?'#1d4ed8':'#e5e7eb';
+      const bg=n.pinned?'#eff6ff':'#fff';
+      if(isEditing){
+        return `<div style="border:1px solid #93c5fd;background:#eff6ff;border-radius:10px;padding:12px;margin-bottom:8px">
+          <p style="font-size:11px;color:#6b7280;margin-bottom:6px">공지 수정</p>
+          <textarea class="fi ta" id="nt-edit-input-${n._docId}" rows="4">${escapeHtml(n.body||'')}</textarea>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="nt-edit-pin-${n._docId}" ${n.pinned?'checked':''}> <span>상단 고정</span></label>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button class="btn bs bsm" style="flex:1" onclick="noticeCancelEdit()">취소</button>
+            <button class="btn bp bsm" style="flex:1" onclick="noticeSaveEdit('${n._docId}')">저장</button>
+          </div>
+        </div>`;
+      }
+      return `<div style="border:1px solid ${accent};background:${bg};border-radius:10px;padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+          ${pinBadge}<b style="font-size:12px;color:#111827">${author}</b>${ts?`<span style="font-size:11px;color:#9ca3af">· ${ts}</span>`:''}${adminBtns}
+        </div>
+        <p style="font-size:13.5px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(n.body||'')}</p>
+      </div>`;
+    }).join('');
+  }else if(!isAdmin){
+    itemsHtml=`<p style="font-size:12px;color:#9ca3af;text-align:center;padding:14px 0;background:#f9fafb;border-radius:8px">등록된 공지가 없습니다.</p>`;
+  }else{
+    itemsHtml=`<p style="font-size:12px;color:#9ca3af;text-align:center;padding:14px 0;background:#f9fafb;border-radius:8px">아직 등록된 공지가 없습니다. 위에서 작성해 주세요.</p>`;
+  }
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <span class="bx bb">공지</span><p style="font-size:15px;font-weight:700">공지사항</p>${list.length?`<span style="font-size:11px;color:#6b7280">${list.length}건</span>`:''}
+    </div>
+    ${composer}
+    ${itemsHtml}
+  </div>`;
+}
+function noticeOpenComposer(){S.noticeComposerOpen=true;S.noticeEditId=null;noticeRerender();}
+function noticeCloseComposer(){S.noticeComposerOpen=false;noticeRerender();}
+function noticeStartEdit(id){S.noticeEditId=id;S.noticeComposerOpen=false;noticeRerender();}
+function noticeCancelEdit(){S.noticeEditId=null;noticeRerender();}
+function noticeRerender(){
+  if(S.user?.type==='student')renderStu();
+  else if(S.tab==='bookings')renderAdminBookings();
+}
+async function noticeCreate(){
+  const t=_('nt-new-input');const body=(t?.value||'').trim();
+  if(!body){toast('공지 내용을 입력하세요.','warn');return;}
+  const pinned=!!_('nt-new-pin')?.checked;
+  const now=Date.now();
+  const doc={body,pinned,createdAt:now,updatedAt:now,authorId:S.user?.id||'',authorName:S.user?.name||'관리자'};
+  showLoad(true);
+  try{
+    const ref=await db.collection('notices').add(doc);
+    S.notices.push({_docId:ref.id,...doc});
+    S.noticeComposerOpen=false;
+    toast('공지가 등록되었습니다.','success');
+    noticeRerender();
+  }catch(e){toast('등록 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function noticeSaveEdit(id){
+  const t=_('nt-edit-input-'+id);const body=(t?.value||'').trim();
+  if(!body){toast('공지 내용을 입력하세요.','warn');return;}
+  const pinned=!!_('nt-edit-pin-'+id)?.checked;
+  const now=Date.now();
+  showLoad(true);
+  try{
+    await db.collection('notices').doc(id).update({body,pinned,updatedAt:now});
+    const n=S.notices.find(x=>x._docId===id);if(n){n.body=body;n.pinned=pinned;n.updatedAt=now;}
+    S.noticeEditId=null;
+    noticeRerender();
+  }catch(e){toast('저장 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function noticeDelete(id){
+  if(!(await confirmDialog({title:'공지 삭제',message:'이 공지를 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
+  showLoad(true);
+  try{
+    await db.collection('notices').doc(id).delete();
+    S.notices=S.notices.filter(n=>n._docId!==id);
+    if(S.noticeEditId===id)S.noticeEditId=null;
+    noticeRerender();
+  }catch(e){toast('삭제 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function noticeTogglePin(id){
+  const n=S.notices.find(x=>x._docId===id);if(!n)return;
+  const pinned=!n.pinned;
+  showLoad(true);
+  try{
+    await db.collection('notices').doc(id).update({pinned,updatedAt:Date.now()});
+    n.pinned=pinned;
+    noticeRerender();
+  }catch(e){toast('변경 실패: '+e.message,'error');}
+  showLoad(false);
 }
 
 async function saveExamScore(examId){
@@ -3311,8 +3464,10 @@ function renderAdminBookings(){
     </div>
     <button class="btn ${adminDisabled?'bp':'bd'} bsm" onclick="toggleBookingDisabled()">${adminDisabled?'예약 활성화':'예약 비활성화'}</button>
   </div>`:'';
+  const noticeCard=noticeBoardHtml('admin');
   _('adminC').innerHTML=`<div class="sh np" style="margin-bottom:14px"><span class="shtitle" style="font-size:17px;font-weight:800">예약 현황</span>
     <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">↻ 새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
+    ${noticeCard}
     ${statsCard}
     ${dupCard}
     ${disableCard}
@@ -4230,11 +4385,6 @@ function toast(msg,kind='info',opts={}){
 let _confirmResolver=null;
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
 function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;r(false);}}
-function showHomeNotice(){
-  try{if(localStorage.getItem('hideHomeNotice')==='1')return;}catch(_){}
-  const ov=_('noticeOv');if(!ov)return;
-  ov.classList.remove('hidden');ov.style.display='flex';
-}
 function applyChannelIOVisibility(){
   try{
     if(typeof ChannelIO!=='function')return;
@@ -4243,8 +4393,6 @@ function applyChannelIOVisibility(){
     else ChannelIO('showChannelButton');
   }catch(_){}
 }
-function closeNotice(){const ov=_('noticeOv');if(!ov)return;ov.classList.add('hidden');ov.style.display='none';}
-function dismissNoticeForever(){try{localStorage.setItem('hideHomeNotice','1');}catch(_){}closeNotice();}
 /**
  * confirm()의 비동기 모달 버전. true/false 반환.
  *   await confirmDialog({message:'정말 삭제할까요?'})
@@ -4352,7 +4500,6 @@ function enterHome(){
   showView('vHome');
   applyChips();
   if(!_skipPush)navPush({v:'vHome'});
-  showHomeNotice();
   applyChannelIOVisibility();
 }
 function goHome(){enterHome();}
