@@ -2,11 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 뿌리오 API 크리덴셜 (settings/ppurio, settings/ppurio_token) 은
-    // 클라이언트에서 절대 접근 금지. Cloud Functions는 Admin SDK로 우회한다.
-    // 관리자 UI 도 ppurioAdmin HTTP 엔드포인트를 통해서만 CRUD.
+    // 차단 컬렉션:
+    //   settings/* — 뿌리오 API 크리덴셜. ppurioAdmin Cloud Function 만 접근.
+    //   admins/*  — 관리자 아이디/평문 비밀번호/PIN. adminApi/loginToken Cloud
+    //               Function 만 접근. (Phase 1 보안 강화)
+    // 나머지(students, bookings, requests, notices, schedule, config, lectures)는
+    // 임시 개방 — Phase 2 에서 Firebase Auth 클레임 기반 권한으로 단계적 강화 예정.
     match /{collection}/{docPath=**} {
-      allow read, write: if collection != 'settings';
+      allow read, write: if collection != 'settings' && collection != 'admins';
     }
   }
 }
