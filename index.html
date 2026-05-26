@@ -1953,16 +1953,23 @@ function renderAdminConsult(){
   const examCounts=cExams.map(ex=>({ex,n:baseStu.filter(s=>hasStuExamScore(s,ex.id)).length}));
   const noteAny=baseStu.filter(s=>_consultNoteState(s)!=='none').length;
   const noteVisible=baseStu.filter(s=>_consultNoteState(s)==='visible').length;
+  const questionCount=baseStu.filter(s=>{const bk=bookingByStu[s._docId];return bk&&bk.question&&bk.question.trim();}).length;
   const stat=(label,val,color)=>`<span style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:999px;padding:5px 12px;font-size:12px;white-space:nowrap"><span style="color:#6b7280;font-weight:600">${label}</span><b style="color:${color||'#111827'}">${val}</b></span>`;
   const summaryHtml=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
     ${stat('예약',`${bookedCount}/${total}`,'#1C64F2')}
+    ${stat('질문',`${questionCount}/${bookedCount}`,'#ea580c')}
     ${examCounts.map(({ex,n})=>stat(ex.name.replace(/\s*모의.*$/,''),`${n}/${total}`,'#15803d')).join('')}
     ${stat('기록',`${noteAny}/${total}${noteVisible?` · 공개 ${noteVisible}`:''}`,'#7c3aed')}
   </div>`;
   const rows=sorted.map(s=>{
-    const booked=S.bookings.some(b=>b.studentId===s._docId);
+    const bk=bookingByStu[s._docId];
+    const booked=!!bk;
+    const hasQuestion=!!(bk&&bk.question&&bk.question.trim());
     const noteState=_consultNoteState(s);
     const scoreCells=cExams.map(ex=>`<td style="text-align:center;line-height:1">${hasStuExamScore(s,ex.id)?_OK_SVG:_NA_DOT}</td>`).join('');
+    const questionCell=hasQuestion
+      ? `<td style="text-align:center;line-height:1" title="질문 작성됨"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M9.5 9a2.5 2.5 0 1 1 4.5 1.5c-.7.6-1.5.9-1.5 2"/><circle cx="12" cy="17" r="0.9" fill="#ea580c" stroke="none"/></svg></td>`
+      : `<td style="text-align:center;line-height:1">${_NA_DOT}</td>`;
     const noteCell=noteState==='visible'
       ? `<td style="text-align:center;line-height:1"><div style="display:inline-flex;align-items:center;gap:4px">${_OK_SVG}<span style="font-size:10px;font-weight:700;color:#15803d;background:#dcfce7;border-radius:6px;padding:1px 5px">공개</span></div></td>`
       : noteState==='private'
@@ -1973,6 +1980,7 @@ function renderAdminConsult(){
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
       <td style="text-align:center;line-height:1">${booked?_OK_SVG:_NA_DOT}</td>
+      ${questionCell}
       ${scoreCells}
       ${noteCell}
     </tr>`;}).join('');
@@ -1984,8 +1992,8 @@ function renderAdminConsult(){
   ${summaryHtml}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw"><table class="consult-tbl">
-    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th>${examHeaders}<th>기록</th></tr></thead>
-    <tbody>${rows||`<tr><td colspan="${6+cExams.length}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>질문</th>${examHeaders}<th>기록</th></tr></thead>
+    <tbody>${rows||`<tr><td colspan="${7+cExams.length}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
   </table></div></div>`;
 }
 
@@ -2020,6 +2028,44 @@ function getGradeSubjects(stu){
   return subjects;
 }
 
+function detectSubjectChanges(stu,exams){
+  const changes=[];
+  let prev=null;
+  for(const ex of exams){
+    const sc=getStuExamScore(stu,ex.id);if(!sc)continue;
+    const cur={
+      kor:sc.korSubj||'',
+      mat:sc.matSubj||'',
+      exp:[sc.exp1Subj,sc.exp2Subj].filter(Boolean)
+    };
+    if(prev){
+      const items=[];
+      if(prev.cur.kor&&cur.kor&&prev.cur.kor!==cur.kor)items.push({label:'국어',from:prev.cur.kor,to:cur.kor});
+      if(prev.cur.mat&&cur.mat&&prev.cur.mat!==cur.mat)items.push({label:'수학',from:prev.cur.mat,to:cur.mat});
+      const prevSet=new Set(prev.cur.exp),curSet=new Set(cur.exp);
+      const removed=prev.cur.exp.filter(s=>!curSet.has(s));
+      const added=cur.exp.filter(s=>!prevSet.has(s));
+      const n=Math.min(removed.length,added.length);
+      for(let i=0;i<n;i++)items.push({label:'탐구',from:removed[i],to:added[i]});
+      if(items.length)changes.push({fromName:prev.name,toName:ex.name,items});
+    }
+    prev={cur,name:ex.name};
+  }
+  return changes;
+}
+function subjectChangesHtml(stu,exams){
+  const changes=detectSubjectChanges(stu,exams);
+  if(!changes.length)return '';
+  const shortName=n=>(n||'').replace(/\s*모의.*$/,'').trim()||n;
+  const rows=changes.map(ch=>{
+    const arrows=ch.items.map(it=>`<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #fed7aa;border-radius:6px;padding:2px 8px;font-size:11px"><span style="color:#9a3412;font-weight:700">${it.label}</span><span style="color:#374151">${escapeHtml(it.from)}</span><span style="color:#ea580c;font-weight:700">→</span><span style="color:#111827;font-weight:700">${escapeHtml(it.to)}</span></span>`).join(' ');
+    return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0"><span style="font-size:11px;color:#6b7280;font-weight:600;white-space:nowrap">${escapeHtml(shortName(ch.fromName))} → ${escapeHtml(shortName(ch.toName))}</span>${arrows}</div>`;
+  }).join('');
+  return `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 12px;margin-bottom:10px">
+    <p style="font-size:11px;font-weight:700;color:#9a3412;margin-bottom:4px">선택과목 변경</p>
+    ${rows}
+  </div>`;
+}
 function drawGradeGraph(exams,stu,subjInfo){
   const W=700,H=240,PL=56,PR=56,PT=24,PB=36;
   const cw=W-PL-PR,ch=H-PT-PB;
@@ -2213,6 +2259,7 @@ function renderConsultDetail(){
     </div>
     <div class="card" style="margin-bottom:12px">
       <p style="font-size:13px;font-weight:700;margin-bottom:10px">등급 추이</p>
+      ${subjectChangesHtml(stu,exams)}
       <div class="dtabs" style="margin-bottom:10px">${graphTabs}</div>
       ${graphBody}
     </div>
@@ -2925,7 +2972,7 @@ async function saveStu(docId){
   const acctPhone=noStu?gphone:phone;
   const aid=acctId(name,acctPhone.replace(/\D/g,''));
   if(S.students.find(s=>s.accountId===aid&&s._docId!==docId)){showErr('mErr',`계정 ID '${aid}'가 이미 존재합니다.`);return;}
-  if(seat&&S.students.find(s=>s.seat===seat&&s._docId!==docId)){const dup=S.students.find(s=>s.seat===seat&&s._docId!==docId);showErr('mErr',`${seat}번 좌석은 이미 '${dup.name}' 학생에게 배정되어 있습니다.`);return;}
+  if(seat){const dup=S.students.find(s=>s.seat===seat&&s._docId!==docId&&!s.withdrawn);if(dup){showErr('mErr',`${seat}번 좌석은 이미 '${dup.name}' 학생에게 배정되어 있습니다.`);return;}}
   showLoad(true);
   try{
     if(docId){
