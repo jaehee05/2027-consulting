@@ -599,6 +599,65 @@ const RAW_MAX_DEFAULTS={korCommon:76,korElective:24,matCommon:74,matElective:26}
 function getRawMax(key){const m=S.config?.rawMax||{};const v=m[key];return v!=null&&v!==''?Number(v):RAW_MAX_DEFAULTS[key];}
 function korTotalMax(){return getRawMax('korCommon')+getRawMax('korElective');}
 function matTotalMax(){return getRawMax('matCommon')+getRawMax('matElective');}
+
+// ── 표준점수 산출 (2027 수능 방식) ── ADMIN 전용. 학생 화면에는 노출하지 않는다.
+// 공통+선택 구조의 국어/수학에 대해 본교 응시 코호트 기준으로 추정 표준점수 계산.
+// 단계: (1) 선택과목 집단별 조정원점수 → (2) 전체 응시 공통 평균/표준편차로 Z화 →
+//       (3) 배점비율(공통/선택) 가중합 → (4) 가중합을 코호트 내 표준화 후 20z+100.
+function _avg(a){return a.reduce((s,v)=>s+v,0)/a.length;}
+function _sd(a){const m=_avg(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/a.length);}
+function computeExamStandardScores(examId){
+  const out={kor:{},mat:{}};
+  for(const area of ['kor','mat']){
+    const cKey=area+'CommonRaw',eKey=area+'ElectiveRaw',subjKey=area+'Subj';
+    const cMax=getRawMax(area+'Common'),eMax=getRawMax(area+'Elective'),tot=cMax+eMax;
+    const wC=tot?cMax/tot:0.5,wE=tot?eMax/tot:0.5;
+    const takers=[];
+    for(const stu of S.students){
+      const sc=getStuExamScore(stu,examId);if(!sc)continue;
+      const c=sc[cKey],e=sc[eKey],subj=sc[subjKey];
+      if(c===''||e===''||c==null||e==null||!subj)continue;
+      const cn=Number(c),en=Number(e);if(isNaN(cn)||isNaN(en))continue;
+      takers.push({stuId:stu._docId,c:cn,e:en,subj});
+    }
+    if(takers.length<2)continue;
+    const allC=takers.map(t=>t.c);
+    const muCAll=_avg(allC),sdCAll=_sd(allC);
+    if(!sdCAll)continue;
+    const groups={};
+    for(const t of takers){(groups[t.subj]=groups[t.subj]||[]).push(t);}
+    const zSums=[];
+    for(const t of takers){
+      const grp=groups[t.subj];if(grp.length<2){t.zSum=null;continue;}
+      const cg=grp.map(g=>g.c),eg=grp.map(g=>g.e);
+      const muCG=_avg(cg),sdCG=_sd(cg),muEG=_avg(eg),sdEG=_sd(eg);
+      if(!sdEG){t.zSum=null;continue;}
+      const adjE=sdCG/sdEG*(t.e-muEG)+muCG;
+      const zC=(t.c-muCAll)/sdCAll;
+      const zE=(adjE-muCAll)/sdCAll;
+      t.zSum=wC*zC+wE*zE;
+      zSums.push(t.zSum);
+    }
+    if(zSums.length<2)continue;
+    const muZ=_avg(zSums),sdZ=_sd(zSums);
+    if(!sdZ)continue;
+    for(const t of takers){
+      if(t.zSum==null)continue;
+      const z=(t.zSum-muZ)/sdZ;
+      out[area][t.stuId]=Math.round(20*z+100);
+    }
+  }
+  return out;
+}
+function getExamStandardScores(examId){
+  if(!S._stdCache)S._stdCache={};
+  if(!S._stdCache[examId])S._stdCache[examId]=computeExamStandardScores(examId);
+  return S._stdCache[examId];
+}
+function invalidateStandardScores(examId){
+  if(!S._stdCache)return;
+  if(examId)delete S._stdCache[examId];else S._stdCache={};
+}
 function gcRelGroups(exam){
   const sci2=exam&&exam.hasScienceII;
   return [
@@ -1330,6 +1389,7 @@ async function finishScoreWizard(){
     mergeGradeOverrides(stu,examId,scoreData);
     if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;
     await db.collection('students').doc(S.studentDocId).update({['scores.'+examId]:scoreData});
+    invalidateStandardScores(examId);
     S.editingExamId=null;S.scoreStep=getScoreSteps(exam).length;renderScoreWizard();
   }catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
@@ -1362,7 +1422,7 @@ function rawWithDiff(raw,cuts){
   if(!cur&&!upper)return raw;
   return `<span style="position:relative;display:inline-block">${upper?`<span style="position:absolute;right:100%;top:50%;transform:translateY(-50%);margin-right:3px">${upper}</span>`:''}<span>${raw}</span>${cur?`<span style="position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:3px">${cur}</span>`:''}</span>`;
 }
-function examScoreTblFull(exam,sc){if(!sc)return '';
+function examScoreTblFull(exam,sc,stuDocId){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
   const gc=exam.gradeCuts||{};const gca=S.config.gradeCuts?.abs||{};
   const kg=examGradeCell(exam,sc.korSubj,sc.korRaw,sc.korGradeOverride),mg=examGradeCell(exam,sc.matSubj,sc.matRaw,sc.matGradeOverride);
@@ -1372,12 +1432,21 @@ function examScoreTblFull(exam,sc){if(!sc)return '';
   const krD=rawWithDiff(sc.korRaw,gc[sc.korSubj]),mrD=rawWithDiff(sc.matRaw,gc[sc.matSubj]);
   const erD=rawWithDiff(sc.engRaw,gca.eng),e1rD=rawWithDiff(sc.exp1Raw,gc[sc.exp1Subj]),e2rD=rawWithDiff(sc.exp2Raw,gc[sc.exp2Subj]);
   const gradeLabel=hasAnyEstGrade(exam)?'예상등급':'등급';
+  let stdRow='';
+  if(stuDocId&&S.user?.type!=='student'){
+    const std=getExamStandardScores(exam.id);
+    const kStd=std.kor[stuDocId],mStd=std.mat[stuDocId];
+    const kCell=kStd!=null?String(kStd):'—';
+    const mCell=mStd!=null?String(mStd):'—';
+    stdRow=`<tr style="background:#f8fafc"><td class="rh" style="font-size:10px;color:#7c3aed;font-weight:700" title="ADMIN 전용 — 본교 응시 코호트 기준 추정값">표준점수<br><span style="font-size:9px;color:#9ca3af;font-weight:500">(내부 추정)</span></td><td class="dl"></td><td class="vl" style="color:#7c3aed;font-weight:700">${kCell}</td><td class="vl" style="color:#7c3aed;font-weight:700">${mCell}</td><td class="dl"></td><td class="dl"></td><td class="dl"></td>${hasL2?'<td class="dl"></td>':''}</tr>`;
+  }
   return `<div style="overflow-x:auto"><table class="sc-tbl">
   ${scTblColgroup(hasL2)}
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
   <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${krD}</td><td class="vl">${mrD}</td><td class="vl">${erD}</td><td class="vl">${e1rD}</td><td class="vl">${e2rD}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px;${hasAnyEstGrade(exam)?'color:#f59e0b;font-weight:700':''}">${gradeLabel}</td>${hg}${kg}${mg}${eg}${e1g}${e2g}${l2g}</tr>
+  ${stdRow}
 </table></div>`;}
 
 function examScoreTblHtml(exam,sc){if(!sc)return '';
@@ -2295,7 +2364,7 @@ function renderConsultDetail(){
   if(examsWithScore.length){
     scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.consultScoreTab=${i};renderConsultDetail()">${ex.name}</button>`).join('');
     const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
-    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
+    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id),stu._docId);
   }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
   const subjects=getGradeSubjects(stu);
   const graphTabIdx=S.consultGraphTab||0;
@@ -3003,7 +3072,7 @@ function renderOpScoreDetail(){
   if(examsWithScore.length){
     scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.opScoreTab=${i};renderAdminScores()">${ex.name}</button>`).join('');
     const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
-    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
+    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id),stu._docId);
   }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
   const subjects=getGradeSubjects(stu);
   const graphTabIdx=Math.min(S.opGraphTab||0,Math.max(0,subjects.length-1));
@@ -3352,7 +3421,7 @@ async function saveRawMax(){
   for(const k of Object.keys(next)){if(!(next[k]>=0)){toast(k+' 값이 올바르지 않습니다.','warn');return;}}
   S.config.rawMax=next;
   showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);closeModal();toast('원점수 범위가 저장되었습니다.','success');}
+  try{await db.collection('config').doc('main').set(S.config);invalidateStandardScores();closeModal();toast('원점수 범위가 저장되었습니다.','success');}
   catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
 }
@@ -4066,6 +4135,7 @@ async function adminDelExamScore(stuDocId, examId, from, bookDocId){
   try{
     await db.collection('students').doc(stuDocId).update({['scores.'+examId]:firebase.firestore.FieldValue.delete()});
     const stu=S.students.find(x=>x._docId===stuDocId);if(stu&&stu.scores)delete stu.scores[examId];
+    invalidateStandardScores(examId);
     if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
     else if(from==='stuDetail'){closeModal();openStuDetail(stuDocId);}
     else{closeModal();renderAdminScores();}
@@ -4154,6 +4224,7 @@ async function saveAdminScore(stuDocId, examId, from, bookDocId){
   try{
     await db.collection('students').doc(stuDocId).update({['scores.'+examId]:scoreData});
     const stu=S.students.find(x=>x._docId===stuDocId);if(stu){if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;}
+    invalidateStandardScores(examId);
     if(from==='booking'&&bookDocId)openBookDetail(bookDocId);
     else if(from==='stuDetail')openStuDetail(stuDocId);
     else{closeModal();renderAdminScores();}
