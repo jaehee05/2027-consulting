@@ -675,15 +675,19 @@ function showLoad(v){_('vLoad').style.display=v?'flex':'none';}
 /* ── REQUEST LISTENER ── */
 var _reqListener=null, _reqSeedDone=false;
 var _bkListener=null, _bkSeedDone=false;
-function pendingReqCountForAdmin(){return S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change').length;}
+function pendingReqCountForAdmin(){return S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change'&&r.type!=='add_student').length;}
+function pendingAddStudentCount(){return S.requests.filter(r=>r.type==='add_student'&&r.status==='pending').length;}
 function updateAdminTabs(){
   if(!S.user||S.user.type==='student')return;
   const el=_('adminTabs');if(!el)return;
   const isAdmin=S.user.type==='admin';
   const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['notices','공지사항'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['students','학생 목록'],['scores','학생 성적'],['bookings','예약 현황']];
   const n=pendingReqCountForAdmin();
+  const nAdd=isAdmin?pendingAddStudentCount():0;
   el.innerHTML=tabs.map(([id,label])=>{
-    const badge=(id==='bookings'&&n>0)?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${n}</span>`:'';
+    let badge='';
+    if(id==='bookings'&&n>0)badge=` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${n}</span>`;
+    else if(id==='students'&&nAdd>0)badge=` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${nAdd}</span>`;
     return `<button class="tab ${S.tab===id?'on':''}" onclick="setTab('${id}')">${label}${badge}</button>`;
   }).join('');
 }
@@ -724,7 +728,7 @@ function startRequestsListener(){
       }
     });
     _reqSeedDone=true;
-    if(isAdminUser){updateAdminTabs();if(needAdminRerender&&S.tab==='bookings')renderAdminBookings();}
+    if(isAdminUser){updateAdminTabs();if(needAdminRerender){if(S.tab==='bookings')renderAdminBookings();else if(S.tab==='students')renderAdminStudents();}}
     if(isStudent&&needStuRerender)safeRerenderStu();
   },err=>{console.error('requests listener error',err);});
 }
@@ -2511,7 +2515,19 @@ function renderOpStudents(){
   </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
+  const myReqs=S.requests.filter(r=>r.type==='add_student'&&r.createdBy===S.user.id).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const myPending=myReqs.filter(r=>r.status==='pending');
+  const myRecent=myReqs.filter(r=>r.status!=='pending'&&(Date.now()-(r.resolvedAt||r.createdAt||0))<7*24*60*60*1000).slice(0,10);
+  const fmtDate=(ts)=>ts?new Date(ts).toLocaleDateString('ko-KR'):'—';
+  const myReqRows=[...myPending,...myRecent].map(r=>{
+    const p=r.payload||{};
+    const status=r.status==='pending'?'<span class="bx" style="background:#fef3c7;color:#92400e">대기</span>':r.status==='approved'?'<span class="bx bg">승인</span>':'<span class="bx br">거절</span>';
+    const rej=r.status==='rejected'&&r.rejectReason?`<div style="font-size:11px;color:#dc2626;margin-top:3px">사유: ${escapeHtml(r.rejectReason)}</div>`:'';
+    return `<tr><td>${status}</td><td style="font-weight:600">${escapeHtml(p.name||'')}</td><td style="font-size:12px">${escapeHtml(p.school||'')} ${escapeHtml(p.grade||'')}</td><td style="font-size:12px">${escapeHtml(p.guardianPhone||p.studentPhone||'')}</td><td style="font-size:11px;color:#6b7280">${fmtDate(r.createdAt)}${rej}</td>${r.status==='pending'?`<td style="white-space:nowrap"><button class="btn bd bsm" onclick="cancelAddStudentRequest('${r._docId}')">취소</button></td>`:'<td></td>'}</tr>`;
+  }).join('');
+  const myReqCard=(myPending.length||myRecent.length)?`<div class="card" style="margin-bottom:14px;padding:0"><div style="padding:12px 14px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:700">내가 요청한 학생 추가</span><span style="font-size:12px;color:#6b7280">대기 ${myPending.length}건${myRecent.length?` · 최근 처리 ${myRecent.length}건`:''}</span></div><div class="tw"><table><thead><tr><th>상태</th><th>이름</th><th>학교/학년</th><th>연락처</th><th>요청일</th><th>관리</th></tr></thead><tbody>${myReqRows}</tbody></table></div></div>`:'';
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가 요청</button></div>
+  ${myReqCard}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
   </div>
@@ -2569,7 +2585,9 @@ function renderAdminStudents(){
     <div class="ab-count">${selCount}명 선택</div>
     <div class="ab-actions"><button class="btn bs bsm" onclick="exitAlimtalkMode()">취소</button><button class="btn ${selCount?'bp':'bs'} bsm" ${selCount?'':'disabled style="opacity:.5;cursor:not-allowed"'} onclick="confirmAlimtalkBulk()">발송 →</button></div>
   </div>`:'';
+  const addReqCard=adminAddStudentRequestsHtml();
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
+  ${addReqCard}
   ${modeBanner}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
@@ -3021,7 +3039,10 @@ function openStuModal(docId){
   const s=docId?S.students.find(x=>x._docId===docId):null;
   const noStu=!!s?.noStudentPhone;
   const isAdmin=S.user?.type==='admin';
-  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${s?'학생 정보 수정':'학생 추가'}</p>
+  const isOpAdd=!isAdmin&&!s;
+  const title=s?'학생 정보 수정':(isOpAdd?'학생 추가 요청':'학생 추가');
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${title}</p>
+    ${isOpAdd?`<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e">⏳ 입력하신 정보로 관리자에게 학생 추가 요청을 보냅니다. 관리자 승인 후 실제로 추가됩니다.</div>`:''}
     <div class="frow"><div class="fg"><label class="fl">이름</label><input class="fi" id="sn" value="${s?.name||''}" placeholder="홍길동" oninput="updPrev()"></div>
     <div class="fg"><label class="fl">학년</label><select class="fi fsel" id="sg"><option ${!s||s.grade==='고3'?'selected':''}>고3</option><option ${s?.grade==='고2'?'selected':''}>고2</option><option ${s?.grade==='고1'?'selected':''}>고1</option></select></div></div>
     <div class="fg"><label class="fl">학교 (예: 서울고 → 서울고등학교)</label><input class="fi" id="ss" value="${s?.school||''}" placeholder="서울고"></div>
@@ -3047,7 +3068,7 @@ function openStuModal(docId){
     </div>
     ${s?`<div style="margin-bottom:14px"><button class="btn bs bsm" onclick="resetPw('${docId}')">🔑 비밀번호 초기화</button></div>`:''}
     <div class="ferr" id="mErr"></div>
-    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveStu('${docId||''}')">저장</button></div>`;
+    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveStu('${docId||''}')">${isOpAdd?'요청 보내기':'저장'}</button></div>`;
   openModal();}
 
 function updPrev(){
@@ -3081,18 +3102,130 @@ async function saveStu(docId){
   const aid=acctId(name,acctPhone.replace(/\D/g,''));
   if(S.students.find(s=>s.accountId===aid&&s._docId!==docId)){showErr('mErr',`계정 ID '${aid}'가 이미 존재합니다.`);return;}
   if(seat){const dup=S.students.find(s=>s.seat===seat&&s._docId!==docId&&!s.withdrawn);if(dup){showErr('mErr',`${seat}번 좌석은 이미 '${dup.name}' 학생에게 배정되어 있습니다.`);return;}}
+  const isAdmin=S.user?.type==='admin';
+  if(!isAdmin&&docId){showErr('mErr','학생 정보 수정 권한이 없습니다.');return;}
   showLoad(true);
   try{
-    if(docId){
+    if(!isAdmin){
+      const payload={name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat:seat||'',notifyExcluded:false,consultExcluded:false};
+      const dup=S.requests.find(r=>r.type==='add_student'&&r.status==='pending'&&r.payload?.name===name&&((r.payload?.guardianPhone||'')===gphone));
+      if(dup){showErr('mErr','이미 동일한 학생에 대한 대기 중인 요청이 있습니다.');showLoad(false);return;}
+      const req={type:'add_student',status:'pending',payload,createdAt:Date.now(),createdBy:S.user.id,createdByName:S.user.name||''};
+      const ref=await db.collection('requests').add(req);S.requests.push({_docId:ref.id,...req});
+      closeModal();toast('학생 추가 요청을 보냈습니다. 관리자 승인 후 등록됩니다.','success');
+      renderAdminStudents();
+    }else if(docId){
       await db.collection('students').doc(docId).update({name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,notifyExcluded,consultExcluded});
       const s=S.students.find(x=>x._docId===docId);if(s)Object.assign(s,{name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,notifyExcluded,consultExcluded});
+      closeModal();renderAdminStudents();
     }else{
       const data={name,grade,school,studentPhone:phone,guardianPhone:gphone,noStudentPhone:noStu,seat,accountId:aid,accountPw:initPw(acctPhone),isFirstLogin:true,notifyExcluded,consultExcluded};
       const ref=await db.collection('students').add(data);S.students.push({_docId:ref.id,...data});
+      closeModal();renderAdminStudents();
     }
-    closeModal();renderAdminStudents();
   }catch(e){showErr('mErr','저장 실패: '+e.message);}
   showLoad(false);}
+
+function adminAddStudentRequestsHtml(){
+  const pending=S.requests.filter(r=>r.type==='add_student'&&r.status==='pending').sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const resolved=S.requests.filter(r=>r.type==='add_student'&&r.status!=='pending').sort((a,b)=>(b.resolvedAt||b.createdAt||0)-(a.resolvedAt||a.createdAt||0)).slice(0,10);
+  if(!pending.length&&!resolved.length)return '';
+  const fmtDate=(ts)=>ts?new Date(ts).toLocaleDateString('ko-KR'):'—';
+  const pendingRows=pending.map(r=>{
+    const p=r.payload||{};
+    const stuPhone=p.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':escapeHtml(p.studentPhone||'');
+    return `<tr><td style="font-weight:600">${escapeHtml(p.name||'')}</td>
+      <td><span class="bx ${p.grade==='고3'?'br':p.grade==='고2'?'bb':'bg'}">${escapeHtml(p.grade||'')}</span></td>
+      <td>${escapeHtml(p.school||'')}</td>
+      <td style="font-size:12px">학생: ${stuPhone}<br>보호자: ${escapeHtml(p.guardianPhone||'')}</td>
+      <td style="font-size:12px">${p.seat?p.seat+'번':'—'}</td>
+      <td style="font-size:11px;color:#6b7280">${escapeHtml(r.createdByName||'')}<br>${fmtDate(r.createdAt)}</td>
+      <td style="white-space:nowrap"><div style="display:flex;gap:5px"><button class="btn bp bsm" onclick="approveAddStudentRequest('${r._docId}')">승인</button><button class="btn bd bsm" onclick="rejectAddStudentRequest('${r._docId}')">거절</button></div></td>
+    </tr>`;
+  }).join('');
+  const resolvedRows=resolved.map(r=>{
+    const p=r.payload||{};
+    const status=r.status==='approved'?'<span class="bx bg">승인</span>':'<span class="bx br">거절</span>';
+    const rej=r.status==='rejected'&&r.rejectReason?`<div style="font-size:11px;color:#6b7280;margin-top:2px">${escapeHtml(r.rejectReason)}</div>`:'';
+    return `<tr><td>${status}</td><td style="font-weight:600">${escapeHtml(p.name||'')}</td><td style="font-size:12px">${escapeHtml(p.school||'')} ${escapeHtml(p.grade||'')}</td><td style="font-size:11px;color:#6b7280">${escapeHtml(r.createdByName||'')}<br>${fmtDate(r.resolvedAt||r.createdAt)}${rej}</td><td><button class="btn bd bsm" onclick="deleteRequest('${r._docId}')">삭제</button></td></tr>`;
+  }).join('');
+  return `<div class="card" style="margin-bottom:14px;padding:0;border:1px solid ${pending.length?'#fcd34d':'#e5e7eb'};${pending.length?'background:#fffbeb':''}">
+    <div style="padding:12px 14px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:700">OP 학생 추가 요청</span>
+      ${pending.length?`<span class="bx" style="background:#fbbf24;color:#7c2d12">대기 ${pending.length}건</span>`:''}
+      ${resolved.length?`<span style="font-size:12px;color:#6b7280">· 최근 처리 ${resolved.length}건</span>`:''}
+    </div>
+    ${pending.length?`<div class="tw"><table>
+      <thead><tr><th>이름</th><th>학년</th><th>학교</th><th>연락처</th><th>좌석</th><th>요청자/일시</th><th>관리</th></tr></thead>
+      <tbody>${pendingRows}</tbody>
+    </table></div>`:''}
+    ${resolved.length?`<details style="padding:8px 12px"><summary style="font-size:12px;color:#6b7280;cursor:pointer">최근 처리된 요청 ${resolved.length}건 보기</summary><div class="tw" style="margin-top:8px"><table>
+      <thead><tr><th>상태</th><th>이름</th><th>학교/학년</th><th>요청자/처리일</th><th>관리</th></tr></thead>
+      <tbody>${resolvedRows}</tbody>
+    </table></div></details>`:''}
+  </div>`;
+}
+
+async function approveAddStudentRequest(reqDocId){
+  if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
+  const r=S.requests.find(x=>x._docId===reqDocId);
+  if(!r||r.type!=='add_student'||r.status!=='pending'){toast('이미 처리된 요청입니다.','warn');return;}
+  const p=r.payload||{};
+  const acctPhone=p.noStudentPhone?p.guardianPhone:p.studentPhone;
+  const aid=acctId(p.name,(acctPhone||'').replace(/\D/g,''));
+  if(S.students.find(s=>s.accountId===aid)){
+    if(!(await confirmDialog({title:'중복 계정 ID',message:`계정 ID '${aid}' 가 이미 존재합니다. 그래도 진행할까요? (요청을 거절로 처리하는 것을 권장합니다.)`,confirmLabel:'진행',kind:'danger'})))return;
+  }
+  if(p.seat){
+    const dup=S.students.find(s=>s.seat===p.seat&&!s.withdrawn);
+    if(dup){
+      if(!(await confirmDialog({title:'좌석 중복',message:`${p.seat}번 좌석은 이미 '${dup.name}' 학생에게 배정되어 있습니다. 좌석을 미배정으로 두고 추가할까요?`,confirmLabel:'좌석 비우고 추가'})))return;
+      p.seat='';
+    }
+  }
+  showLoad(true);
+  try{
+    const data={name:p.name,grade:p.grade,school:p.school,studentPhone:p.studentPhone||'',guardianPhone:p.guardianPhone,noStudentPhone:!!p.noStudentPhone,seat:p.seat||'',accountId:aid,accountPw:initPw(acctPhone),isFirstLogin:true,notifyExcluded:false,consultExcluded:false};
+    const ref=await db.collection('students').add(data);
+    S.students.push({_docId:ref.id,...data});
+    const upd={status:'approved',resolvedAt:Date.now(),resolvedBy:S.user.id,createdStudentId:ref.id};
+    await db.collection('requests').doc(reqDocId).update(upd);
+    Object.assign(r,upd);
+    toast(`'${p.name}' 학생 추가 완료`,'success');
+    renderAdminStudents();
+  }catch(e){toast('승인 실패: '+e.message,'error');}
+  showLoad(false);
+}
+
+async function rejectAddStudentRequest(reqDocId){
+  if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
+  const r=S.requests.find(x=>x._docId===reqDocId);
+  if(!r||r.type!=='add_student'||r.status!=='pending'){toast('이미 처리된 요청입니다.','warn');return;}
+  const reason=prompt('거절 사유를 입력하세요. (요청자에게 표시됩니다)','');
+  if(reason===null)return;
+  showLoad(true);
+  try{
+    const upd={status:'rejected',rejectReason:reason||'',resolvedAt:Date.now(),resolvedBy:S.user.id};
+    await db.collection('requests').doc(reqDocId).update(upd);
+    Object.assign(r,upd);
+    renderAdminStudents();
+  }catch(e){toast('거절 실패: '+e.message,'error');}
+  showLoad(false);
+}
+
+async function cancelAddStudentRequest(reqDocId){
+  const r=S.requests.find(x=>x._docId===reqDocId);
+  if(!r||r.type!=='add_student'||r.status!=='pending')return;
+  if(r.createdBy!==S.user?.id&&S.user?.type!=='admin'){toast('본인이 보낸 요청만 취소할 수 있습니다.','warn');return;}
+  if(!(await confirmDialog({title:'요청 취소',message:`'${r.payload?.name||''}' 학생 추가 요청을 취소하시겠습니까?`,confirmLabel:'취소',kind:'danger'})))return;
+  showLoad(true);
+  try{
+    await db.collection('requests').doc(reqDocId).delete();
+    S.requests=S.requests.filter(x=>x._docId!==reqDocId);
+    renderAdminStudents();
+  }catch(e){toast('취소 실패: '+e.message,'error');}
+  showLoad(false);
+}
 
 async function delStu(docId){
   const s=S.students.find(x=>x._docId===docId);if(!s)return;
@@ -3676,8 +3809,8 @@ function renderAdminBookings(){
 function adminBookSelDate(id){S.adminBookSelDate=id;renderAdminBookings();}
 
 function renderRequestsSection(){
-  const pending=S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  const resolved=S.requests.filter(r=>r.status!=='pending'&&r.type!=='admin_change').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,20);
+  const pending=S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change'&&r.type!=='add_student').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const resolved=S.requests.filter(r=>r.status!=='pending'&&r.type!=='admin_change'&&r.type!=='add_student').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,20);
   const adminChangePending=S.requests.filter(r=>r.type==='admin_change'&&r.status==='pending').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const adminChangeResolved=S.requests.filter(r=>r.type==='admin_change'&&r.status!=='pending').sort((a,b)=>(b.resolvedAt||b.createdAt||0)-(a.resolvedAt||a.createdAt||0)).slice(0,20);
   const pendingRows=pending.map(r=>{
@@ -3785,7 +3918,7 @@ async function confirmReject(reqId){
 async function deleteRequest(reqId){
   if(!(await confirmDialog({title:'요청 기록 삭제',message:'이 요청 기록을 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
-  try{await db.collection('requests').doc(reqId).delete();S.requests=S.requests.filter(r=>r._docId!==reqId);renderAdminBookings();}
+  try{await db.collection('requests').doc(reqId).delete();S.requests=S.requests.filter(r=>r._docId!==reqId);if(S.tab==='students')renderAdminStudents();else renderAdminBookings();}
   catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);}
 
