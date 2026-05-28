@@ -607,44 +607,90 @@ function matTotalMax(){return getRawMax('matCommon')+getRawMax('matElective');}
 function _avg(a){return a.reduce((s,v)=>s+v,0)/a.length;}
 function _sd(a){const m=_avg(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/a.length);}
 function computeExamStandardScores(examId){
-  const out={kor:{},mat:{}};
+  const exam=getExam(examId);
+  const scoreType=exam?.scoreType||'edu';
+  const out={kor:{},mat:{},exp1:{},exp2:{}};
+  // ── 국어/수학 ──
   for(const area of ['kor','mat']){
-    const cKey=area+'CommonRaw',eKey=area+'ElectiveRaw',subjKey=area+'Subj';
-    const cMax=getRawMax(area+'Common'),eMax=getRawMax(area+'Elective'),tot=cMax+eMax;
-    const wC=tot?cMax/tot:0.5,wE=tot?eMax/tot:0.5;
-    const takers=[];
+    if(scoreType==='kice'){
+      // 수능·평가원: 공통+선택 조정 방식
+      const cKey=area+'CommonRaw',eKey=area+'ElectiveRaw',subjKey=area+'Subj';
+      const cMax=getRawMax(area+'Common'),eMax=getRawMax(area+'Elective'),tot=cMax+eMax;
+      const wC=tot?cMax/tot:0.5,wE=tot?eMax/tot:0.5;
+      const takers=[];
+      for(const stu of S.students){
+        const sc=getStuExamScore(stu,examId);if(!sc)continue;
+        const c=sc[cKey],e=sc[eKey],subj=sc[subjKey];
+        if(c===''||e===''||c==null||e==null||!subj)continue;
+        const cn=Number(c),en=Number(e);if(isNaN(cn)||isNaN(en))continue;
+        takers.push({stuId:stu._docId,c:cn,e:en,subj});
+      }
+      if(takers.length<2)continue;
+      const allC=takers.map(t=>t.c);
+      const muCAll=_avg(allC),sdCAll=_sd(allC);
+      if(!sdCAll)continue;
+      const groups={};
+      for(const t of takers){(groups[t.subj]=groups[t.subj]||[]).push(t);}
+      const zSums=[];
+      for(const t of takers){
+        const grp=groups[t.subj];if(grp.length<2){t.zSum=null;continue;}
+        const cg=grp.map(g=>g.c),eg=grp.map(g=>g.e);
+        const muCG=_avg(cg),sdCG=_sd(cg),muEG=_avg(eg),sdEG=_sd(eg);
+        if(!sdEG){t.zSum=null;continue;}
+        const adjE=sdCG/sdEG*(t.e-muEG)+muCG;
+        const zC=(t.c-muCAll)/sdCAll;
+        const zE=(adjE-muCAll)/sdCAll;
+        t.zSum=wC*zC+wE*zE;
+        zSums.push(t.zSum);
+      }
+      if(zSums.length<2)continue;
+      const muZ=_avg(zSums),sdZ=_sd(zSums);
+      if(!sdZ)continue;
+      for(const t of takers){
+        if(t.zSum==null)continue;
+        const z=(t.zSum-muZ)/sdZ;
+        out[area][t.stuId]=Math.round(20*z+100);
+      }
+    } else {
+      // 교육청 학력평가: 총점 단순 Z → 20z+100
+      const rawKey=area+'Raw';
+      const takers=[];
+      for(const stu of S.students){
+        const sc=getStuExamScore(stu,examId);if(!sc)continue;
+        const r=sc[rawKey];if(r===''||r==null)continue;
+        const rn=Number(r);if(isNaN(rn))continue;
+        takers.push({stuId:stu._docId,r:rn});
+      }
+      if(takers.length<2)continue;
+      const rs=takers.map(t=>t.r);
+      const mu=_avg(rs),sd=_sd(rs);
+      if(!sd)continue;
+      for(const t of takers){
+        const z=(t.r-mu)/sd;
+        out[area][t.stuId]=Math.round(20*z+100);
+      }
+    }
+  }
+  // ── 탐구 1/2 (학력평가·수능 공통: 과목별 Z → 10z+50) ──
+  for(const idx of [1,2]){
+    const rawKey='exp'+idx+'Raw',subjKey='exp'+idx+'Subj',outKey='exp'+idx;
+    const bySubj={};
     for(const stu of S.students){
       const sc=getStuExamScore(stu,examId);if(!sc)continue;
-      const c=sc[cKey],e=sc[eKey],subj=sc[subjKey];
-      if(c===''||e===''||c==null||e==null||!subj)continue;
-      const cn=Number(c),en=Number(e);if(isNaN(cn)||isNaN(en))continue;
-      takers.push({stuId:stu._docId,c:cn,e:en,subj});
+      const r=sc[rawKey],subj=sc[subjKey];
+      if(r===''||r==null||!subj)continue;
+      const rn=Number(r);if(isNaN(rn))continue;
+      (bySubj[subj]=bySubj[subj]||[]).push({stuId:stu._docId,r:rn});
     }
-    if(takers.length<2)continue;
-    const allC=takers.map(t=>t.c);
-    const muCAll=_avg(allC),sdCAll=_sd(allC);
-    if(!sdCAll)continue;
-    const groups={};
-    for(const t of takers){(groups[t.subj]=groups[t.subj]||[]).push(t);}
-    const zSums=[];
-    for(const t of takers){
-      const grp=groups[t.subj];if(grp.length<2){t.zSum=null;continue;}
-      const cg=grp.map(g=>g.c),eg=grp.map(g=>g.e);
-      const muCG=_avg(cg),sdCG=_sd(cg),muEG=_avg(eg),sdEG=_sd(eg);
-      if(!sdEG){t.zSum=null;continue;}
-      const adjE=sdCG/sdEG*(t.e-muEG)+muCG;
-      const zC=(t.c-muCAll)/sdCAll;
-      const zE=(adjE-muCAll)/sdCAll;
-      t.zSum=wC*zC+wE*zE;
-      zSums.push(t.zSum);
-    }
-    if(zSums.length<2)continue;
-    const muZ=_avg(zSums),sdZ=_sd(zSums);
-    if(!sdZ)continue;
-    for(const t of takers){
-      if(t.zSum==null)continue;
-      const z=(t.zSum-muZ)/sdZ;
-      out[area][t.stuId]=Math.round(20*z+100);
+    for(const subj in bySubj){
+      const grp=bySubj[subj];if(grp.length<2)continue;
+      const rs=grp.map(t=>t.r);
+      const mu=_avg(rs),sd=_sd(rs);
+      if(!sd)continue;
+      for(const t of grp){
+        const z=(t.r-mu)/sd;
+        out[outKey][t.stuId]=Math.round(10*z+50);
+      }
     }
   }
   return out;
@@ -1435,10 +1481,9 @@ function examScoreTblFull(exam,sc,stuDocId){if(!sc)return '';
   let stdRow='';
   if(stuDocId&&S.user?.type!=='student'){
     const std=getExamStandardScores(exam.id);
-    const kStd=std.kor[stuDocId],mStd=std.mat[stuDocId];
-    const kCell=kStd!=null?String(kStd):'—';
-    const mCell=mStd!=null?String(mStd):'—';
-    stdRow=`<tr style="background:#f8fafc"><td class="rh" style="font-size:10px;color:#7c3aed;font-weight:700" title="ADMIN 전용 — 본교 응시 코호트 기준 추정값">표준점수<br><span style="font-size:9px;color:#9ca3af;font-weight:500">(내부 추정)</span></td><td class="dl"></td><td class="vl" style="color:#7c3aed;font-weight:700">${kCell}</td><td class="vl" style="color:#7c3aed;font-weight:700">${mCell}</td><td class="dl"></td><td class="dl"></td><td class="dl"></td>${hasL2?'<td class="dl"></td>':''}</tr>`;
+    const cell=(v)=>v!=null?String(v):'—';
+    const tip=exam.scoreType==='kice'?'평가원·수능 방식 (공통+선택 조정)':'학력평가 방식 (단순 선형변환)';
+    stdRow=`<tr style="background:#f8fafc"><td class="rh" style="font-size:10px;color:#7c3aed;font-weight:700" title="ADMIN 전용 — 본교 응시 코호트 기준 추정값. ${tip}">표준점수<br><span style="font-size:9px;color:#9ca3af;font-weight:500">(내부 추정)</span></td><td class="dl"></td><td class="vl" style="color:#7c3aed;font-weight:700">${cell(std.kor[stuDocId])}</td><td class="vl" style="color:#7c3aed;font-weight:700">${cell(std.mat[stuDocId])}</td><td class="dl"></td><td class="vl" style="color:#7c3aed;font-weight:700">${cell(std.exp1[stuDocId])}</td><td class="vl" style="color:#7c3aed;font-weight:700">${cell(std.exp2[stuDocId])}</td>${hasL2?'<td class="dl"></td>':''}</tr>`;
   }
   return `<div style="overflow-x:auto"><table class="sc-tbl">
   ${scTblColgroup(hasL2)}
@@ -3382,7 +3427,7 @@ function renderAdminExams(){
     const open=isExamOpen(ex);const gcCount=ex.gradeCuts?Object.keys(ex.gradeCuts).length:0;const ecCount=ex.estGradeCuts?Object.keys(ex.estGradeCuts).length:0;
     return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><p style="font-size:15px;font-weight:700">${ex.name}</p>${open?'<span class="bx bg">입력 가능</span>':'<span class="bx bgr">마감</span>'}${ex.provisional?'<span class="bx bpk">가채점</span>':''}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><p style="font-size:15px;font-weight:700">${ex.name}</p>${open?'<span class="bx bg">입력 가능</span>':'<span class="bx bgr">마감</span>'}${ex.provisional?'<span class="bx bpk">가채점</span>':''}<span class="bx bb" style="background:#ede9fe;color:#6d28d9" title="표준점수 산출 방식">${ex.scoreType==='kice'?'평가원':'학력평가'}</span></div>
         <div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openEditExam('${ex.id}')">수정</button><button class="btn bd bsm" onclick="deleteExam('${ex.id}')">삭제</button></div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#6b7280">
@@ -3436,11 +3481,22 @@ function openAbsGradeCutsModal(){
   openModal();
 }
 
+function _examScoreTypeField(cur){
+  const v=cur||'edu';
+  return `<div class="fg"><label class="fl">표준점수 산출 방식</label>
+    <select class="fi fsel" id="exScoreType">
+      <option value="edu" ${v==='edu'?'selected':''}>교육청 학력평가 (단순 선형변환)</option>
+      <option value="kice" ${v==='kice'?'selected':''}>평가원 모의평가·수능 (공통+선택 조정)</option>
+    </select>
+    <p style="font-size:11px;color:#6b7280;margin-top:4px">학력평가: 원점수 → Z → 20z+100 / 평가원: KICE 2027 방식으로 공통·선택 조정 후 가중합</p>
+  </div>`;
+}
 function openAddExam(){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">시험 추가</p>
     <div class="fg"><label class="fl">시험명</label><input class="fi" id="exName" placeholder="예: 3월 모의고사"></div>
     <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date"></div>
     <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date"></div></div>
+    ${_examScoreTypeField('edu')}
     <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2"> 제2외국어/한문 포함</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2"> 과학탐구 II 포함</label>
@@ -3456,6 +3512,7 @@ function openEditExam(examId){
     <div class="fg"><label class="fl">시험명</label><input class="fi" id="exName" value="${ex.name}"></div>
     <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date" value="${ex.scoreStart||''}"></div>
     <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date" value="${ex.scoreEnd||''}"></div></div>
+    ${_examScoreTypeField(ex.scoreType)}
     <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2" ${ex.hasLang2?'checked':''}> 제2외국어/한문 포함</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2" ${ex.hasScienceII?'checked':''}> 과학탐구 II 포함</label>
@@ -3467,13 +3524,13 @@ function openEditExam(examId){
 async function saveExamForm(){
   const name=_('exName')?.value.trim();if(!name){showErr('mErr','시험명을 입력하세요.');return;}
   const examId=_('exId')?.value||('exam_'+uid());
-  const examData={id:examId,name,scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',hasLang2:_('exLang2')?.checked||false,hasScienceII:_('exSci2')?.checked||false,provisional:_('exProvisional')?.checked||false};
+  const examData={id:examId,name,scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',hasLang2:_('exLang2')?.checked||false,hasScienceII:_('exSci2')?.checked||false,provisional:_('exProvisional')?.checked||false,scoreType:_('exScoreType')?.value||'edu'};
   if(!S.config.exams)S.config.exams=[];
   const idx=S.config.exams.findIndex(e=>e.id===examId);
   if(idx>=0){examData.gradeCuts=S.config.exams[idx].gradeCuts||{};examData.estGradeCuts=S.config.exams[idx].estGradeCuts||{};S.config.exams[idx]=examData;}
   else{examData.gradeCuts={};examData.estGradeCuts={};S.config.exams.push(examData);}
   showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();}
+  try{await db.collection('config').doc('main').set(S.config);invalidateStandardScores(examId);closeModal();renderAdminExams();}
   catch(e){showErr('mErr','저장 실패: '+e.message);}
   showLoad(false);}
 
