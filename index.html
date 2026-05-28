@@ -3101,7 +3101,11 @@ async function saveStu(docId){
   const acctPhone=noStu?gphone:phone;
   const aid=acctId(name,acctPhone.replace(/\D/g,''));
   if(S.students.find(s=>s.accountId===aid&&s._docId!==docId)){showErr('mErr',`계정 ID '${aid}'가 이미 존재합니다.`);return;}
-  if(seat){const dup=S.students.find(s=>s.seat===seat&&s._docId!==docId&&!s.withdrawn);if(dup){showErr('mErr',`${seat}번 좌석은 이미 '${dup.name}' 학생에게 배정되어 있습니다.`);return;}}
+  let seatDupWarn='';
+  if(seat){const dup=S.students.find(s=>s.seat===seat&&s._docId!==docId&&!s.withdrawn);if(dup)seatDupWarn=`${seat}번 좌석은 이미 '${dup.name}' 학생에게 배정되어 있습니다.`;}
+  if(seatDupWarn){
+    if(!(await confirmDialog({title:'좌석 번호 중복',message:seatDupWarn+'\n\n그래도 진행하시겠습니까?',confirmLabel:'진행',kind:'danger'})))return;
+  }
   const isAdmin=S.user?.type==='admin';
   if(!isAdmin&&docId){showErr('mErr','학생 정보 수정 권한이 없습니다.');return;}
   showLoad(true);
@@ -3179,8 +3183,7 @@ async function approveAddStudentRequest(reqDocId){
   if(p.seat){
     const dup=S.students.find(s=>s.seat===p.seat&&!s.withdrawn);
     if(dup){
-      if(!(await confirmDialog({title:'좌석 중복',message:`${p.seat}번 좌석은 이미 '${dup.name}' 학생에게 배정되어 있습니다. 좌석을 미배정으로 두고 추가할까요?`,confirmLabel:'좌석 비우고 추가'})))return;
-      p.seat='';
+      if(!(await confirmDialog({title:'좌석 번호 중복',message:`${p.seat}번 좌석은 이미 '${dup.name}' 학생에게 배정되어 있습니다.\n\n그래도 진행하시겠습니까?`,confirmLabel:'진행',kind:'danger'})))return;
     }
   }
   showLoad(true);
