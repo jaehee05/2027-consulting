@@ -505,6 +505,7 @@ const S = {
   editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), alimtalkMode:null, stuSubView:'active',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
   consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0,
+  opScoreStuId:null, opScoreTab:0, opGraphTab:0,
   notices:[], noticeEditId:null, noticeComposerOpen:false
 };
 
@@ -679,7 +680,7 @@ function updateAdminTabs(){
   if(!S.user||S.user.type==='student')return;
   const el=_('adminTabs');if(!el)return;
   const isAdmin=S.user.type==='admin';
-  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['notices','공지사항'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['bookings','예약 현황']];
+  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['notices','공지사항'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['students','학생 목록'],['scores','학생 성적'],['bookings','예약 현황']];
   const n=pendingReqCountForAdmin();
   el.innerHTML=tabs.map(([id,label])=>{
     const badge=(id==='bookings'&&n>0)?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${n}</span>`:'';
@@ -979,6 +980,7 @@ function showWithdrawnNotice(){
 }
 
 function doLogout(){
+  if(S.adminPreviewSnapshot){exitAdminPreview();return;}
   stopRequestsListener();
   stopBookingsListener();
   stopNoticesListener();
@@ -986,7 +988,7 @@ function doLogout(){
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];
   S.noticeEditId=null;S.noticeComposerOpen=false;
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
-  S.stuSelected=new Set();S.consultStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
+  S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   S._pendingAdmin=null;
   clearSession();
   auth.signOut().catch(()=>{});
@@ -2487,7 +2489,40 @@ function renderAdminLogins(){
   </table></div></div>`;
 }
 
+function renderOpStudents(){
+  const gradeOrder={'고3':0,'고2':1,'고1':2};
+  const baseStu=realStu();
+  const sorted=[...baseStu].sort((a,b)=>{
+    if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='seat') return ((a.seat||999))-(b.seat||999);
+    if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
+    return 0;
+  });
+  const rows=sorted.map(s=>{
+    const stuPhone=s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':s.studentPhone;
+    return `<tr>
+    <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+    <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
+    <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}</span></td>
+    <td data-label="학교">${s.school}</td>
+    <td data-label="학생 연락처">${stuPhone}</td>
+    <td data-label="보호자 연락처">${s.guardianPhone}</td>
+  </tr>`;}).join('');
+  const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
+  const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
+  </div>
+  <div class="card" style="padding:0"><div class="tw tw-cards"><table>
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th></tr></thead>
+    <tbody>${rows||'<tr class="empty-row"><td colspan="6" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+  </table></div></div>`;
+}
+
 function renderAdminStudents(){
+  if(S.user?.type!=='admin')return renderOpStudents();
   if(S.stuSubView==='withdrawn')return renderWithdrawnStudents();
   const gradeOrder={'고3':0,'고2':1,'고1':2};
   const baseStu=realStu();
@@ -2520,7 +2555,7 @@ function renderAdminStudents(){
     <td data-label="학생 연락처">${stuPhone}</td>
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
     <td data-label="계정 ID"><code>${s.accountId}</code></td>
-    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
+    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bs bsm" onclick="previewAsStudent('${s._docId}')" title="이 학생의 화면을 미리봅니다">학생뷰</button><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
   </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
@@ -2855,7 +2890,80 @@ async function sendScoreReminderBulk(){
 }
 
 /* ── ADMIN: 학생 성적 ── */
+function renderOpScores(){
+  const gradeOrder={'고3':0,'고2':1,'고1':2};
+  const baseStu=bookableStu();
+  const sorted=[...baseStu].sort((a,b)=>{
+    if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='seat') return ((a.seat||999))-(b.seat||999);
+    if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
+    return 0;
+  });
+  const examsForRows=getExams();
+  const rows=sorted.map(s=>{
+    const examCells=examsForRows.map(ex=>`<td style="text-align:center">${hasStuExamScore(s,ex.id)?_OK_SVG:_NA_DOT}</td>`).join('');
+    return `<tr style="cursor:pointer" onclick="S.opScoreStuId='${s._docId}';S.opScoreTab=0;S.opGraphTab=0;renderAdminScores()">
+      <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+      <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
+      <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
+      ${examCells}
+    </tr>`;}).join('');
+  const examTotals=examsForRows.map(ex=>({ex,total:baseStu.filter(s=>hasStuExamScore(s,ex.id)).length}));
+  const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
+  const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminScores()">${l}</button>`).join('');
+  const examHeaders=examsForRows.map(ex=>`<th title="${escapeHtml(ex.name)}">${ex.name.replace(/\s*모의.*$/,'')}</th>`).join('');
+  const colCount=4+examsForRows.length;
+  _('adminC').innerHTML=`<style>#adminC .opscore-tbl tbody tr:hover{background:#f9fafb}</style>
+  <div class="sh"><span class="shtitle">학생 성적 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
+  <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">${examTotals.map(({ex,total})=>`<div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1;min-width:120px"><span style="font-size:11px;font-weight:600;color:#6b7280">${ex.name}</span><p style="font-size:18px;font-weight:800;margin-top:2px">${total}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${baseStu.length}명</span></p></div>`).join('')}</div>
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
+  <div class="card" style="padding:0"><div class="tw"><table class="opscore-tbl">
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th>${examHeaders}</tr></thead>
+    <tbody>${rows||`<tr><td colspan="${colCount}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
+  </table></div></div>`;
+}
+
+function renderOpScoreDetail(){
+  const stu=S.students.find(x=>x._docId===S.opScoreStuId);
+  if(!stu){S.opScoreStuId=null;renderAdminScores();return;}
+  const exams=getExams();
+  const examsWithScore=exams.filter(ex=>hasStuExamScore(stu,ex.id));
+  const scoreTabIdx=Math.min(S.opScoreTab||0,Math.max(0,examsWithScore.length-1));
+  let scoreTabs='',scoreBody='';
+  if(examsWithScore.length){
+    scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.opScoreTab=${i};renderAdminScores()">${ex.name}</button>`).join('');
+    const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
+    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
+  }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
+  const subjects=getGradeSubjects(stu);
+  const graphTabIdx=Math.min(S.opGraphTab||0,Math.max(0,subjects.length-1));
+  const graphTabs=subjects.map((s,i)=>`<button class="dt ${i===graphTabIdx?'on':''}" onclick="S.opGraphTab=${i};renderAdminScores()">${s.label}</button>`).join('');
+  const selSubj=subjects[graphTabIdx]||subjects[0];
+  const graphBody=subjects.length?drawGradeGraph(exams,stu,selSubj):'';
+  _('adminC').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn bs bsm" onclick="S.opScoreStuId=null;renderAdminScores()">← 목록</button>
+      <div><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}</p></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <p style="font-size:13px;font-weight:700;margin-bottom:10px">성적표</p>
+      ${examsWithScore.length>1?'<div class="dtabs" style="margin-bottom:10px">'+scoreTabs+'</div>':''}
+      ${scoreBody}
+    </div>
+    ${subjects.length?`<div class="card" style="margin-bottom:12px">
+      <p style="font-size:13px;font-weight:700;margin-bottom:10px">등급 추이</p>
+      ${subjectChangesHtml(stu,exams)}
+      <div class="dtabs" style="margin-bottom:10px">${graphTabs}</div>
+      ${graphBody}
+    </div>`:''}`;
+}
+
 function renderAdminScores(){
+  if(S.user?.type!=='admin'){
+    if(S.opScoreStuId)return renderOpScoreDetail();
+    return renderOpScores();
+  }
   const gradeOrder={'고3':0,'고2':1,'고1':2};
   const baseStu=bookableStu();
   const sorted=[...baseStu].sort((a,b)=>{
@@ -4592,6 +4700,45 @@ function enterHome(){
   applyChannelIOVisibility();
 }
 function goHome(){enterHome();}
+
+function previewAsStudent(stuDocId){
+  if(S.user?.type!=='admin'){toast('ADMIN 전용 기능입니다.','warn');return;}
+  const stu=S.students.find(x=>x._docId===stuDocId);
+  if(!stu){toast('학생을 찾을 수 없습니다.','error');return;}
+  S.adminPreviewSnapshot={user:S.user,studentDocId:S.studentDocId,tab:S.tab,consultStuId:S.consultStuId,opScoreStuId:S.opScoreStuId};
+  S.user={type:'student',id:stu.accountId||stuDocId,name:stu.name,isPreview:true,_adminName:S.adminPreviewSnapshot.user.name||'관리자'};
+  S.studentDocId=stuDocId;
+  S.consultStuId=null;S.opScoreStuId=null;S.tab=null;
+  _('stuUname').textContent=stu.name+' 학생 (관리자 미리보기)';
+  showView('vStu');applyChips();renderStu();
+  applyAdminPreviewBanner();
+  if(!_skipPush)navPush({v:'vStu',p:'main'});
+}
+
+function exitAdminPreview(){
+  const snap=S.adminPreviewSnapshot;if(!snap)return;
+  S.adminPreviewSnapshot=null;
+  S.user=snap.user;S.studentDocId=snap.studentDocId;
+  S.consultStuId=snap.consultStuId||null;
+  S.opScoreStuId=snap.opScoreStuId||null;
+  applyAdminPreviewBanner();
+  _('adminUname').textContent=S.user.name;
+  _('adminRoleLabel').textContent='ADMIN';
+  showView('vAdmin');applyChips();
+  setTab(snap.tab||'students');
+}
+
+function applyAdminPreviewBanner(){
+  let b=_('adminPreviewBanner');
+  const on=!!(S.adminPreviewSnapshot&&S.user?.isPreview);
+  if(!on){if(b)b.remove();return;}
+  if(!b){
+    b=document.createElement('div');b.id='adminPreviewBanner';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#fbbf24;color:#7c2d12;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.1)';
+    document.body.appendChild(b);
+  }
+  b.innerHTML=`<span>🔍 관리자 미리보기 — ${escapeHtml(S.user.name||'')} 학생 화면을 보고 있습니다</span><button class="btn bs bsm" style="background:#fff" onclick="exitAdminPreview()">← ADMIN으로 돌아가기</button>`;
+}
 function goLoginView(){showView('vLogin');applyChips();}
 function goConsulting(){
   if(!S.user){goLoginView();return;}
@@ -5104,6 +5251,7 @@ function navGetState(){
   }
   if(S.user&&S.user.type!=='student'){
     if(S.tab==='consult'&&S.consultStuId)return{v:'vAdmin',tab:S.tab,consultStuId:S.consultStuId};
+    if(S.tab==='scores'&&S.user.type!=='admin'&&S.opScoreStuId)return{v:'vAdmin',tab:S.tab,opScoreStuId:S.opScoreStuId};
     return{v:'vAdmin',tab:S.tab};
   }
   return null;
@@ -5124,6 +5272,9 @@ setTab=async function(tab){await _origSetTab(tab);if(!_skipPush)navPush({v:'vAdm
 var _origRenderAdminConsult=renderAdminConsult;
 renderAdminConsult=function(){_origRenderAdminConsult();if(!_skipPush&&S.consultStuId)navPush({v:'vAdmin',tab:'consult',consultStuId:S.consultStuId});};
 
+var _origRenderAdminScores=renderAdminScores;
+renderAdminScores=function(){_origRenderAdminScores();if(!_skipPush&&S.user?.type!=='admin'&&S.opScoreStuId)navPush({v:'vAdmin',tab:'scores',opScoreStuId:S.opScoreStuId});};
+
 window.addEventListener('popstate',function(e){
   var st=e.state;if(!st)return;
   _skipPush=true;
@@ -5142,7 +5293,8 @@ window.addEventListener('popstate',function(e){
       showView('vAdmin');
       if(S.consultStuId&&(!st.consultStuId||st.tab!=='consult')){var cId=S.consultStuId;var cExs=getExams();var cIdx=Math.min(S.consultNoteTab||0,cExs.length-1);var cExam=cExs[cIdx];var cStu=S.students.find(function(x){return x._docId===cId;});if(cExam&&cStu){var cNote=_('consultInput')?.value||'';var cVis=_('consultVisible')?.checked||false;var prev=(cStu.consultNotes&&cStu.consultNotes[cExam.id])||{note:'',visible:false};if(cNote!==(prev.note||'')||cVis!==!!prev.visible){if(!cStu.consultNotes)cStu.consultNotes={};cStu.consultNotes[cExam.id]={note:cNote,visible:cVis};db.collection('students').doc(cId).update({['consultNotes.'+cExam.id]:{note:cNote,visible:cVis}}).catch(function(){});}}if(cStu){var cMemo=_('consultMemoInput')?.value;if(cMemo!=null&&cMemo!==(cStu.memo||'')){cStu.memo=cMemo;db.collection('students').doc(cId).update({memo:cMemo}).catch(function(){});}}}
       if(st.consultStuId){S.consultStuId=st.consultStuId;S.tab='consult';_origSetTab('consult');}
-      else if(st.tab){if(st.tab==='consult')S.consultStuId=null;_origSetTab(st.tab);}
+      else if(st.opScoreStuId){S.opScoreStuId=st.opScoreStuId;S.tab='scores';_origSetTab('scores');}
+      else if(st.tab){if(st.tab==='consult')S.consultStuId=null;if(st.tab==='scores')S.opScoreStuId=null;_origSetTab(st.tab);}
     }
   }finally{_skipPush=false;}
 });
