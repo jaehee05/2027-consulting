@@ -595,115 +595,6 @@ function getStuExamScore(stu,examId){return stu?.scores?.[examId]||null;}
 function hasStuExamScore(stu,examId){const sc=getStuExamScore(stu,examId);return sc&&Object.values(sc).some(v=>v);}
 
 const GC_ABS_SUBJS=[['eng','영어',100],['his','한국사',50],['lang2','제2외국어/한문',50]];
-const RAW_MAX_DEFAULTS={korCommon:76,korElective:24,matCommon:74,matElective:26};
-function getRawMax(key){const m=S.config?.rawMax||{};const v=m[key];return v!=null&&v!==''?Number(v):RAW_MAX_DEFAULTS[key];}
-function korTotalMax(){return getRawMax('korCommon')+getRawMax('korElective');}
-function matTotalMax(){return getRawMax('matCommon')+getRawMax('matElective');}
-
-// ── 표준점수 산출 (2027 수능 방식) ── ADMIN 전용. 학생 화면에는 노출하지 않는다.
-// 공통+선택 구조의 국어/수학에 대해 본교 응시 코호트 기준으로 추정 표준점수 계산.
-// 단계: (1) 선택과목 집단별 조정원점수 → (2) 전체 응시 공통 평균/표준편차로 Z화 →
-//       (3) 배점비율(공통/선택) 가중합 → (4) 가중합을 코호트 내 표준화 후 20z+100.
-function _avg(a){return a.reduce((s,v)=>s+v,0)/a.length;}
-function _sd(a){const m=_avg(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/a.length);}
-function computeExamStandardScores(examId){
-  const exam=getExam(examId);
-  const scoreType=exam?.scoreType||'edu';
-  const out={kor:{},mat:{},exp1:{},exp2:{}};
-  // ── 국어/수학 ──
-  for(const area of ['kor','mat']){
-    if(scoreType==='kice'){
-      // 수능·평가원: 공통+선택 조정 방식
-      const cKey=area+'CommonRaw',eKey=area+'ElectiveRaw',subjKey=area+'Subj';
-      const cMax=getRawMax(area+'Common'),eMax=getRawMax(area+'Elective'),tot=cMax+eMax;
-      const wC=tot?cMax/tot:0.5,wE=tot?eMax/tot:0.5;
-      const takers=[];
-      for(const stu of S.students){
-        const sc=getStuExamScore(stu,examId);if(!sc)continue;
-        const c=sc[cKey],e=sc[eKey],subj=sc[subjKey];
-        if(c===''||e===''||c==null||e==null||!subj)continue;
-        const cn=Number(c),en=Number(e);if(isNaN(cn)||isNaN(en))continue;
-        takers.push({stuId:stu._docId,c:cn,e:en,subj});
-      }
-      if(takers.length<2)continue;
-      const allC=takers.map(t=>t.c);
-      const muCAll=_avg(allC),sdCAll=_sd(allC);
-      if(!sdCAll)continue;
-      const groups={};
-      for(const t of takers){(groups[t.subj]=groups[t.subj]||[]).push(t);}
-      const zSums=[];
-      for(const t of takers){
-        const grp=groups[t.subj];if(grp.length<2){t.zSum=null;continue;}
-        const cg=grp.map(g=>g.c),eg=grp.map(g=>g.e);
-        const muCG=_avg(cg),sdCG=_sd(cg),muEG=_avg(eg),sdEG=_sd(eg);
-        if(!sdEG){t.zSum=null;continue;}
-        const adjE=sdCG/sdEG*(t.e-muEG)+muCG;
-        const zC=(t.c-muCAll)/sdCAll;
-        const zE=(adjE-muCAll)/sdCAll;
-        t.zSum=wC*zC+wE*zE;
-        zSums.push(t.zSum);
-      }
-      if(zSums.length<2)continue;
-      const muZ=_avg(zSums),sdZ=_sd(zSums);
-      if(!sdZ)continue;
-      for(const t of takers){
-        if(t.zSum==null)continue;
-        const z=(t.zSum-muZ)/sdZ;
-        out[area][t.stuId]=Math.round(20*z+100);
-      }
-    } else {
-      // 교육청 학력평가: 총점 단순 Z → 20z+100
-      const rawKey=area+'Raw';
-      const takers=[];
-      for(const stu of S.students){
-        const sc=getStuExamScore(stu,examId);if(!sc)continue;
-        const r=sc[rawKey];if(r===''||r==null)continue;
-        const rn=Number(r);if(isNaN(rn))continue;
-        takers.push({stuId:stu._docId,r:rn});
-      }
-      if(takers.length<2)continue;
-      const rs=takers.map(t=>t.r);
-      const mu=_avg(rs),sd=_sd(rs);
-      if(!sd)continue;
-      for(const t of takers){
-        const z=(t.r-mu)/sd;
-        out[area][t.stuId]=Math.round(20*z+100);
-      }
-    }
-  }
-  // ── 탐구 1/2 (학력평가·수능 공통: 과목별 Z → 10z+50) ──
-  for(const idx of [1,2]){
-    const rawKey='exp'+idx+'Raw',subjKey='exp'+idx+'Subj',outKey='exp'+idx;
-    const bySubj={};
-    for(const stu of S.students){
-      const sc=getStuExamScore(stu,examId);if(!sc)continue;
-      const r=sc[rawKey],subj=sc[subjKey];
-      if(r===''||r==null||!subj)continue;
-      const rn=Number(r);if(isNaN(rn))continue;
-      (bySubj[subj]=bySubj[subj]||[]).push({stuId:stu._docId,r:rn});
-    }
-    for(const subj in bySubj){
-      const grp=bySubj[subj];if(grp.length<2)continue;
-      const rs=grp.map(t=>t.r);
-      const mu=_avg(rs),sd=_sd(rs);
-      if(!sd)continue;
-      for(const t of grp){
-        const z=(t.r-mu)/sd;
-        out[outKey][t.stuId]=Math.round(10*z+50);
-      }
-    }
-  }
-  return out;
-}
-function getExamStandardScores(examId){
-  if(!S._stdCache)S._stdCache={};
-  if(!S._stdCache[examId])S._stdCache[examId]=computeExamStandardScores(examId);
-  return S._stdCache[examId];
-}
-function invalidateStandardScores(examId){
-  if(!S._stdCache)return;
-  if(examId)delete S._stdCache[examId];else S._stdCache={};
-}
 function gcRelGroups(exam){
   const sci2=exam&&exam.hasScienceII;
   return [
@@ -1246,8 +1137,8 @@ function expSubjIndex(exam,subj){
 }
 function getScoreSteps(exam){
   const steps=[
-    {id:'kor',title:'국어',type:'gridRawSplit',subjKey:'korSubj',rawKey:'korRaw',commonKey:'korCommonRaw',electiveKey:'korElectiveRaw',commonMaxKey:'korCommon',electiveMaxKey:'korElective',items:['화법과 작문','언어와 매체']},
-    {id:'mat',title:'수학',type:'gridRawSplit',subjKey:'matSubj',rawKey:'matRaw',commonKey:'matCommonRaw',electiveKey:'matElectiveRaw',commonMaxKey:'matCommon',electiveMaxKey:'matElective',items:['확률과 통계','미적분','기하']},
+    {id:'kor',title:'국어',type:'gridRaw',subjKey:'korSubj',rawKey:'korRaw',rawMax:100,items:['화법과 작문','언어와 매체']},
+    {id:'mat',title:'수학',type:'gridRaw',subjKey:'matSubj',rawKey:'matRaw',rawMax:100,items:['확률과 통계','미적분','기하']},
     {id:'eng',title:'영어',type:'rawOnly',rawMax:100,rawKey:'engRaw'},
     {id:'his',title:'한국사',type:'rawOnly',rawMax:50,rawKey:'hisRaw'},
     {id:'exp1s',title:'탐구 1',type:'expGrid',subjKey:'exp1Subj',excludeKey:null},
@@ -1266,7 +1157,7 @@ function startScoreWizard(examId){
   const stu=S.students.find(x=>x._docId===S.studentDocId);
   const sc=getStuExamScore(stu,examId)||{};
   S.scoreWizardExamId=examId;S.scoreStep=0;
-  S.scoreWizard={korSubj:sc.korSubj||'',korRaw:sc.korRaw||'',korCommonRaw:sc.korCommonRaw||'',korElectiveRaw:sc.korElectiveRaw||'',matSubj:sc.matSubj||'',matRaw:sc.matRaw||'',matCommonRaw:sc.matCommonRaw||'',matElectiveRaw:sc.matElectiveRaw||'',engRaw:sc.engRaw||'',hisRaw:sc.hisRaw||'',exp1Subj:sc.exp1Subj||'',exp1Raw:sc.exp1Raw||'',exp2Subj:sc.exp2Subj||'',exp2Raw:sc.exp2Raw||'',lang2Subj:sc.lang2Subj||'',lang2Raw:sc.lang2Raw||'',lang2Take:!!(sc.lang2Subj||sc.lang2Raw),_legacyKorRaw:!sc.korCommonRaw&&!sc.korElectiveRaw?sc.korRaw||'':'',_legacyMatRaw:!sc.matCommonRaw&&!sc.matElectiveRaw?sc.matRaw||'':''};
+  S.scoreWizard={korSubj:sc.korSubj||'',korRaw:sc.korRaw||'',matSubj:sc.matSubj||'',matRaw:sc.matRaw||'',engRaw:sc.engRaw||'',hisRaw:sc.hisRaw||'',exp1Subj:sc.exp1Subj||'',exp1Raw:sc.exp1Raw||'',exp2Subj:sc.exp2Subj||'',exp2Raw:sc.exp2Raw||'',lang2Subj:sc.lang2Subj||'',lang2Raw:sc.lang2Raw||'',lang2Take:!!(sc.lang2Subj||sc.lang2Raw)};
   renderScoreWizard();
 }
 
@@ -1299,35 +1190,6 @@ function renderScoreWizard(){
       <div class="sw-bottom">${prevBtn}${cur?`<button class="sw-next" onclick="swSaveStep();S.scoreStep++;renderScoreWizard()">다음</button>`:''}</div>
     </div></div>`;
     if(cur)setTimeout(()=>{const el=_('sw-raw');if(el)el.focus();},50);
-    return;
-  }
-
-  if(st.type==='gridRawSplit'){
-    const cur=w[st.subjKey]||'';
-    const cMax=getRawMax(st.commonMaxKey),eMax=getRawMax(st.electiveMaxKey),totMax=cMax+eMax;
-    const curC=w[st.commonKey]||'',curE=w[st.electiveKey]||'';
-    const legacyKey='_legacy'+st.rawKey.charAt(0).toUpperCase()+st.rawKey.slice(1);
-    const legacy=w[legacyKey]||'';
-    const cols=st.items.length<=3?st.items.length:3;
-    let grid=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-top:8px">`;
-    for(const item of st.items){
-      const sel=item===cur;
-      grid+=`<button style="padding:16px 8px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':'#e5e7eb'};background:${sel?'#1C64F2':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}'){S.scoreWizard['${st.commonKey}']='';S.scoreWizard['${st.electiveKey}']='';};S.scoreWizard['${st.subjKey}']='${item}';renderScoreWizard()">${item}</button>`;
-    }
-    grid+=`</div>`;
-    const sumNow=(Number(curC)||0)+(Number(curE)||0);
-    const showSum=(curC!==''||curE!=='');
-    const legacyHint=cur&&legacy&&!showSum?`<p style="font-size:12px;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 10px;margin-top:14px">기존 입력 총점: ${escapeHtml(String(legacy))}점 — 공통/선택을 새로 입력해 저장하면 덮어쓰여집니다.</p>`:'';
-    const splitFields=cur?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px">
-      <div class="sw-field" style="margin:0"><label class="sw-label on">공통 (0~${cMax})</label><input class="sw-input" id="sw-rawC" type="number" min="0" max="${cMax}" placeholder="공통 원점수" value="${curC}" oninput="swValidateRaw(this,${cMax});swUpdateSplitSum()"></div>
-      <div class="sw-field" style="margin:0"><label class="sw-label on">선택 (0~${eMax})</label><input class="sw-input" id="sw-rawE" type="number" min="0" max="${eMax}" placeholder="선택 원점수" value="${curE}" oninput="swValidateRaw(this,${eMax});swUpdateSplitSum()"></div>
-    </div>
-    <p id="sw-sumLine" style="font-size:13px;color:#374151;margin-top:10px;font-weight:600">총점: <span id="sw-sumVal">${showSum?sumNow:'—'}</span> / ${totMax}</p>${legacyHint}`:'';
-    c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
-      <div><p class="sw-title">${st.title}</p><p style="color:#6b7280;font-size:14px;margin-bottom:4px">선택과목을 선택하세요.</p>${grid}${splitFields}</div>
-      <div class="sw-bottom">${prevBtn}${cur?`<button class="sw-next" onclick="swSaveStep();S.scoreStep++;renderScoreWizard()">다음</button>`:''}</div>
-    </div></div>`;
-    if(cur)setTimeout(()=>{const el=_('sw-rawC');if(el&&!curC)el.focus();},50);
     return;
   }
 
@@ -1394,29 +1256,11 @@ function swValidateRaw(el,max){
   if(v<0){toast('원점수는 0 이상이어야 합니다.','warn');el.value='';return;}
   if(v>max){toast('원점수는 '+max+' 이하여야 합니다.','warn');el.value='';return;}
 }
-function swUpdateSplitSum(){
-  const c=_('sw-rawC'),e=_('sw-rawE'),v=_('sw-sumVal');if(!v)return;
-  const cv=c?.value||'',ev=e?.value||'';
-  if(cv===''&&ev===''){v.textContent='—';return;}
-  v.textContent=(Number(cv)||0)+(Number(ev)||0);
-}
 function swSaveStep(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
   const steps=getScoreSteps(exam);const st=steps[S.scoreStep];if(!st)return;
   if(st.type==='expGrid')return;
   if(st.type==='lang2Page'){if(S.scoreWizard.lang2Take)S.scoreWizard.lang2Raw=_('sw-raw')?.value||'';return;}
-  if(st.type==='gridRawSplit'){
-    const cv=_('sw-rawC')?.value||'',ev=_('sw-rawE')?.value||'';
-    S.scoreWizard[st.commonKey]=cv;
-    S.scoreWizard[st.electiveKey]=ev;
-    if(cv===''&&ev===''){
-      const legacyKey='_legacy'+st.rawKey.charAt(0).toUpperCase()+st.rawKey.slice(1);
-      S.scoreWizard[st.rawKey]=S.scoreWizard[legacyKey]||'';
-    }else{
-      S.scoreWizard[st.rawKey]=String((Number(cv)||0)+(Number(ev)||0));
-    }
-    return;
-  }
   if(st.rawKey){S.scoreWizard[st.rawKey]=_('sw-raw')?.value||'';}
 }
 
@@ -1427,7 +1271,7 @@ async function finishScoreWizard(){
     const i1=expSubjIndex(exam,w.exp1Subj),i2=expSubjIndex(exam,w.exp2Subj);
     if(i1>=0&&i2>=0&&i2<=i1){toast('탐구 과목 순서가 올바르지 않습니다.\n1선택 과목이 2선택 과목보다 우선순위가 높아야 합니다.\n(사회탐구 > 과학탐구, 과탐Ⅰ > 과탐Ⅱ)','warn',{duration:5000});return;}
   }
-  const scoreData={korSubj:w.korSubj,korRaw:w.korRaw,korCommonRaw:w.korCommonRaw||'',korElectiveRaw:w.korElectiveRaw||'',korGrade:getExamGrade(exam,w.korSubj,w.korRaw),matSubj:w.matSubj,matRaw:w.matRaw,matCommonRaw:w.matCommonRaw||'',matElectiveRaw:w.matElectiveRaw||'',matGrade:getExamGrade(exam,w.matSubj,w.matRaw),engRaw:w.engRaw,engGrade:getAbsGrade('eng',w.engRaw),hisRaw:w.hisRaw,hisGrade:getAbsGrade('his',w.hisRaw),exp1Subj:w.exp1Subj,exp1Raw:w.exp1Raw,exp1Grade:getExamGrade(exam,w.exp1Subj,w.exp1Raw),exp2Subj:w.exp2Subj,exp2Raw:w.exp2Raw,exp2Grade:getExamGrade(exam,w.exp2Subj,w.exp2Raw)};
+  const scoreData={korSubj:w.korSubj,korRaw:w.korRaw,korGrade:getExamGrade(exam,w.korSubj,w.korRaw),matSubj:w.matSubj,matRaw:w.matRaw,matGrade:getExamGrade(exam,w.matSubj,w.matRaw),engRaw:w.engRaw,engGrade:getAbsGrade('eng',w.engRaw),hisRaw:w.hisRaw,hisGrade:getAbsGrade('his',w.hisRaw),exp1Subj:w.exp1Subj,exp1Raw:w.exp1Raw,exp1Grade:getExamGrade(exam,w.exp1Subj,w.exp1Raw),exp2Subj:w.exp2Subj,exp2Raw:w.exp2Raw,exp2Grade:getExamGrade(exam,w.exp2Subj,w.exp2Raw)};
   if(exam.hasLang2){scoreData.lang2Subj=w.lang2Subj;scoreData.lang2Raw=w.lang2Raw;scoreData.lang2Grade=getAbsGrade('lang2',w.lang2Raw);}
   showLoad(true);
   try{
@@ -1435,7 +1279,6 @@ async function finishScoreWizard(){
     mergeGradeOverrides(stu,examId,scoreData);
     if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;
     await db.collection('students').doc(S.studentDocId).update({['scores.'+examId]:scoreData});
-    invalidateStandardScores(examId);
     S.editingExamId=null;S.scoreStep=getScoreSteps(exam).length;renderScoreWizard();
   }catch(e){toast('저장 실패: '+e.message,'error');}
   showLoad(false);
@@ -1468,7 +1311,7 @@ function rawWithDiff(raw,cuts){
   if(!cur&&!upper)return raw;
   return `<span style="position:relative;display:inline-block">${upper?`<span style="position:absolute;right:100%;top:50%;transform:translateY(-50%);margin-right:3px">${upper}</span>`:''}<span>${raw}</span>${cur?`<span style="position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:3px">${cur}</span>`:''}</span>`;
 }
-function examScoreTblFull(exam,sc,stuDocId){if(!sc)return '';
+function examScoreTblFull(exam,sc){if(!sc)return '';
   const hasL2=exam.hasLang2&&(sc.lang2Subj||sc.lang2Raw);
   const gc=exam.gradeCuts||{};const gca=S.config.gradeCuts?.abs||{};
   const kg=examGradeCell(exam,sc.korSubj,sc.korRaw,sc.korGradeOverride),mg=examGradeCell(exam,sc.matSubj,sc.matRaw,sc.matGradeOverride);
@@ -1478,20 +1321,12 @@ function examScoreTblFull(exam,sc,stuDocId){if(!sc)return '';
   const krD=rawWithDiff(sc.korRaw,gc[sc.korSubj]),mrD=rawWithDiff(sc.matRaw,gc[sc.matSubj]);
   const erD=rawWithDiff(sc.engRaw,gca.eng),e1rD=rawWithDiff(sc.exp1Raw,gc[sc.exp1Subj]),e2rD=rawWithDiff(sc.exp2Raw,gc[sc.exp2Subj]);
   const gradeLabel=hasAnyEstGrade(exam)?'예상등급':'등급';
-  let stdRow='';
-  if(stuDocId&&S.user?.type!=='student'){
-    const std=getExamStandardScores(exam.id);
-    const cell=(v)=>v!=null?String(v):'—';
-    const tip=exam.scoreType==='kice'?'평가원·수능 방식 (공통+선택 조정)':'학력평가 방식 (단순 선형변환)';
-    stdRow=`<tr style="background:#f8fafc"><td class="rh" style="font-size:10px;color:#7c3aed;font-weight:700" title="ADMIN 전용 — 본교 응시 코호트 기준 추정값. ${tip}">표준점수<br><span style="font-size:9px;color:#9ca3af;font-weight:500">(내부 추정)</span></td><td class="dl"></td><td class="vl" style="color:#7c3aed;font-weight:700">${cell(std.kor[stuDocId])}</td><td class="vl" style="color:#7c3aed;font-weight:700">${cell(std.mat[stuDocId])}</td><td class="dl"></td><td class="vl" style="color:#7c3aed;font-weight:700">${cell(std.exp1[stuDocId])}</td><td class="vl" style="color:#7c3aed;font-weight:700">${cell(std.exp2[stuDocId])}</td>${hasL2?'<td class="dl"></td>':''}</tr>`;
-  }
   return `<div style="overflow-x:auto"><table class="sc-tbl">
   ${scTblColgroup(hasL2)}
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
   <tr><td class="rh" style="font-size:10px">선택과목</td><td class="dl"></td><td style="font-size:11px">${sc.korSubj||'—'}</td><td style="font-size:11px">${sc.matSubj||'—'}</td><td class="dl"></td><td style="font-size:11px">${sc.exp1Subj||'—'}</td><td style="font-size:11px">${sc.exp2Subj||'—'}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${krD}</td><td class="vl">${mrD}</td><td class="vl">${erD}</td><td class="vl">${e1rD}</td><td class="vl">${e2rD}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px;${hasAnyEstGrade(exam)?'color:#f59e0b;font-weight:700':''}">${gradeLabel}</td>${hg}${kg}${mg}${eg}${e1g}${e2g}${l2g}</tr>
-  ${stdRow}
 </table></div>`;}
 
 function examScoreTblHtml(exam,sc){if(!sc)return '';
@@ -2409,7 +2244,7 @@ function renderConsultDetail(){
   if(examsWithScore.length){
     scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.consultScoreTab=${i};renderConsultDetail()">${ex.name}</button>`).join('');
     const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
-    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id),stu._docId);
+    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
   }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
   const subjects=getGradeSubjects(stu);
   const graphTabIdx=S.consultGraphTab||0;
@@ -3117,7 +2952,7 @@ function renderOpScoreDetail(){
   if(examsWithScore.length){
     scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.opScoreTab=${i};renderAdminScores()">${ex.name}</button>`).join('');
     const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
-    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id),stu._docId);
+    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
   }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
   const subjects=getGradeSubjects(stu);
   const graphTabIdx=Math.min(S.opGraphTab||0,Math.max(0,subjects.length-1));
@@ -3427,7 +3262,7 @@ function renderAdminExams(){
     const open=isExamOpen(ex);const gcCount=ex.gradeCuts?Object.keys(ex.gradeCuts).length:0;const ecCount=ex.estGradeCuts?Object.keys(ex.estGradeCuts).length:0;
     return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><p style="font-size:15px;font-weight:700">${ex.name}</p>${open?'<span class="bx bg">입력 가능</span>':'<span class="bx bgr">마감</span>'}${ex.provisional?'<span class="bx bpk">가채점</span>':''}<span class="bx bb" style="background:#ede9fe;color:#6d28d9" title="표준점수 산출 방식">${ex.scoreType==='kice'?'평가원':'학력평가'}</span></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><p style="font-size:15px;font-weight:700">${ex.name}</p>${open?'<span class="bx bg">입력 가능</span>':'<span class="bx bgr">마감</span>'}${ex.provisional?'<span class="bx bpk">가채점</span>':''}</div>
         <div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="openEditExam('${ex.id}')">수정</button><button class="btn bd bsm" onclick="deleteExam('${ex.id}')">삭제</button></div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#6b7280">
@@ -3441,34 +3276,7 @@ function renderAdminExams(){
     </div>`;}).join('');
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">시험 관리</span><button class="btn bp bsm" onclick="openAddExam()">+ 시험 추가</button></div>
     ${examCards||'<div class="card empty">등록된 시험이 없습니다.</div>'}
-    <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn bs bsm" onclick="openRawMaxModal()">국어/수학 원점수 범위</button><button class="btn bs bsm" onclick="openAbsGradeCutsModal()">절대평가 등급컷 수정</button></div>`;
-}
-
-function openRawMaxModal(){
-  const m=S.config?.rawMax||{};
-  const cur=(k)=>m[k]!=null&&m[k]!==''?m[k]:RAW_MAX_DEFAULTS[k];
-  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:6px">국어/수학 원점수 범위 <span class="bx bb" style="font-size:10px;margin-left:6px">모든 시험 공통</span></p>
-    <p style="font-size:11px;color:#6b7280;margin-bottom:14px">학생/관리자가 성적 입력할 때 공통·선택 각각의 최대 원점수입니다. 시험에 따라 조정하세요.</p>
-    <p style="font-size:13px;font-weight:700;margin:8px 0 8px">국어</p>
-    <div class="frow"><div class="fg"><label class="fl">공통 최대 원점수</label><input class="fi" id="rm-kc" type="number" min="0" max="100" value="${cur('korCommon')}"></div>
-    <div class="fg"><label class="fl">선택 최대 원점수</label><input class="fi" id="rm-ke" type="number" min="0" max="100" value="${cur('korElective')}"></div></div>
-    <p style="font-size:13px;font-weight:700;margin:8px 0 8px">수학</p>
-    <div class="frow"><div class="fg"><label class="fl">공통 최대 원점수</label><input class="fi" id="rm-mc" type="number" min="0" max="100" value="${cur('matCommon')}"></div>
-    <div class="fg"><label class="fl">선택 최대 원점수</label><input class="fi" id="rm-me" type="number" min="0" max="100" value="${cur('matElective')}"></div></div>
-    <p style="font-size:11px;color:#6b7280;margin-top:6px">기본값: 국어 76+24=100, 수학 74+26=100</p>
-    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveRawMax()">저장</button></div>`;
-  openModal();
-}
-
-async function saveRawMax(){
-  const read=(id,def)=>{const v=_(id)?.value;return v!==''&&v!=null?Number(v):def;};
-  const next={korCommon:read('rm-kc',RAW_MAX_DEFAULTS.korCommon),korElective:read('rm-ke',RAW_MAX_DEFAULTS.korElective),matCommon:read('rm-mc',RAW_MAX_DEFAULTS.matCommon),matElective:read('rm-me',RAW_MAX_DEFAULTS.matElective)};
-  for(const k of Object.keys(next)){if(!(next[k]>=0)){toast(k+' 값이 올바르지 않습니다.','warn');return;}}
-  S.config.rawMax=next;
-  showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);invalidateStandardScores();closeModal();toast('원점수 범위가 저장되었습니다.','success');}
-  catch(e){toast('저장 실패: '+e.message,'error');}
-  showLoad(false);
+    <div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn bs bsm" onclick="openAbsGradeCutsModal()">절대평가 등급컷 수정</button></div>`;
 }
 
 function openAbsGradeCutsModal(){
@@ -3481,22 +3289,11 @@ function openAbsGradeCutsModal(){
   openModal();
 }
 
-function _examScoreTypeField(cur){
-  const v=cur||'edu';
-  return `<div class="fg"><label class="fl">표준점수 산출 방식</label>
-    <select class="fi fsel" id="exScoreType">
-      <option value="edu" ${v==='edu'?'selected':''}>교육청 학력평가 (단순 선형변환)</option>
-      <option value="kice" ${v==='kice'?'selected':''}>평가원 모의평가·수능 (공통+선택 조정)</option>
-    </select>
-    <p style="font-size:11px;color:#6b7280;margin-top:4px">학력평가: 원점수 → Z → 20z+100 / 평가원: KICE 2027 방식으로 공통·선택 조정 후 가중합</p>
-  </div>`;
-}
 function openAddExam(){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">시험 추가</p>
     <div class="fg"><label class="fl">시험명</label><input class="fi" id="exName" placeholder="예: 3월 모의고사"></div>
     <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date"></div>
     <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date"></div></div>
-    ${_examScoreTypeField('edu')}
     <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2"> 제2외국어/한문 포함</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2"> 과학탐구 II 포함</label>
@@ -3512,7 +3309,6 @@ function openEditExam(examId){
     <div class="fg"><label class="fl">시험명</label><input class="fi" id="exName" value="${ex.name}"></div>
     <div class="frow"><div class="fg"><label class="fl">성적 입력 시작일 (선택)</label><input class="fi" id="exStart" type="date" value="${ex.scoreStart||''}"></div>
     <div class="fg"><label class="fl">성적 입력 종료일 (선택)</label><input class="fi" id="exEnd" type="date" value="${ex.scoreEnd||''}"></div></div>
-    ${_examScoreTypeField(ex.scoreType)}
     <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2" ${ex.hasLang2?'checked':''}> 제2외국어/한문 포함</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exSci2" ${ex.hasScienceII?'checked':''}> 과학탐구 II 포함</label>
@@ -3524,13 +3320,13 @@ function openEditExam(examId){
 async function saveExamForm(){
   const name=_('exName')?.value.trim();if(!name){showErr('mErr','시험명을 입력하세요.');return;}
   const examId=_('exId')?.value||('exam_'+uid());
-  const examData={id:examId,name,scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',hasLang2:_('exLang2')?.checked||false,hasScienceII:_('exSci2')?.checked||false,provisional:_('exProvisional')?.checked||false,scoreType:_('exScoreType')?.value||'edu'};
+  const examData={id:examId,name,scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',hasLang2:_('exLang2')?.checked||false,hasScienceII:_('exSci2')?.checked||false,provisional:_('exProvisional')?.checked||false};
   if(!S.config.exams)S.config.exams=[];
   const idx=S.config.exams.findIndex(e=>e.id===examId);
   if(idx>=0){examData.gradeCuts=S.config.exams[idx].gradeCuts||{};examData.estGradeCuts=S.config.exams[idx].estGradeCuts||{};S.config.exams[idx]=examData;}
   else{examData.gradeCuts={};examData.estGradeCuts={};S.config.exams.push(examData);}
   showLoad(true);
-  try{await db.collection('config').doc('main').set(S.config);invalidateStandardScores(examId);closeModal();renderAdminExams();}
+  try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();}
   catch(e){showErr('mErr','저장 실패: '+e.message);}
   showLoad(false);}
 
@@ -4192,7 +3988,6 @@ async function adminDelExamScore(stuDocId, examId, from, bookDocId){
   try{
     await db.collection('students').doc(stuDocId).update({['scores.'+examId]:firebase.firestore.FieldValue.delete()});
     const stu=S.students.find(x=>x._docId===stuDocId);if(stu&&stu.scores)delete stu.scores[examId];
-    invalidateStandardScores(examId);
     if(from==='booking'&&bookDocId){closeModal();openBookDetail(bookDocId);}
     else if(from==='stuDetail'){closeModal();openStuDetail(stuDocId);}
     else{closeModal();renderAdminScores();}
@@ -4203,22 +3998,11 @@ function openAdminScoreEdit(stuDocId, examId, from, bookDocId){
   const exam=getExam(examId);if(!exam)return;
   const sc=getStuExamScore(stu,examId)||{};
   const backAction=from==='booking'&&bookDocId?`openBookDetail('${bookDocId}')`:from==='stuDetail'?`openStuDetail('${stuDocId}')`:`closeModal();renderAdminScores()`;
-  const kCMax=getRawMax('korCommon'),kEMax=getRawMax('korElective'),mCMax=getRawMax('matCommon'),mEMax=getRawMax('matElective');
-  const kLegacy=(!sc.korCommonRaw&&!sc.korElectiveRaw&&sc.korRaw)?sc.korRaw:'';
-  const mLegacy=(!sc.matCommonRaw&&!sc.matElectiveRaw&&sc.matRaw)?sc.matRaw:'';
-  const kSumNow=(sc.korCommonRaw||sc.korElectiveRaw)?(Number(sc.korCommonRaw||0)+Number(sc.korElectiveRaw||0)):'';
-  const mSumNow=(sc.matCommonRaw||sc.matElectiveRaw)?(Number(sc.matCommonRaw||0)+Number(sc.matElectiveRaw||0)):'';
   let formHtml=`
     <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label><select class="fi fsel" id="as-ks"><option value="">선택</option><option ${sc.korSubj==='화법과 작문'?'selected':''}>화법과 작문</option><option ${sc.korSubj==='언어와 매체'?'selected':''}>언어와 매체</option></select></div>
-    <div class="fg"></div></div>
-    <div class="frow"><div class="fg"><label class="fl">국어 공통 원점수 (0~${kCMax})</label><input class="fi" id="as-kcr" type="number" min="0" max="${kCMax}" value="${sc.korCommonRaw||''}" placeholder="0~${kCMax}" oninput="updAdminScoreSum('k')"></div>
-    <div class="fg"><label class="fl">국어 선택 원점수 (0~${kEMax})</label><input class="fi" id="as-ker" type="number" min="0" max="${kEMax}" value="${sc.korElectiveRaw||''}" placeholder="0~${kEMax}" oninput="updAdminScoreSum('k')"></div></div>
-    <p style="font-size:12px;color:#374151;margin:-6px 0 12px;font-weight:600">국어 총점: <span id="as-ksum">${kSumNow!==''?kSumNow:'—'}</span> / ${kCMax+kEMax}${kLegacy?` <span style="color:#92400e;font-weight:500">(기존 총점 ${kLegacy}점 — 공통/선택 새로 입력 시 덮어씁니다)</span>`:''}</p>
+    <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div></div>
     <div class="frow"><div class="fg"><label class="fl">수학 선택과목</label><select class="fi fsel" id="as-ms"><option value="">선택</option><option ${sc.matSubj==='확률과 통계'?'selected':''}>확률과 통계</option><option ${sc.matSubj==='미적분'?'selected':''}>미적분</option><option ${sc.matSubj==='기하'?'selected':''}>기하</option></select></div>
-    <div class="fg"></div></div>
-    <div class="frow"><div class="fg"><label class="fl">수학 공통 원점수 (0~${mCMax})</label><input class="fi" id="as-mcr" type="number" min="0" max="${mCMax}" value="${sc.matCommonRaw||''}" placeholder="0~${mCMax}" oninput="updAdminScoreSum('m')"></div>
-    <div class="fg"><label class="fl">수학 선택 원점수 (0~${mEMax})</label><input class="fi" id="as-mer" type="number" min="0" max="${mEMax}" value="${sc.matElectiveRaw||''}" placeholder="0~${mEMax}" oninput="updAdminScoreSum('m')"></div></div>
-    <p style="font-size:12px;color:#374151;margin:-6px 0 12px;font-weight:600">수학 총점: <span id="as-msum">${mSumNow!==''?mSumNow:'—'}</span> / ${mCMax+mEMax}${mLegacy?` <span style="color:#92400e;font-weight:500">(기존 총점 ${mLegacy}점 — 공통/선택 새로 입력 시 덮어씁니다)</span>`:''}</p>
+    <div class="fg"><label class="fl">수학 원점수</label><input class="fi" id="as-mr" type="number" min="0" max="100" value="${sc.matRaw||''}" placeholder="0–100"></div></div>
     <div class="frow"><div class="fg"><label class="fl">영어 원점수</label><input class="fi" id="as-er" type="number" min="0" max="100" value="${sc.engRaw||''}" placeholder="0–100"></div>
     <div class="fg"><label class="fl">한국사 원점수</label><input class="fi" id="as-hr" type="number" min="0" max="50" value="${sc.hisRaw||''}" placeholder="0–50"></div></div>
     <div class="frow"><div class="fg"><label class="fl">탐구 1 과목</label><select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'',exam.hasScienceII)}</select></div>
@@ -4248,27 +4032,12 @@ function openAdminScoreEdit(stuDocId, examId, from, bookDocId){
   if(!_('mOv').classList.contains('hidden'))return;openModal();
 }
 
-function updAdminScoreSum(which){
-  const c=_(which==='k'?'as-kcr':'as-mcr'),e=_(which==='k'?'as-ker':'as-mer'),s=_(which==='k'?'as-ksum':'as-msum');if(!s)return;
-  const cv=c?.value||'',ev=e?.value||'';
-  if(cv===''&&ev===''){s.textContent='—';return;}
-  s.textContent=(Number(cv)||0)+(Number(ev)||0);
-}
 async function saveAdminScore(stuDocId, examId, from, bookDocId){
   const exam=getExam(examId);if(!exam)return;
-  const stu=S.students.find(x=>x._docId===stuDocId);
-  const prevSc=stu?getStuExamScore(stu,examId)||{}:{};
-  const korSubj=_('as-ks')?.value||'',matSubj=_('as-ms')?.value||'';
-  const kcStr=_('as-kcr')?.value||'',keStr=_('as-ker')?.value||'',mcStr=_('as-mcr')?.value||'',meStr=_('as-mer')?.value||'';
-  let korRaw,korCommonRaw,korElectiveRaw;
-  if(kcStr!==''||keStr!==''){korCommonRaw=kcStr;korElectiveRaw=keStr;korRaw=String((Number(kcStr)||0)+(Number(keStr)||0));}
-  else{korCommonRaw=prevSc.korCommonRaw||'';korElectiveRaw=prevSc.korElectiveRaw||'';korRaw=prevSc.korRaw||'';}
-  let matRaw,matCommonRaw,matElectiveRaw;
-  if(mcStr!==''||meStr!==''){matCommonRaw=mcStr;matElectiveRaw=meStr;matRaw=String((Number(mcStr)||0)+(Number(meStr)||0));}
-  else{matCommonRaw=prevSc.matCommonRaw||'';matElectiveRaw=prevSc.matElectiveRaw||'';matRaw=prevSc.matRaw||'';}
+  const korSubj=_('as-ks')?.value||'',korRaw=_('as-kr')?.value||'',matSubj=_('as-ms')?.value||'',matRaw=_('as-mr')?.value||'';
   const exp1Subj=_('as-e1s')?.value||'',exp1Raw=_('as-e1r')?.value||'',exp2Subj=_('as-e2s')?.value||'',exp2Raw=_('as-e2r')?.value||'';
   const engRaw=_('as-er')?.value||'',hisRaw=_('as-hr')?.value||'';
-  const scoreData={korSubj,korRaw,korCommonRaw,korElectiveRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matCommonRaw,matElectiveRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engRaw,engGrade:getAbsGrade('eng',engRaw),hisRaw,hisGrade:getAbsGrade('his',hisRaw),exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
+  const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engRaw,engGrade:getAbsGrade('eng',engRaw),hisRaw,hisGrade:getAbsGrade('his',hisRaw),exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
   if(exam.hasLang2){scoreData.lang2Subj=_('as-l2s')?.value||'';scoreData.lang2Raw=_('as-l2r')?.value||'';scoreData.lang2Grade=getAbsGrade('lang2',scoreData.lang2Raw);}
   scoreData.korGradeOverride=_('ao-k')?.value||'';
   scoreData.matGradeOverride=_('ao-m')?.value||'';
@@ -4281,7 +4050,6 @@ async function saveAdminScore(stuDocId, examId, from, bookDocId){
   try{
     await db.collection('students').doc(stuDocId).update({['scores.'+examId]:scoreData});
     const stu=S.students.find(x=>x._docId===stuDocId);if(stu){if(!stu.scores)stu.scores={};stu.scores[examId]=scoreData;}
-    invalidateStandardScores(examId);
     if(from==='booking'&&bookDocId)openBookDetail(bookDocId);
     else if(from==='stuDetail')openStuDetail(stuDocId);
     else{closeModal();renderAdminScores();}
