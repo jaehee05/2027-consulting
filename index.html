@@ -489,14 +489,20 @@ const ADMIN_API_URL = 'https://asia-northeast3-consulting-dd53f.cloudfunctions.n
 
 const DEFAULT_INACTIVE_SLOTS = ['12:00','12:30','18:00','18:30'];
 function isDefaultInactiveSlot(slot){return DEFAULT_INACTIVE_SLOTS.includes(slot);}
-function ensureDefaultInactiveSlots(){
+// 기존 날짜에 12/18시 전후 슬롯을 1회만 채워 넣는다. 이후 ADMIN이 자유롭게 삭제할 수 있도록
+// 영구 플래그를 두어 다시 자동 추가하지 않는다. ADMIN 세션에서만 실행·저장.
+async function migrateDefaultInactiveSlotsOnce(){
   if(!Array.isArray(S.schedule?.dates))return;
+  if(S.schedule._defaultInactiveMigrated)return;
+  if(S.user?.type!=='admin')return;
   S.schedule.dates.forEach(d=>{
     if(!Array.isArray(d.slots))d.slots=[];
     let changed=false;
     for(const sl of DEFAULT_INACTIVE_SLOTS){if(!d.slots.includes(sl)){d.slots.push(sl);changed=true;}}
     if(changed)d.slots.sort();
   });
+  S.schedule._defaultInactiveMigrated=true;
+  try{await saveScheduleToDb();}catch(e){console.warn('default-inactive migration save failed',e);}
 }
 const DFLT_DATES = [
   {id:'d1',date:'2026-06-05',label:'6월 5일 (금)',slots:[]},
@@ -832,7 +838,7 @@ async function loadAll(){
     S.students=stuSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.schedule=scSnap.exists?scSnap.data():{dates:JSON.parse(JSON.stringify(DFLT_DATES))};
     if(!S.schedule.dates)S.schedule.dates=JSON.parse(JSON.stringify(DFLT_DATES));
-    ensureDefaultInactiveSlots();
+    await migrateDefaultInactiveSlotsOnce();
     S.config=cfgSnap.exists?cfgSnap.data():{};
     if(!S.config.exams){
       S.config.exams=[];
@@ -3475,9 +3481,8 @@ function renderAdminSchedule(){
           :'background:repeating-linear-gradient(135deg,#d1d5db 0,#d1d5db 8px,#9ca3af 8px,#9ca3af 16px);color:#1f2937;border-color:#6b7280;border-style:dashed';
         const mainCls=active?'adm-slot':'adm-slot vacant';
         const lbl=active?'활성':'비활성';
-        const tt=dflt?(active?'클릭하여 비활성화 (점심·저녁 기본 비활성 슬롯)':'클릭하여 활성화 (점심·저녁 기본 비활성 슬롯)'):(active?'클릭하여 비활성화 · × 슬롯 삭제':'클릭하여 활성화 · × 슬롯 삭제');
-        const xBtn=dflt?'':xBtnHtml(d.id,sl);
-        return `<span style="position:relative;display:block">${xBtn}<button class="${mainCls}" style="${mainStyle}" onclick="toggleSlotActive('${d.id}','${sl}')" title="${tt}"><span class="adm-slot-time">${sl}</span><span class="adm-slot-name">${lbl}</span></button></span>`;
+        const tt=active?'클릭하여 비활성화 · × 슬롯 삭제':'클릭하여 활성화 · × 슬롯 삭제';
+        return `<span style="position:relative;display:block">${xBtnHtml(d.id,sl)}<button class="${mainCls}" style="${mainStyle}" onclick="toggleSlotActive('${d.id}','${sl}')" title="${tt}"><span class="adm-slot-time">${sl}</span><span class="adm-slot-name">${lbl}</span></button></span>`;
       }
       return `<span style="position:relative;display:block">${xBtnHtml(d.id,sl)}<button class="adm-slot vacant" onclick="confirmRmSlot('${d.id}','${sl}')" title="클릭하여 삭제"><span class="adm-slot-time">${sl}</span><span class="adm-slot-name">비어있음</span></button></span>`;
     }).join('');
