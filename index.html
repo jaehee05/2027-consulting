@@ -2392,6 +2392,26 @@ async function saveStuMemo(stuDocId){
   showLoad(false);
 }
 
+function openStuMemoModal(docId){
+  const s=S.students.find(x=>x._docId===docId);if(!s)return;
+  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">학생 메모</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:14px">${escapeHtml(s.name)}${s.school?` · ${escapeHtml(s.school)}`:''}${s.grade?` ${escapeHtml(s.grade)}`:''}</p>
+    <textarea class="fi ta" id="stuMemoInput" rows="6" placeholder="학생 관련 메모를 기록하세요. (학생에게 노출되지 않음)">${escapeHtml(s.memo||'')}</textarea>
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveStuMemoModal('${docId}')">저장</button></div>`;
+  openModal();
+}
+async function saveStuMemoModal(docId){
+  const memo=_('stuMemoInput')?.value||'';
+  showLoad(true);
+  try{
+    await db.collection('students').doc(docId).update({memo});
+    const s=S.students.find(x=>x._docId===docId);if(s)s.memo=memo;
+    closeModal();
+    if(S.tab==='students')renderAdminStudents();
+    toast('메모가 저장되었습니다.','success');
+  }catch(e){toast('저장 실패: '+e.message,'error');}
+  showLoad(false);
+}
 async function saveConsultNote(stuDocId,examId){
   const data=_readConsultEditor();
   showLoad(true);
@@ -2524,6 +2544,7 @@ function renderOpStudents(){
   });
   const rows=sorted.map(s=>{
     const stuPhone=s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':s.studentPhone;
+    const hasMemo=!!(s.memo&&s.memo.trim());
     return `<tr>
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
@@ -2531,6 +2552,7 @@ function renderOpStudents(){
     <td data-label="학교">${s.school}</td>
     <td data-label="학생 연락처">${stuPhone}</td>
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
+    <td data-label="메모" class="cell-actions" style="white-space:nowrap;text-align:right"><button class="btn ${hasMemo?'bp':'bs'} bsm" onclick="openStuMemoModal('${s._docId}')">${hasMemo?'메모 ✓':'메모'}</button></td>
   </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
@@ -2551,8 +2573,8 @@ function renderOpStudents(){
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
   </div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table>
-    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th></tr></thead>
-    <tbody>${rows||'<tr class="empty-row"><td colspan="6" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th style="text-align:right">메모</th></tr></thead>
+    <tbody>${rows||'<tr class="empty-row"><td colspan="7" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
   </table></div></div>`;
 }
 
