@@ -812,6 +812,77 @@ function startNoticesListener(){
 }
 function stopNoticesListener(){if(_ntListener){try{_ntListener();}catch(e){}_ntListener=null;}_ntSeedDone=false;}
 
+// 학생 호출(calls) 실시간 리스너 — ADMIN이 호출하면 OP에게 차단 모달 표시.
+let _callsListener=null,_callsSeedDone=false,_activeCallModalId=null;
+let _modalLocked=false;
+function startCallsListener(){
+  if(_callsListener){try{_callsListener();}catch(e){}_callsListener=null;}
+  _callsSeedDone=false;
+  _callsListener=db.collection('calls').where('status','==','pending').onSnapshot(snap=>{
+    _callsSeedDone=true;
+    const isOp=S.user&&S.user.type!=='student'&&S.user.type!=='admin';
+    if(!isOp)return;
+    const pending=snap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+    if(!pending.length){
+      if(_activeCallModalId){_modalLocked=false;_activeCallModalId=null;closeModal();}
+      return;
+    }
+    const next=pending[0];
+    if(next._docId===_activeCallModalId)return;
+    showCallModal(next);
+  },err=>{console.error('calls listener error',err);});
+}
+function stopCallsListener(){
+  if(_callsListener){try{_callsListener();}catch(e){}_callsListener=null;}
+  _callsSeedDone=false;
+  if(_activeCallModalId){_modalLocked=false;_activeCallModalId=null;closeModal();}
+}
+function showCallModal(c){
+  _activeCallModalId=c._docId;_modalLocked=true;
+  const when=c.createdAt?new Date(c.createdAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'';
+  const caller=escapeHtml(c.calledByName||'관리자');
+  renderModal({
+    title:'📢 학생 호출',
+    sub:`<b style="color:#1C64F2;font-size:18px">${escapeHtml(c.studentName||'')}</b> 학생을 호출했습니다.`,
+    body:`<div style="font-size:12px;color:#6b7280;margin-top:6px">${caller}${when?` · ${when}`:''}</div>`,
+    actions:[{label:'확인했습니다',kind:'primary',onclick:`acknowledgeCall('${c._docId}')`}]
+  });
+}
+async function acknowledgeCall(callId){
+  try{
+    await db.collection('calls').doc(callId).update({
+      status:'acknowledged',
+      acknowledgedAt:Date.now(),
+      acknowledgedBy:S.user?.id||'',
+      acknowledgedByName:S.user?.name||''
+    });
+    _modalLocked=false;_activeCallModalId=null;closeModal();
+  }catch(e){toast('확인 처리 실패: '+e.message,'error');}
+}
+async function callStudent(stuId){
+  if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
+  const stu=S.students.find(x=>x._docId===stuId);
+  if(!stu){toast('학생을 찾을 수 없습니다.','error');return;}
+  const ok=await confirmDialog({
+    title:'학생 호출',
+    message:`<b>${escapeHtml(stu.name)}</b> 학생을 호출할까요? OP에게 알림이 표시됩니다.`,
+    confirmLabel:'호출',
+    kind:'primary'
+  });
+  if(!ok)return;
+  try{
+    await db.collection('calls').add({
+      studentId:stuId,
+      studentName:stu.name||'',
+      calledBy:S.user.id||'',
+      calledByName:S.user.name||'',
+      status:'pending',
+      createdAt:Date.now()
+    });
+    toast(`${stu.name} 학생을 호출했습니다.`,'success');
+  }catch(e){toast('호출 실패: '+e.message,'error');}
+}
+
 var _skipPush=false;
 function showView(id){
   ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy'].forEach(v=>{
@@ -859,6 +930,7 @@ async function loadAll(){
   startRequestsListener();
   startBookingsListener();
   startNoticesListener();
+  if(S.user&&S.user.type!=='student')startCallsListener();
 }
 async function loadAdmins(){
   try{
@@ -1007,6 +1079,7 @@ function doLogout(){
   stopRequestsListener();
   stopBookingsListener();
   stopNoticesListener();
+  stopCallsListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];
   S.noticeEditId=null;S.noticeComposerOpen=false;
@@ -2274,7 +2347,8 @@ function renderConsultDetail(){
   _('adminC').innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <button class="btn bs bsm" onclick="autoSaveConsultNote()">← 목록</button>
-      <div><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p></div>
+      <div style="flex:1"><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p></div>
+      <button class="btn bp bsm" onclick="callStudent('${stu._docId}')" title="OP에게 학생을 호출합니다">📢 호출</button>
     </div>
     ${qInfo}
     <div class="card" style="margin-bottom:12px">
@@ -2612,7 +2686,7 @@ function renderAdminStudents(){
     <td data-label="학생 연락처">${stuPhone}</td>
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
     <td data-label="계정 ID"><code>${s.accountId}</code></td>
-    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bs bsm" onclick="previewAsStudent('${s._docId}')" title="이 학생의 화면을 미리봅니다">학생뷰</button><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
+    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bp bsm" onclick="callStudent('${s._docId}')" title="OP에게 학생을 호출합니다">호출</button><button class="btn bs bsm" onclick="previewAsStudent('${s._docId}')" title="이 학생의 화면을 미리봅니다">학생뷰</button><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
   </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
@@ -4760,7 +4834,7 @@ function toast(msg,kind='info',opts={}){
 /* ── MODAL ── */
 let _confirmResolver=null;
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
-function closeModal(){const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;r(false);}}
+function closeModal(){if(_modalLocked)return;const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;r(false);}}
 function applyChannelIOVisibility(){
   try{
     if(typeof ChannelIO!=='function')return;
