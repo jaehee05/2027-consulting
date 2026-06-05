@@ -459,6 +459,15 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   <div class="page" style="max-width:780px"><div id="classC"></div></div>
 </div>
 
+<!-- 태블릿 -->
+<div id="vTablet" class="hidden">
+  <div class="topbar">
+    <div class="tl"><span class="chip">멘토링 태블릿</span><span class="tname">KJHEDU</span></div>
+    <div class="tr"><span class="uname" id="tabletUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+  </div>
+  <div class="page" style="max-width:880px"><div id="tabletC"></div></div>
+</div>
+
 <!-- 모달 -->
 <div id="mOv" class="overlay hidden" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="mCt"></div>
@@ -906,9 +915,156 @@ async function callStudent(stuId){
   }catch(e){toast('호출 실패: '+e.message,'error');}
 }
 
+// 멘토링 태블릿 세션 — sessions/tablet doc.
+// ADMIN이 멘토링 상세에서 "멘토링 시작"을 누르면 doc 생성 → 태블릿이 실시간으로 학생 화면을 표시.
+let _tabletSessionListener=null,_tabletStudentListener=null,_tabletStudentId=null;
+function startTabletSessionListener(){
+  stopTabletSessionListener();
+  _tabletSessionListener=db.collection('sessions').doc('tablet').onSnapshot(doc=>{
+    const sess=doc.exists?doc.data():null;
+    S.tabletSession=(sess&&sess.studentId)?sess:null;
+    if(S.user?.type==='tablet'){
+      const newId=S.tabletSession?.studentId||null;
+      if(newId!==_tabletStudentId){
+        _stopTabletStudentListener();
+        if(newId)_startTabletStudentListener(newId);
+      }
+      renderTablet();
+    }
+  },err=>console.error('tablet session listener',err));
+}
+function stopTabletSessionListener(){
+  if(_tabletSessionListener){try{_tabletSessionListener();}catch(e){}_tabletSessionListener=null;}
+  _stopTabletStudentListener();
+  S.tabletSession=null;
+}
+function _startTabletStudentListener(stuId){
+  _tabletStudentId=stuId;
+  _tabletStudentListener=db.collection('students').doc(stuId).onSnapshot(doc=>{
+    if(!doc.exists)return;
+    const data={_docId:doc.id,...doc.data()};
+    const idx=S.students.findIndex(s=>s._docId===doc.id);
+    if(idx<0)S.students.push(data);else S.students[idx]=data;
+    if(S.user?.type==='tablet')renderTablet();
+  },err=>console.error('tablet student listener',err));
+}
+function _stopTabletStudentListener(){
+  if(_tabletStudentListener){try{_tabletStudentListener();}catch(e){}_tabletStudentListener=null;}
+  _tabletStudentId=null;
+}
+function enterTablet(){
+  if(S.user?.type!=='tablet'){enterHome();return;}
+  _('tabletUname').textContent=S.user.name||'태블릿';
+  showView('vTablet');applyChips();
+  renderTablet();
+}
+function renderTablet(){
+  const sess=S.tabletSession;
+  if(!sess||!sess.studentId){
+    _('tabletC').innerHTML=`<div class="card np" style="text-align:center;padding:80px 24px;background:linear-gradient(135deg,#f9fafb,#f3f4f6);border:1px solid #e5e7eb">
+      <p style="font-size:68px;line-height:1;margin-bottom:18px">🎓</p>
+      <p style="font-size:22px;font-weight:800;color:#111827;margin-bottom:10px">멘토링 대기 중</p>
+      <p style="font-size:14px;color:#6b7280;line-height:1.65">관리자가 학생을 선택하면<br>이곳에 학생 정보가 자동으로 표시됩니다.</p>
+    </div>`;
+    return;
+  }
+  const stu=S.students.find(x=>x._docId===sess.studentId);
+  if(!stu){
+    _('tabletC').innerHTML=`<div class="card" style="padding:40px 20px;text-align:center"><p style="font-size:16px;font-weight:700;color:#dc2626;margin-bottom:8px">⚠ 학생 정보를 불러오는 중</p><p style="font-size:13px;color:#6b7280">잠시만 기다려주세요.</p></div>`;
+    return;
+  }
+  renderTabletConsult(stu);
+}
+function renderTabletConsult(stu){
+  const booking=S.bookings.find(b=>b.studentId===stu._docId);
+  const exams=getExams();
+  const examsWithScore=exams.filter(ex=>hasStuExamScore(stu,ex.id));
+  const scoreTabIdx=Math.min(S.tabletScoreTab||0,Math.max(0,examsWithScore.length-1));
+  let scoreTabs='',scoreBody='';
+  if(examsWithScore.length){
+    scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.tabletScoreTab=${i};renderTablet()">${escapeHtml(ex.name)}</button>`).join('');
+    const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
+    scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
+  }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
+  const subjects=getGradeSubjects(stu);
+  const graphTabIdx=Math.min(S.tabletGraphTab||0,Math.max(0,subjects.length-1));
+  const graphTabs=subjects.map((s,i)=>`<button class="dt ${i===graphTabIdx?'on':''}" onclick="S.tabletGraphTab=${i};renderTablet()">${escapeHtml(s.label)}</button>`).join('');
+  const selSubj=subjects[graphTabIdx]||subjects[0];
+  const graphBody=selSubj?drawGradeGraph(exams,stu,selSubj):'';
+  const qInfo=booking?qBoardHtml(booking,{role:'admin'}):'';
+  const noteTabIdx=Math.min(S.tabletNoteTab||0,Math.max(0,exams.length-1));
+  const selNoteExam=exams[noteTabIdx];
+  const noteTabs=exams.map((ex,i)=>{
+    const n=stu.consultNotes&&stu.consultNotes[ex.id];
+    const has=n&&n.note&&n.note.trim();
+    const dot=has?`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#22c55e;margin-left:4px;vertical-align:middle"></span>`:'';
+    return `<button class="dt ${i===noteTabIdx?'on':''}" onclick="S.tabletNoteTab=${i};renderTablet()">${escapeHtml(ex.name)}${dot}</button>`;
+  }).join('');
+  const noteText=(stu.consultNotes&&selNoteExam&&stu.consultNotes[selNoteExam.id]?.note)||'';
+  const noteCard=exams.length?`<div class="card" style="margin-bottom:12px">
+    <p style="font-size:13px;font-weight:700;margin-bottom:10px">멘토링 내용</p>
+    <div class="dtabs" style="margin-bottom:10px">${noteTabs}</div>
+    <div style="white-space:pre-wrap;font-size:14px;line-height:1.65;color:#1f2937;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;min-height:120px">${noteText?escapeHtml(noteText):'<span style="color:#9ca3af">멘토링 내용이 아직 기록되지 않았습니다.</span>'}</div>
+  </div>`:'';
+  _('tabletC').innerHTML=`
+    <div class="card np" style="margin-bottom:14px;padding:18px 20px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        ${stu.seat?`<span style="display:inline-block;background:#1C64F2;color:#fff;border-radius:10px;padding:6px 14px;font-size:15px;font-weight:800">좌석 ${escapeHtml(String(stu.seat))}</span>`:''}
+        <div style="flex:1;min-width:140px"><p style="font-size:20px;font-weight:800;color:#111827">${escapeHtml(stu.name)}</p><p style="font-size:13px;color:#1d4ed8;margin-top:2px">${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}${booking?' · '+escapeHtml(booking.dateLabel||'')+' '+escapeHtml(booking.slot||''):''}</p></div>
+      </div>
+    </div>
+    ${qInfo}
+    <div class="card" style="margin-bottom:12px">
+      <p style="font-size:13px;font-weight:700;margin-bottom:10px">성적표</p>
+      ${examsWithScore.length>1?'<div class="dtabs" style="margin-bottom:10px">'+scoreTabs+'</div>':''}
+      ${scoreBody}
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <p style="font-size:13px;font-weight:700;margin-bottom:10px">등급 추이</p>
+      ${subjectChangesHtml(stu,exams)}
+      ${subjects.length>1?`<div class="dtabs" style="margin-bottom:10px">${graphTabs}</div>`:''}
+      ${graphBody}
+    </div>
+    ${noteCard}`;
+}
+async function startTabletSession(stuId){
+  if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
+  const stu=S.students.find(x=>x._docId===stuId);
+  if(!stu){toast('학생을 찾을 수 없습니다.','error');return;}
+  const cur=S.tabletSession;
+  if(cur&&cur.studentId&&cur.studentId!==stuId){
+    const ok=await confirmDialog({
+      title:'멘토링 세션 변경',
+      message:`현재 태블릿에 <b>${escapeHtml(cur.studentName||'')}</b> 학생이 표시되고 있습니다.<br><b>${escapeHtml(stu.name)}</b> 학생으로 변경할까요?`,
+      confirmLabel:'변경',
+      kind:'primary'
+    });
+    if(!ok)return;
+  }
+  try{
+    const data={studentId:stuId,studentName:stu.name||'',studentSeat:stu.seat||'',startedBy:S.user.id||'',startedByName:S.user.name||'',startedAt:Date.now()};
+    await db.collection('sessions').doc('tablet').set(data);
+    S.tabletSession=data;
+    if(S.tab==='consult'&&S.consultStuId===stuId&&typeof renderConsultDetail==='function')renderConsultDetail();
+    toast(`📺 ${stu.name} 학생 멘토링이 태블릿에 표시됩니다.`,'success');
+  }catch(e){toast('세션 시작 실패: '+e.message,'error');}
+}
+async function endTabletSession(){
+  if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
+  const cur=S.tabletSession;
+  if(!cur)return;
+  const prevStu=cur.studentId;
+  try{
+    await db.collection('sessions').doc('tablet').delete();
+    S.tabletSession=null;
+    if(S.tab==='consult'&&S.consultStuId===prevStu&&typeof renderConsultDetail==='function')renderConsultDetail();
+    toast('⏹ 멘토링 세션이 종료되었습니다.','success');
+  }catch(e){toast('세션 종료 실패: '+e.message,'error');}
+}
+
 var _skipPush=false;
 function showView(id){
-  ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy'].forEach(v=>{
+  ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy','vTablet'].forEach(v=>{
     const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
     if(['vSetup','vLogin','vPin'].includes(v))el.style.display=v===id?'flex':'none';
   });
@@ -954,6 +1110,7 @@ async function loadAll(){
   startBookingsListener();
   startNoticesListener();
   if(S.user&&S.user.type!=='student')startCallsListener();
+  if(S.user&&(S.user.type==='admin'||S.user.type==='tablet'))startTabletSessionListener();
 }
 async function loadAdmins(){
   try{
@@ -1010,9 +1167,10 @@ async function finishLoginWithToken(r,keep){
     enterHome();
     return;
   }
-  // admin or viewer
+  // admin / viewer / tablet
   S.user={type:r.type,id:r.id,name:r.name};
   await loadAll();
+  if(r.type==='tablet'){enterTablet();return;}
   _('adminUname').textContent=r.name;
   _('adminRoleLabel').textContent=r.type==='admin'?'ADMIN':'OP';
   enterHome();
@@ -1103,6 +1261,7 @@ function doLogout(){
   stopBookingsListener();
   stopNoticesListener();
   stopCallsListener();
+  stopTabletSessionListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];
   S.noticeEditId=null;S.noticeComposerOpen=false;
@@ -2367,10 +2526,18 @@ function renderConsultDetail(){
   const selSubj=subjects[graphTabIdx]||subjects[0];
   const graphBody=drawGradeGraph(exams,stu,selSubj);
   const qInfo=booking?qBoardHtml(booking,{role:'admin'}):'';
+  const _sess=S.tabletSession;
+  const _isActive=_sess&&_sess.studentId===stu._docId;
+  const _otherActive=_sess&&_sess.studentId&&_sess.studentId!==stu._docId;
+  const _sessTitle=_isActive?'태블릿 표시 종료':(_otherActive?'현재 다른 학생 표시 중':'태블릿에 이 학생 표시');
+  const _sessBtn=_isActive
+    ?`<button class="btn bd bsm" onclick="endTabletSession()" title="${_sessTitle}">⏹ 멘토링 종료</button>`
+    :`<button class="btn bp bsm" style="background:#1C64F2;border-color:#1C64F2" onclick="startTabletSession('${stu._docId}')" title="${_sessTitle}">📺 ${_otherActive?'멘토링 변경':'멘토링 시작'}</button>`;
   _('adminC').innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn bs bsm" onclick="autoSaveConsultNote()">← 목록</button>
-      <div><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p></div>
+      <div style="flex:1;min-width:120px"><p style="font-size:16px;font-weight:700">${escapeHtml(stu.name)}${_isActive?' <span class="bx bb" style="font-size:10px">📺 태블릿 표시 중</span>':''}</p><p style="font-size:12px;color:#6b7280">${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}${booking?' · '+escapeHtml(booking.dateLabel||'')+' '+escapeHtml(booking.slot||''):''}</p></div>
+      ${_sessBtn}
     </div>
     ${qInfo}
     <div class="card" style="margin-bottom:12px">
@@ -4495,8 +4662,8 @@ async function setBookAttendance(docId,status){
 }
 
 /* ── ADMIN: 계정 관리 ── */
-function roleLabel(r){return r==='admin'?'ADMIN':r==='test'?'TEST':'OP';}
-function roleBadgeClass(r){return r==='admin'?'br':r==='test'?'bg':'bb';}
+function roleLabel(r){return r==='admin'?'ADMIN':r==='test'?'TEST':r==='tablet'?'태블릿':'OP';}
+function roleBadgeClass(r){return r==='admin'?'br':r==='test'?'bg':r==='tablet'?'bpk':'bb';}
 
 function renderAdminAccounts(){
   const rows=S.admins.map(a=>{
@@ -4526,6 +4693,7 @@ function openAcctModal(accId){
     <div class="fg"><label class="fl">권한</label><select class="fi fsel" id="acrole" ${roleDisabled?'disabled style="background:#f9fafb;color:#6b7280"':''}>
       <option value="admin" ${a?.role==='admin'?'selected':''}>ADMIN</option>
       <option value="viewer" ${a?.role==='viewer'?'selected':''}>OP</option>
+      <option value="tablet" ${a?.role==='tablet'?'selected':''}>태블릿</option>
       <option value="test" ${a?.role==='test'?'selected':''}>TEST</option>
     </select>${roleDisabled?'<p style="font-size:11px;color:#9ca3af;margin-top:4px">TEST 계정의 권한은 변경할 수 없습니다. 삭제 후 재생성하세요.</p>':''}</div>
     ${a?`<div class="fg"><label class="fl">비밀번호 변경 (변경 시에만 입력)</label><input class="fi" id="acpw" type="password" placeholder="새 비밀번호 (비워두면 유지)"></div>`:`<div class="fg"><label class="fl">비밀번호 (6자 이상)</label><input class="fi" id="acpw" type="password" placeholder="비밀번호"></div>`}
@@ -5460,9 +5628,10 @@ async function init(){
       try{
         const tr=await fbUser.getIdTokenResult(true);
         const c=tr.claims||{};
-        if(c.role==='admin'||c.role==='viewer'){
+        if(c.role==='admin'||c.role==='viewer'||c.role==='tablet'){
           S.user={type:c.role,id:c.loginId,name:c.name||''};
           await loadAll();
+          if(c.role==='tablet'){showLoad(false);enterTablet();return;}
           _('adminUname').textContent=c.name||'';
           _('adminRoleLabel').textContent=c.role==='admin'?'ADMIN':'OP';
           showLoad(false);enterHome();return;
