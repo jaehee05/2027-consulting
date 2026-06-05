@@ -829,7 +829,7 @@ let _activeCallModalId=null;
 let _modalLocked=false;
 function startCallsListener(){
   stopCallsListener();
-  if(!S.user||S.user.type==='student')return;
+  if(!S.user||S.user.type==='student'||S.user.type==='tablet')return;
   if(S.user.type==='admin'){
     _adminCallsSeedDone=false;
     _adminCallsListener=db.collection('calls').where('calledBy','==',S.user.id).onSnapshot(snap=>{
