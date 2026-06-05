@@ -837,10 +837,12 @@ function startCallsListener(){
         if(!_adminCallsSeedDone)return;
         if(ch.type==='added'||ch.type==='modified'){
           const d=ch.doc.data();
+          const ackBy=d.acknowledgedByName||'OP';
+          const sname=d.studentName||'';
           if(d.status==='acknowledged'){
-            const ackBy=d.acknowledgedByName||'OP';
-            const sname=d.studentName||'';
             toast(`✓ ${ackBy}님이 ${sname} 학생 호출을 확인했습니다.`,'success',{duration:5000});
+          }else if(d.status==='absent'){
+            toast(`⚠ ${ackBy}: ${sname} 학생이 자리에 없거나 미등원입니다.`,'warn',{duration:6000});
           }
         }
       });
@@ -875,19 +877,22 @@ function showCallModal(c){
     title:'📢 학생 호출',
     sub:`${seat}<b style="color:#1C64F2;font-size:18px">${escapeHtml(c.studentName||'')}</b> 학생을 호출했습니다.`,
     body:`<div style="font-size:12px;color:#6b7280;margin-top:6px">${caller}${when?` · ${when}`:''}</div>`,
-    actions:[{label:'확인했습니다',kind:'primary',onclick:`acknowledgeCall('${c._docId}')`}]
+    actions:[
+      {label:'미등원',kind:'danger',onclick:`resolveCall('${c._docId}','absent')`},
+      {label:'확인',kind:'primary',onclick:`resolveCall('${c._docId}','acknowledged')`}
+    ]
   });
 }
-async function acknowledgeCall(callId){
+async function resolveCall(callId,status){
   try{
     await db.collection('calls').doc(callId).update({
-      status:'acknowledged',
+      status,
       acknowledgedAt:Date.now(),
       acknowledgedBy:S.user?.id||'',
       acknowledgedByName:S.user?.name||''
     });
     _modalLocked=false;_activeCallModalId=null;closeModal();
-  }catch(e){toast('확인 처리 실패: '+e.message,'error');}
+  }catch(e){toast('처리 실패: '+e.message,'error');}
 }
 async function callStudent(stuId){
   if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
