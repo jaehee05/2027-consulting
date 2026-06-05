@@ -5032,7 +5032,7 @@ function applyChannelIOVisibility(){
   try{
     if(typeof ChannelIO!=='function')return;
     const t=S.user?.type;
-    if(t==='admin'||t==='operator')ChannelIO('hideChannelButton');
+    if(t==='admin'||t==='operator'||t==='tablet')ChannelIO('hideChannelButton');
     else ChannelIO('showChannelButton');
   }catch(_){}
 }
