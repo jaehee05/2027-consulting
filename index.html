@@ -3499,7 +3499,7 @@ async function saveEstGradeCutsFromModal(examId){
   const allRel=gcAllRel(ex);ex.estGradeCuts={};
   for(let si=0;si<allRel.length;si++){
     const subj=allRel[si],vals=[];let hasVal=false;
-    for(let i=0;i<8;i++){const lo=_('ec-'+si+'-'+i+'-lo')?.value;const hi=_('ec-'+si+'-'+i+'-hi')?.value;if(lo!==''||hi!==''){vals.push({lo:lo!==''?Number(lo):'',hi:hi!==''?Number(hi):''});hasVal=true;}else{vals.push({lo:'',hi:''});}}
+    for(let i=0;i<8;i++){const lo=_('ec-'+si+'-'+i+'-lo')?.value;const hi=_('ec-'+si+'-'+i+'-hi')?.value;if(lo!==''||hi!==''){const lN=lo!==''?Number(lo):'';const hN=hi!==''?Number(hi):'';const ef=(lN===''&&hN!=='')?{lo:hN,hi:hN}:(hN===''&&lN!=='')?{lo:lN,hi:lN}:{lo:lN,hi:hN};vals.push(ef);hasVal=true;}else{vals.push({lo:'',hi:''});}}
     if(hasVal)ex.estGradeCuts[subj]=vals;
   }
   showLoad(true);
