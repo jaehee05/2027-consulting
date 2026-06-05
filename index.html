@@ -4109,16 +4109,19 @@ function openBookDetail(docId){
     <div style="display:flex;gap:6px">${attBtn('attended','출석','ok')}${attBtn('noshow','결석','no')}${attBtn('','미정','none')}</div>
     <p style="font-size:11px;color:#9ca3af;margin-top:6px">결석 처리 시 슬롯이 비워지고 학생은 '결석 처리된 학생' 목록으로 이동합니다.</p>
   </div>`:'';
+  const actionsHtml=isAdmin
+    ?`<div style="display:flex;gap:8px;margin:14px 0 4px;flex-wrap:wrap"><button class="btn bs" style="flex:1;min-width:80px" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1;min-width:90px;background:#ea580c;border-color:#ea580c" onclick="closeModal();callStudent('${stuId}')" title="OP에게 학생을 호출합니다">📢 호출</button><button class="btn bs" style="flex:1;min-width:100px;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button><button class="btn bp" style="flex:1;min-width:80px" onclick="openAdminBook('${docId}')">변경</button><button class="btn bd" style="flex:1;min-width:80px" onclick="closeModal();adminDelBook('${docId}')">삭제</button></div>`
+    :`<div style="display:flex;gap:8px;margin:14px 0 4px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bs" style="flex:1;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button></div>`;
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">예약 상세 정보</p>
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${b.studentName}${attLabel}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">예약 일시</p><p style="font-weight:700;font-size:14px">${b.dateLabel} ${b.slot}</p></div>
       ${stu?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div><div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':stu.studentPhone}</p></div>${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}`:''}
     </div></div>
+    ${actionsHtml}
     ${attSection}
     ${examSections}
-    ${qBoardHtml(b,{role:isAdmin?'admin':'student'})}
-    ${isAdmin?`<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn bs" style="flex:1;min-width:80px" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1;min-width:90px;background:#ea580c;border-color:#ea580c" onclick="closeModal();callStudent('${stuId}')" title="OP에게 학생을 호출합니다">📢 호출</button><button class="btn bs" style="flex:1;min-width:100px;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button><button class="btn bp" style="flex:1;min-width:80px" onclick="openAdminBook('${docId}')">변경</button><button class="btn bd" style="flex:1;min-width:80px" onclick="closeModal();adminDelBook('${docId}')">삭제</button></div>`:`<div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bs" style="flex:1;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button></div>`}`;openModal();}
+    ${qBoardHtml(b,{role:isAdmin?'admin':'student'})}`;openModal();}
 
 async function adminDelExamScore(stuDocId, examId, from, bookDocId){
   const ex=getExam(examId);if(!ex)return;
