@@ -812,16 +812,35 @@ function startNoticesListener(){
 }
 function stopNoticesListener(){if(_ntListener){try{_ntListener();}catch(e){}_ntListener=null;}_ntSeedDone=false;}
 
-// 학생 호출(calls) 실시간 리스너 — ADMIN이 호출하면 OP에게 차단 모달 표시.
-let _callsListener=null,_callsSeedDone=false,_activeCallModalId=null;
+// 학생 호출(calls) 실시간 리스너.
+// OP: status=pending 인 호출을 차단 모달로 표시.
+// ADMIN: 자기가 만든 호출이 OP에 의해 acknowledged 되면 토스트로 알림.
+let _callsListener=null,_adminCallsListener=null,_adminCallsSeedDone=false;
+let _activeCallModalId=null;
 let _modalLocked=false;
 function startCallsListener(){
-  if(_callsListener){try{_callsListener();}catch(e){}_callsListener=null;}
-  _callsSeedDone=false;
+  stopCallsListener();
+  if(!S.user||S.user.type==='student')return;
+  if(S.user.type==='admin'){
+    _adminCallsSeedDone=false;
+    _adminCallsListener=db.collection('calls').where('calledBy','==',S.user.id).onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=>{
+        if(!_adminCallsSeedDone)return;
+        if(ch.type==='added'||ch.type==='modified'){
+          const d=ch.doc.data();
+          if(d.status==='acknowledged'){
+            const ackBy=d.acknowledgedByName||'OP';
+            const sname=d.studentName||'';
+            toast(`✓ ${ackBy}님이 ${sname} 학생 호출을 확인했습니다.`,'success',{duration:5000});
+          }
+        }
+      });
+      _adminCallsSeedDone=true;
+    },err=>console.error('admin calls listener error',err));
+    return;
+  }
+  // OP
   _callsListener=db.collection('calls').where('status','==','pending').onSnapshot(snap=>{
-    _callsSeedDone=true;
-    const isOp=S.user&&S.user.type!=='student'&&S.user.type!=='admin';
-    if(!isOp)return;
     const pending=snap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
     if(!pending.length){
       if(_activeCallModalId){_modalLocked=false;_activeCallModalId=null;closeModal();}
@@ -830,20 +849,22 @@ function startCallsListener(){
     const next=pending[0];
     if(next._docId===_activeCallModalId)return;
     showCallModal(next);
-  },err=>{console.error('calls listener error',err);});
+  },err=>console.error('calls listener error',err));
 }
 function stopCallsListener(){
   if(_callsListener){try{_callsListener();}catch(e){}_callsListener=null;}
-  _callsSeedDone=false;
+  if(_adminCallsListener){try{_adminCallsListener();}catch(e){}_adminCallsListener=null;}
+  _adminCallsSeedDone=false;
   if(_activeCallModalId){_modalLocked=false;_activeCallModalId=null;closeModal();}
 }
 function showCallModal(c){
   _activeCallModalId=c._docId;_modalLocked=true;
   const when=c.createdAt?new Date(c.createdAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'';
   const caller=escapeHtml(c.calledByName||'관리자');
+  const seat=c.studentSeat?`<span style="display:inline-block;background:#1C64F2;color:#fff;border-radius:8px;padding:3px 10px;font-size:14px;font-weight:800;margin-right:8px;vertical-align:middle">좌석 ${escapeHtml(String(c.studentSeat))}</span>`:'';
   renderModal({
     title:'📢 학생 호출',
-    sub:`<b style="color:#1C64F2;font-size:18px">${escapeHtml(c.studentName||'')}</b> 학생을 호출했습니다.`,
+    sub:`${seat}<b style="color:#1C64F2;font-size:18px">${escapeHtml(c.studentName||'')}</b> 학생을 호출했습니다.`,
     body:`<div style="font-size:12px;color:#6b7280;margin-top:6px">${caller}${when?` · ${when}`:''}</div>`,
     actions:[{label:'확인했습니다',kind:'primary',onclick:`acknowledgeCall('${c._docId}')`}]
   });
@@ -863,9 +884,10 @@ async function callStudent(stuId){
   if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
   const stu=S.students.find(x=>x._docId===stuId);
   if(!stu){toast('학생을 찾을 수 없습니다.','error');return;}
+  const seatBadge=stu.seat?`<span style="display:inline-block;background:#1C64F2;color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:6px">좌석 ${escapeHtml(String(stu.seat))}</span>`:'';
   const ok=await confirmDialog({
     title:'학생 호출',
-    message:`<b>${escapeHtml(stu.name)}</b> 학생을 호출할까요? OP에게 알림이 표시됩니다.`,
+    message:`${seatBadge}<b>${escapeHtml(stu.name)}</b> 학생을 호출할까요? OP에게 알림이 표시됩니다.`,
     confirmLabel:'호출',
     kind:'primary'
   });
@@ -874,6 +896,7 @@ async function callStudent(stuId){
     await db.collection('calls').add({
       studentId:stuId,
       studentName:stu.name||'',
+      studentSeat:stu.seat||'',
       calledBy:S.user.id||'',
       calledByName:S.user.name||'',
       status:'pending',
@@ -2347,8 +2370,7 @@ function renderConsultDetail(){
   _('adminC').innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <button class="btn bs bsm" onclick="autoSaveConsultNote()">← 목록</button>
-      <div style="flex:1"><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p></div>
-      <button class="btn bp bsm" onclick="callStudent('${stu._docId}')" title="OP에게 학생을 호출합니다">📢 호출</button>
+      <div><p style="font-size:16px;font-weight:700">${stu.name}</p><p style="font-size:12px;color:#6b7280">${stu.school} ${stu.grade}${booking?' · '+booking.dateLabel+' '+booking.slot:''}</p></div>
     </div>
     ${qInfo}
     <div class="card" style="margin-bottom:12px">
@@ -2686,7 +2708,7 @@ function renderAdminStudents(){
     <td data-label="학생 연락처">${stuPhone}</td>
     <td data-label="보호자 연락처">${s.guardianPhone}</td>
     <td data-label="계정 ID"><code>${s.accountId}</code></td>
-    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bp bsm" onclick="callStudent('${s._docId}')" title="OP에게 학생을 호출합니다">호출</button><button class="btn bs bsm" onclick="previewAsStudent('${s._docId}')" title="이 학생의 화면을 미리봅니다">학생뷰</button><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
+    <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bs bsm" onclick="previewAsStudent('${s._docId}')" title="이 학생의 화면을 미리봅니다">학생뷰</button><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
   </tr>`;}).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
@@ -4096,7 +4118,7 @@ function openBookDetail(docId){
     ${attSection}
     ${examSections}
     ${qBoardHtml(b,{role:isAdmin?'admin':'student'})}
-    ${isAdmin?`<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn bs" style="flex:1;min-width:80px" onclick="closeModal()">닫기</button><button class="btn bs" style="flex:1;min-width:100px;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button><button class="btn bp" style="flex:1;min-width:80px" onclick="openAdminBook('${docId}')">변경</button><button class="btn bd" style="flex:1;min-width:80px" onclick="closeModal();adminDelBook('${docId}')">삭제</button></div>`:`<div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bs" style="flex:1;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button></div>`}`;openModal();}
+    ${isAdmin?`<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn bs" style="flex:1;min-width:80px" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1;min-width:90px;background:#ea580c;border-color:#ea580c" onclick="closeModal();callStudent('${stuId}')" title="OP에게 학생을 호출합니다">📢 호출</button><button class="btn bs" style="flex:1;min-width:100px;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button><button class="btn bp" style="flex:1;min-width:80px" onclick="openAdminBook('${docId}')">변경</button><button class="btn bd" style="flex:1;min-width:80px" onclick="closeModal();adminDelBook('${docId}')">삭제</button></div>`:`<div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bs" style="flex:1;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button></div>`}`;openModal();}
 
 async function adminDelExamScore(stuDocId, examId, from, bookDocId){
   const ex=getExam(examId);if(!ex)return;
