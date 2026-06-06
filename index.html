@@ -1746,8 +1746,8 @@ function qBoardHtml(booking,ctx){
   }).join(''):'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:12px 0;background:#f9fafb;border-radius:8px">아직 답변이 없습니다.</p>';
   const placeholder=isAdmin?'학생에게 댓글로 답변하기':'추가 질문이나 코멘트 남기기';
   const inputHtml=`<div style="margin-top:14px;padding-top:14px;border-top:1px solid #f3f4f6">
-    <textarea class="fi ta" id="qb-cmt-input-${bid}" rows="2" placeholder="${placeholder}"></textarea>
-    <button class="btn bp bsm" style="margin-top:8px;width:100%" onclick="qbAddComment('${bid}','${role}')">댓글 등록</button>
+    <textarea class="fi ta qb-cmt-input" data-bid="${bid}" rows="2" placeholder="${placeholder}"></textarea>
+    <button class="btn bp bsm" style="margin-top:8px;width:100%" onclick="qbAddComment(this,'${bid}','${role}')">댓글 등록</button>
   </div>`;
   const cmtCount=comments.length;
   const statusBadge=q?'<span class="bx bg">작성됨</span>':'<span class="bx bgr">미작성</span>';
@@ -1793,8 +1793,8 @@ async function qbDelPost(bid){
   }catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);
 }
-async function qbAddComment(bid,role){
-  const t=_('qb-cmt-input-'+bid);
+async function qbAddComment(btn,bid,role){
+  const t=btn?.parentElement?.querySelector('textarea.qb-cmt-input')||_('qb-cmt-input-'+bid);
   const txt=(t?.value||'').trim();
   if(!txt){toast('내용을 입력하세요.','warn');return;}
   const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
