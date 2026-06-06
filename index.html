@@ -3944,9 +3944,9 @@ function renderAdminBookings(){
   const totalStu=bookableStu().length;
   const bookedStu=bookableStu().filter(s=>bookedIds.has(s._docId)).length;
   const utilization=totalStu?Math.round(bookedStu/totalStu*100):0;
-  /* 중복 예약 검사 */
+  /* 중복 예약 검사 — 결석 처리된 예약은 슬롯을 비우므로 검사에서 제외 */
   const byStu={},bySlot={};
-  S.bookings.forEach(b=>{
+  S.bookings.filter(b=>!isNoShow(b)).forEach(b=>{
     (byStu[b.studentId]=byStu[b.studentId]||[]).push(b);
     const k=(b.date||'')+'|'+(b.slot||'');
     (bySlot[k]=bySlot[k]||[]).push(b);
