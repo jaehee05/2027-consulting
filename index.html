@@ -4826,12 +4826,6 @@ function openGrantPoints(stuId,editId){
   const curTs=rec?.ts||Date.now();
   const stuOpts=[...S.students].sort((a,b)=>(a.seat||999)-(b.seat||999)||(a.name||'').localeCompare(b.name||''))
     .map(s=>`<option value="${s._docId}" ${curStuId===s._docId?'selected':''}>${escapeHtml(s.seat?`${s.seat}. ${s.name}`:s.name)}</option>`).join('');
-  const kindRadio=(val,label,color,bg)=>{
-    const on=curKind===val;
-    return `<label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:1.5px solid ${on?color:'#e5e7eb'};border-radius:8px;background:${on?bg:'#fff'};color:${on?color:'#6b7280'};font-weight:700;cursor:pointer">
-      <input type="radio" name="gp-kind" value="${val}" ${on?'checked':''} onchange="onPointKindChange()" style="margin-right:6px">${label}
-    </label>`;
-  };
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${rec?'기록 수정':'상벌점 부여'}</p>
     <div class="fg"><label class="fl">학생</label>
       <select class="fi fsel" id="gp-stu" ${rec?'disabled':''}>
@@ -4839,10 +4833,11 @@ function openGrantPoints(stuId,editId){
       </select>
     </div>
     <div class="fg"><label class="fl">종류</label>
-      <div style="display:flex;gap:8px">${kindRadio('penalty','벌점','#991b1b','#fee2e2')}${kindRadio('merit','상점','#166534','#dcfce7')}</div>
+      <div id="gp-kind-toggle" style="display:flex;gap:8px"></div>
     </div>
-    <div class="fg"><label class="fl">항목 <span id="gp-free-hint" style="font-size:11px;color:#9ca3af;font-weight:400;display:none">(기타 — 사유와 점수를 직접 입력하세요)</span></label>
-      <select class="fi fsel" id="gp-item" onchange="onPointItemChange()"></select>
+    <div class="fg"><label class="fl">사유 선택 <span id="gp-free-hint" style="font-size:11px;color:#9ca3af;font-weight:400;display:none">(기타 — 사유와 점수를 직접 입력하세요)</span></label>
+      <div id="gp-item-groups" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb;max-height:300px;overflow-y:auto"></div>
+      <input type="hidden" id="gp-item" value="">
     </div>
     <div class="fg" id="gp-detail-chips-wrap" style="display:none"><label class="fl">세부 내용 빠른 선택 <span id="gp-chips-hint" style="font-size:11px;color:#9ca3af;font-weight:400">(클릭하면 점수가 자동 반영됩니다)</span></label>
       <div id="gp-detail-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -4866,38 +4861,99 @@ function openGrantPoints(stuId,editId){
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitGrantPoints()">${rec?'저장':'부여'}</button></div>`;
   openModal();
+  renderKindToggle(curKind);
   populatePointItemSelect(curKind,curItemId,curLabel,curPoints,!!rec);
+}
+function renderKindToggle(curKind){
+  const wrap=_('gp-kind-toggle');if(!wrap)return;
+  const radio=(val,label,color,bg)=>{
+    const on=curKind===val;
+    return `<label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:1.5px solid ${on?color:'#e5e7eb'};border-radius:8px;background:${on?bg:'#fff'};color:${on?color:'#6b7280'};font-weight:700;cursor:pointer">
+      <input type="radio" name="gp-kind" value="${val}" ${on?'checked':''} onchange="onPointKindChange()" style="margin-right:6px">${label}
+    </label>`;
+  };
+  wrap.innerHTML=radio('penalty','벌점','#991b1b','#fee2e2')+radio('merit','상점','#166534','#dcfce7');
 }
 function onPointKindChange(){
   const kind=document.querySelector('input[name=gp-kind]:checked')?.value||'penalty';
+  renderKindToggle(kind);
   populatePointItemSelect(kind);
 }
 function populatePointItemSelect(kind,selectedId,curLabel,curPoints,isEdit){
   const items=getPointItems()[kind]||[];
-  const sel=_('gp-item');if(!sel)return;
   let initial=selectedId&&items.find(it=>it.id===selectedId)?selectedId:'';
   if(!initial&&curLabel){
     const m=items.find(it=>!it.free&&it.label===curLabel);
     if(m)initial=m.id;
   }
-  if(!initial)initial=items.find(it=>it.free)?.id||items[0]?.id||'';
-  const groups={};const groupOrder=[];
+  if(!initial){const first=items.find(it=>!it.free);initial=first?.id||items[0]?.id||'';}
+  setItemSelection(kind,initial,isEdit?curLabel:null,isEdit?curPoints:null);
+}
+function sortItemGroupOrder(groups,order){
+  return order.slice().sort((a,b)=>{
+    const aAllFree=groups[a].every(it=>it.free)||a==='기타';
+    const bAllFree=groups[b].every(it=>it.free)||b==='기타';
+    if(aAllFree&&!bAllFree)return 1;
+    if(!aAllFree&&bAllFree)return -1;
+    return 0;
+  });
+}
+function renderItemGroups(kind,selectedId){
+  const items=getPointItems()[kind]||[];
+  const groups={};const order=[];
   items.forEach(it=>{
     const g=it.group||'(미분류)';
-    if(!groups[g]){groups[g]=[];groupOrder.push(g);}
+    if(!groups[g]){groups[g]=[];order.push(g);}
     groups[g].push(it);
   });
-  const optHtml=it=>{
-    const detailsJson=JSON.stringify(normalizeDetails(it).filter(d=>d.label)).replace(/"/g,'&quot;');
-    return `<option value="${it.id}" data-free="${it.free?'1':'0'}" data-group="${escapeHtml(it.group||'')}" data-label="${escapeHtml(it.label)}" data-points="${it.points||0}" data-details="${detailsJson}" ${initial===it.id?'selected':''}>${escapeHtml(it.label)}${it.free?'':` (${it.points}점)`}</option>`;
-  };
-  sel.innerHTML=groupOrder.map(g=>`<optgroup label="${escapeHtml(g)}">${groups[g].map(optHtml).join('')}</optgroup>`).join('');
-  applyPointItemSelection(isEdit?curLabel:'',isEdit?curPoints:null);
+  const sortedOrder=sortItemGroupOrder(groups,order);
+  return sortedOrder.map(g=>{
+    const its=[...groups[g]].sort((a,b)=>(a.free?1:0)-(b.free?1:0));
+    const chips=its.map(it=>{
+      const active=it.id===selectedId;
+      const free=!!it.free;
+      const baseBg=free?'#fef3c7':'#fff';
+      const baseFg=free?'#92400e':'#374151';
+      const baseBd=free?'#fde68a':'#e5e7eb';
+      const bg=active?(free?'#f59e0b':'#1C64F2'):baseBg;
+      const fg=active?'#fff':baseFg;
+      const bd=active?(free?'#f59e0b':'#1C64F2'):baseBd;
+      const tail=free?'<span style="opacity:.75;font-weight:400;margin-left:4px">직접 입력</span>':`<span style="opacity:.75;font-weight:400;margin-left:4px">${it.points||0}점</span>`;
+      return `<button type="button" data-id="${it.id}" onclick="pickItemChip(this)" style="background:${bg};color:${fg};border:1.5px solid ${bd};padding:8px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin:0 6px 6px 0">${escapeHtml(it.label)}${tail}</button>`;
+    }).join('');
+    return `<div style="margin-bottom:10px">
+      <p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px;padding-left:2px">${escapeHtml(g)}</p>
+      <div style="display:flex;flex-wrap:wrap">${chips}</div>
+    </div>`;
+  }).join('');
+}
+function setItemSelection(kind,itemId,presetLabel,presetPoints){
+  const items=getPointItems()[kind]||[];
+  const item=items.find(it=>it.id===itemId);
+  const sel=_('gp-item');if(!sel)return;
+  if(item){
+    sel.value=item.id;
+    sel.dataset.free=item.free?'1':'0';
+    sel.dataset.group=item.group||'';
+    sel.dataset.label=item.label||'';
+    sel.dataset.points=String(item.points||0);
+    sel.dataset.details=JSON.stringify(normalizeDetails(item).filter(d=>d.label));
+  }else{
+    sel.value='';
+    sel.dataset.free='0';sel.dataset.group='';sel.dataset.label='';sel.dataset.points='0';sel.dataset.details='[]';
+  }
+  const wrap=_('gp-item-groups');
+  if(wrap)wrap.innerHTML=renderItemGroups(kind,itemId);
+  applyPointItemSelection(presetLabel,presetPoints);
+}
+function pickItemChip(btn){
+  const id=btn.dataset.id;
+  const kind=document.querySelector('input[name=gp-kind]:checked')?.value||'penalty';
+  setItemSelection(kind,id);
 }
 function applyPointItemSelection(presetLabel,presetPoints){
-  const sel=_('gp-item');if(!sel)return;
-  const opt=sel.options[sel.selectedIndex];if(!opt)return;
-  const free=opt.dataset.free==='1';
+  const sel=_('gp-item');if(!sel||!sel.value)return;
+  const free=sel.dataset.free==='1';
   const labelInput=_('gp-label'),pointsInput=_('gp-points'),hint=_('gp-free-hint'),labelWrap=_('gp-label-wrap');
   if(free){
     labelInput.value=presetLabel||'';
@@ -4907,14 +4963,14 @@ function applyPointItemSelection(presetLabel,presetPoints){
     if(hint)hint.style.display='';
     if(labelWrap)labelWrap.style.display='';
   }else{
-    labelInput.value=opt.dataset.label||'';
+    labelInput.value=sel.dataset.label||'';
     labelInput.setAttribute('readonly','readonly');
     if(hint)hint.style.display='none';
     if(labelWrap)labelWrap.style.display='none';
   }
   const isEdit=presetPoints!=null;
-  pointsInput.value=isEdit?presetPoints:(opt.dataset.points||'1');
-  let details=[];try{details=JSON.parse(opt.dataset.details||'[]');}catch(e){}
+  pointsInput.value=isEdit?presetPoints:(sel.dataset.points||'0');
+  let details=[];try{details=JSON.parse(sel.dataset.details||'[]');}catch(e){}
   const validDetails=details.filter(d=>d.label);
   const dl=_('gp-detail-list');
   if(dl)dl.innerHTML=validDetails.map(d=>`<option value="${escapeHtml(d.label)}">`).join('');
@@ -4925,7 +4981,7 @@ function applyPointItemSelection(presetLabel,presetPoints){
     if(!isEdit)onGrantDetailInput();
   }
   renderDetailChips(validDetails,detailInput?.value||'');
-  const basePoints=Number(opt.dataset.points)||0;
+  const basePoints=Number(sel.dataset.points)||0;
   const hint2=_('gp-chips-hint');
   if(hint2){
     if(basePoints===0&&validDetails.length>0){
@@ -4981,10 +5037,9 @@ function onGrantDetailInput(){
 async function submitGrantPoints(){
   const stuId=_('gp-stu').value;
   const kind=document.querySelector('input[name=gp-kind]:checked')?.value;
-  const itemId=_('gp-item').value;
   const itemSel=_('gp-item');
-  const itemOpt=itemSel.options[itemSel.selectedIndex];
-  const group=itemOpt?.dataset.group||'';
+  const itemId=itemSel.value;
+  const group=itemSel.dataset.group||'';
   const label=(_('gp-label').value||'').trim();
   const points=Number(_('gp-points').value)||0;
   const memo=(_('gp-detail').value||'').trim();
@@ -4996,9 +5051,9 @@ async function submitGrantPoints(){
   if(!itemId){showErr('mErr','항목을 선택하세요.');return;}
   if(!label){showErr('mErr','항목명을 입력하세요.');return;}
   if(!(points>0)){
-    const basePoints=Number(itemOpt?.dataset.points)||0;
+    const basePoints=Number(itemSel.dataset.points)||0;
     let hasDetails=false;
-    try{hasDetails=JSON.parse(itemOpt?.dataset.details||'[]').some(d=>d.label);}catch(e){}
+    try{hasDetails=JSON.parse(itemSel.dataset.details||'[]').some(d=>d.label);}catch(e){}
     if(basePoints===0&&hasDetails)showErr('mErr','이 사유는 기본 점수가 비어 있어 세부 내용을 반드시 선택해야 합니다.');
     else showErr('mErr','점수는 1 이상이어야 합니다.');
     return;
@@ -5050,7 +5105,7 @@ function renderPointItemsEditor(){
       <button class="btn bs bsm" style="font-size:11px;padding:4px 10px;margin-top:2px" onclick="addDetailRow('${kind}','${it.id}')">+ 세부 내용 추가</button>
     </div>`;
   };
-  const renderList=(kind)=>(items[kind]||[]).map(it=>{
+  const renderList=(kind)=>[...(items[kind]||[])].sort((a,b)=>(a.free?1:0)-(b.free?1:0)).map(it=>{
     const isEtc=!!it.free;
     const topRow=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
       <input class="fi pi-group" value="${escapeHtml(it.group||'')}" placeholder="구분 (예: 출결)" style="flex:0 1 110px;min-width:90px;font-size:12px${isEtc?';background:#f9fafb;color:#6b7280':''}" ${isEtc?'readonly':''}>
