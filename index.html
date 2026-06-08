@@ -4844,7 +4844,7 @@ function openGrantPoints(stuId,editId){
     <div class="fg"><label class="fl">항목 <span id="gp-free-hint" style="font-size:11px;color:#9ca3af;font-weight:400;display:none">(기타 — 사유와 점수를 직접 입력하세요)</span></label>
       <select class="fi fsel" id="gp-item" onchange="onPointItemChange()"></select>
     </div>
-    <div class="fg" id="gp-detail-chips-wrap" style="display:none"><label class="fl">세부 내용 빠른 선택 <span style="font-size:11px;color:#9ca3af;font-weight:400">(클릭하면 점수가 자동 반영됩니다)</span></label>
+    <div class="fg" id="gp-detail-chips-wrap" style="display:none"><label class="fl">세부 내용 빠른 선택 <span id="gp-chips-hint" style="font-size:11px;color:#9ca3af;font-weight:400">(클릭하면 점수가 자동 반영됩니다)</span></label>
       <div id="gp-detail-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
     <div class="fg" id="gp-label-wrap" style="display:none"><label class="fl">사유 직접 입력</label>
@@ -4925,6 +4925,17 @@ function applyPointItemSelection(presetLabel,presetPoints){
     if(!isEdit)onGrantDetailInput();
   }
   renderDetailChips(validDetails,detailInput?.value||'');
+  const basePoints=Number(opt.dataset.points)||0;
+  const hint2=_('gp-chips-hint');
+  if(hint2){
+    if(basePoints===0&&validDetails.length>0){
+      hint2.textContent='(필수 선택 — 사유에 기본 점수가 없습니다)';
+      hint2.style.color='#dc2626';
+    }else{
+      hint2.textContent='(클릭하면 점수가 자동 반영됩니다)';
+      hint2.style.color='#9ca3af';
+    }
+  }
 }
 function renderDetailChips(details,currentDetail){
   const wrap=_('gp-detail-chips-wrap'),chips=_('gp-detail-chips');
@@ -4984,7 +4995,14 @@ async function submitGrantPoints(){
   if(!kind){showErr('mErr','종류를 선택하세요.');return;}
   if(!itemId){showErr('mErr','항목을 선택하세요.');return;}
   if(!label){showErr('mErr','항목명을 입력하세요.');return;}
-  if(!(points>0)){showErr('mErr','점수는 1 이상이어야 합니다.');return;}
+  if(!(points>0)){
+    const basePoints=Number(itemOpt?.dataset.points)||0;
+    let hasDetails=false;
+    try{hasDetails=JSON.parse(itemOpt?.dataset.details||'[]').some(d=>d.label);}catch(e){}
+    if(basePoints===0&&hasDetails)showErr('mErr','이 사유는 기본 점수가 비어 있어 세부 내용을 반드시 선택해야 합니다.');
+    else showErr('mErr','점수는 1 이상이어야 합니다.');
+    return;
+  }
   const stu=S.students.find(s=>s._docId===stuId);if(!stu){showErr('mErr','학생을 찾을 수 없습니다.');return;}
   const rec={_id:editId||uid(),kind,itemId,group,label,points,memo,ts,by:{id:S.user?.id||'',name:S.user?.name||'관리자'}};
   const list=Array.isArray(stu.pointLog)?stu.pointLog:[];
