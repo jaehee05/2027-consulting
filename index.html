@@ -4680,17 +4680,39 @@ async function setBookAttendance(docId,status){
 function defaultPointItems(){
   return {
     penalty:[
-      {id:'p_late',label:'지각',points:1,details:['5분 미만','10분 미만','10분 이상']},
-      {id:'p_absent',label:'무단 결석',points:2,details:[]},
-      {id:'p_attitude',label:'수업 태도 불량',points:1,details:['휴대폰 사용','잡담','졸음']},
-      {id:'p_etc',label:'기타',points:1,free:true,details:[]}
+      {id:'p_late',group:'출결',label:'지각',points:1,details:[
+        {label:'5분 미만',points:1},
+        {label:'10분 미만',points:2},
+        {label:'10분 이상',points:3}
+      ]},
+      {id:'p_absent',group:'출결',label:'무단 결석',points:5,details:[]},
+      {id:'p_attitude',group:'학습 태도',label:'수업 태도 불량',points:1,details:[
+        {label:'휴대폰 사용',points:2},
+        {label:'잡담',points:1},
+        {label:'졸음',points:1}
+      ]},
+      {id:'p_etc',group:'기타',label:'기타',points:1,free:true,details:[]}
     ],
     merit:[
-      {id:'m_active',label:'적극 참여',points:1,details:['질문 적극','발표 우수']},
-      {id:'m_homework',label:'우수 과제',points:1,details:['만점','풀이 우수']},
-      {id:'m_etc',label:'기타',points:1,free:true,details:[]}
+      {id:'m_active',group:'수업 태도',label:'적극 참여',points:1,details:[
+        {label:'질문 적극',points:1},
+        {label:'발표 우수',points:2}
+      ]},
+      {id:'m_homework',group:'과제',label:'우수 과제',points:1,details:[
+        {label:'만점',points:2},
+        {label:'풀이 우수',points:1}
+      ]},
+      {id:'m_etc',group:'기타',label:'기타',points:1,free:true,details:[]}
     ]
   };
+}
+function normalizeDetails(item){
+  if(!item||!Array.isArray(item.details))return [];
+  const base=Number(item.points)||0;
+  return item.details.map(d=>{
+    if(typeof d==='string')return {label:d,points:base};
+    return {label:String(d.label||''),points:Number(d.points)||base};
+  }).filter(d=>d.label);
 }
 function getPointItems(){
   const cfg=S.config?.pointItems;
@@ -4762,7 +4784,7 @@ function renderAdminPoints(){
     return `<tr>
       <td data-label="" class="cell-head"><span>${escapeHtml(r._stu.name||'')}</span><span class="head-meta">${kindBx}</span></td>
       <td data-label="종류" class="cell-hide">${kindBx}</td>
-      <td data-label="항목">${escapeHtml(r.label||'')}</td>
+      <td data-label="항목"><div style="display:flex;flex-direction:column;gap:1px"><span>${escapeHtml(r.label||'')}</span>${r.group?`<span style="font-size:10px;color:#9ca3af">${escapeHtml(r.group)}</span>`:''}</div></td>
       <td data-label="점수" style="color:${ptsColor};font-weight:700">${ptsSign}${r.points||0}</td>
       <td data-label="세부 내용" style="font-size:12px;color:#6b7280;max-width:260px;white-space:pre-wrap">${escapeHtml(r.memo||'')}</td>
       <td data-label="일시" style="font-size:12px;color:#6b7280;white-space:nowrap">${fmtPointTs(r.ts)}</td>
@@ -4826,8 +4848,8 @@ function openGrantPoints(stuId,editId){
       <div class="fg" style="flex:1 1 140px;min-width:120px;margin-bottom:0"><label class="fl">사유 <span style="font-size:11px;color:#9ca3af;font-weight:400">(대주제)</span></label>
         <input class="fi" id="gp-label" value="${escapeHtml(curLabel)}" placeholder="사유">
       </div>
-      <div class="fg" style="flex:2 1 240px;min-width:160px;margin-bottom:0"><label class="fl">세부 내용 <span style="font-size:11px;color:#9ca3af;font-weight:400">(소주제 — 선택 또는 직접 입력)</span></label>
-        <input class="fi" id="gp-detail" list="gp-detail-list" value="${escapeHtml(curMemo)}" placeholder="세부 내용">
+      <div class="fg" style="flex:2 1 240px;min-width:160px;margin-bottom:0"><label class="fl">세부 내용 <span style="font-size:11px;color:#9ca3af;font-weight:400">(소주제 — 선택 시 점수 자동 반영)</span></label>
+        <input class="fi" id="gp-detail" list="gp-detail-list" value="${escapeHtml(curMemo)}" placeholder="세부 내용" oninput="onGrantDetailInput()">
         <datalist id="gp-detail-list"></datalist>
       </div>
     </div>
@@ -4858,10 +4880,17 @@ function populatePointItemSelect(kind,selectedId,curLabel,curPoints,isEdit){
     if(m)initial=m.id;
   }
   if(!initial)initial=items.find(it=>it.free)?.id||items[0]?.id||'';
-  sel.innerHTML=items.map(it=>{
-    const detailsJson=JSON.stringify(Array.isArray(it.details)?it.details:[]).replace(/"/g,'&quot;');
-    return `<option value="${it.id}" data-free="${it.free?'1':'0'}" data-label="${escapeHtml(it.label)}" data-points="${it.points||0}" data-details="${detailsJson}" ${initial===it.id?'selected':''}>${escapeHtml(it.label)}${it.free?'':` (${it.points}점)`}</option>`;
-  }).join('');
+  const groups={};const groupOrder=[];
+  items.forEach(it=>{
+    const g=it.group||'(미분류)';
+    if(!groups[g]){groups[g]=[];groupOrder.push(g);}
+    groups[g].push(it);
+  });
+  const optHtml=it=>{
+    const detailsJson=JSON.stringify(normalizeDetails(it)).replace(/"/g,'&quot;');
+    return `<option value="${it.id}" data-free="${it.free?'1':'0'}" data-group="${escapeHtml(it.group||'')}" data-label="${escapeHtml(it.label)}" data-points="${it.points||0}" data-details="${detailsJson}" ${initial===it.id?'selected':''}>${escapeHtml(it.label)}${it.free?'':` (${it.points}점)`}</option>`;
+  };
+  sel.innerHTML=groupOrder.map(g=>`<optgroup label="${escapeHtml(g)}">${groups[g].map(optHtml).join('')}</optgroup>`).join('');
   applyPointItemSelection(isEdit?curLabel:'',isEdit?curPoints:null);
 }
 function applyPointItemSelection(presetLabel,presetPoints){
@@ -4881,16 +4910,34 @@ function applyPointItemSelection(presetLabel,presetPoints){
     labelInput.style.background='#f9fafb';
     if(hint)hint.style.display='none';
   }
-  pointsInput.value=presetPoints!=null?presetPoints:(opt.dataset.points||'1');
+  const isEdit=presetPoints!=null;
+  pointsInput.value=isEdit?presetPoints:(opt.dataset.points||'1');
   let details=[];try{details=JSON.parse(opt.dataset.details||'[]');}catch(e){}
   const dl=_('gp-detail-list');
-  if(dl)dl.innerHTML=details.map(d=>`<option value="${escapeHtml(d)}">`).join('');
+  if(dl)dl.innerHTML=details.map(d=>`<option value="${escapeHtml(d.label)}">`).join('');
+  const detailInput=_('gp-detail');
+  if(detailInput){
+    const map={};details.forEach(d=>{map[d.label]=d.points;});
+    detailInput._detailsMap=map;
+    if(!isEdit)onGrantDetailInput();
+  }
 }
 function onPointItemChange(){applyPointItemSelection();}
+function onGrantDetailInput(){
+  const di=_('gp-detail');if(!di)return;
+  const v=(di.value||'').trim();
+  const map=di._detailsMap||{};
+  if(v && Object.prototype.hasOwnProperty.call(map,v)){
+    _('gp-points').value=map[v];
+  }
+}
 async function submitGrantPoints(){
   const stuId=_('gp-stu').value;
   const kind=document.querySelector('input[name=gp-kind]:checked')?.value;
   const itemId=_('gp-item').value;
+  const itemSel=_('gp-item');
+  const itemOpt=itemSel.options[itemSel.selectedIndex];
+  const group=itemOpt?.dataset.group||'';
   const label=(_('gp-label').value||'').trim();
   const points=Number(_('gp-points').value)||0;
   const memo=(_('gp-detail').value||'').trim();
@@ -4903,7 +4950,7 @@ async function submitGrantPoints(){
   if(!label){showErr('mErr','항목명을 입력하세요.');return;}
   if(!(points>0)){showErr('mErr','점수는 1 이상이어야 합니다.');return;}
   const stu=S.students.find(s=>s._docId===stuId);if(!stu){showErr('mErr','학생을 찾을 수 없습니다.');return;}
-  const rec={_id:editId||uid(),kind,itemId,label,points,memo,ts,by:{id:S.user?.id||'',name:S.user?.name||'관리자'}};
+  const rec={_id:editId||uid(),kind,itemId,group,label,points,memo,ts,by:{id:S.user?.id||'',name:S.user?.name||'관리자'}};
   const list=Array.isArray(stu.pointLog)?stu.pointLog:[];
   const next=editId?list.map(r=>r._id===editId?{...r,...rec}:r):[...list,rec];
   showLoad(true);
@@ -4936,21 +4983,33 @@ function openPointItemsEdit(){
 }
 function renderPointItemsEditor(){
   const items=S.pointItemsDraft;
+  const renderDetails=(it,kind)=>{
+    const details=normalizeDetails(it);
+    const rows=details.map((d,i)=>`<div class="pi-detail-row" style="display:flex;gap:6px;margin-bottom:4px">
+      <input class="fi pi-detail-label" value="${escapeHtml(d.label)}" placeholder="세부 내용 (소주제)" style="flex:1;font-size:12px">
+      <input class="fi pi-detail-points" type="number" min="0" step="1" value="${d.points||0}" style="width:64px;font-size:12px" placeholder="점수">
+      <button class="btn bd bsm" style="width:30px;padding:0" onclick="removeDetailRow('${kind}','${it.id}',${i})" title="세부 내용 삭제">×</button>
+    </div>`).join('');
+    return `<div class="pi-details-list" style="margin-top:8px;padding-left:8px;border-left:2px solid #f3f4f6">
+      <p style="font-size:11px;color:#6b7280;margin-bottom:4px">세부 내용 (소주제 · 세부별 점수)</p>
+      ${rows}
+      <button class="btn bs bsm" style="font-size:11px;padding:4px 10px;margin-top:2px" onclick="addDetailRow('${kind}','${it.id}')">+ 세부 내용 추가</button>
+    </div>`;
+  };
   const renderList=(kind)=>(items[kind]||[]).map(it=>{
     const isEtc=!!it.free;
-    const detailsText=Array.isArray(it.details)?it.details.join('\n'):'';
-    const topRow=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-      <input class="fi pi-label" value="${escapeHtml(it.label)}" placeholder="사유 (대주제)" style="flex:1${isEtc?';background:#f9fafb;color:#6b7280':''}" ${isEtc?'readonly title="기타 항목은 사유를 변경할 수 없습니다"':''}>
-      <input class="fi pi-points" type="number" min="0" step="1" value="${it.points||0}" style="width:80px" placeholder="점수">
-      ${isEtc?'<span class="bx" style="background:#fef3c7;color:#92400e;font-size:10px;width:56px;text-align:center">기타</span>':`<button class="btn bd bsm" style="width:56px" onclick="removePointItem('${kind}','${it.id}')">삭제</button>`}
+    const topRow=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
+      <input class="fi pi-group" value="${escapeHtml(it.group||'')}" placeholder="구분 (예: 출결)" style="flex:0 1 110px;min-width:90px;font-size:12px${isEtc?';background:#f9fafb;color:#6b7280':''}" ${isEtc?'readonly':''}>
+      <input class="fi pi-label" value="${escapeHtml(it.label)}" placeholder="사유 (대주제)" style="flex:1 1 120px;min-width:100px${isEtc?';background:#f9fafb;color:#6b7280':''}" ${isEtc?'readonly title="기타 항목은 사유를 변경할 수 없습니다"':''}>
+      <input class="fi pi-points" type="number" min="0" step="1" value="${it.points||0}" style="width:74px" placeholder="기본 점수">
+      ${isEtc?'<span class="bx" style="background:#fef3c7;color:#92400e;font-size:10px;width:48px;text-align:center">기타</span>':`<button class="btn bd bsm" style="width:48px" onclick="removePointItem('${kind}','${it.id}')">삭제</button>`}
     </div>`;
-    const detailRow=isEtc?'':`<textarea class="fi ta pi-details" rows="2" placeholder="세부 내용 (소주제) — 한 줄에 하나씩, 부여 시 선택지로 표시" style="font-size:12px;margin-bottom:4px">${escapeHtml(detailsText)}</textarea>`;
     return `<div class="pi-row" data-id="${it.id}" data-free="${isEtc?'1':'0'}" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:8px">
-      ${topRow}${detailRow}
+      ${topRow}${isEtc?'':renderDetails(it,kind)}
     </div>`;
   }).join('');
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:6px">상벌점 항목 편집</p>
-    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">사유(대주제)와 세부 내용(소주제)을 미리 설정해 두면 부여 시 빠르게 선택할 수 있습니다. 기타 항목은 부여 시 사유와 세부 내용을 모두 직접 입력합니다.</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">구분(예: 출결) · 사유(대주제) · 세부 내용(소주제)을 미리 설정하면 부여 시 빠르게 선택할 수 있고 세부 내용을 고르면 점수가 자동으로 반영됩니다. 기타 항목은 부여 시 사유와 세부 내용·점수를 모두 직접 입력합니다.</p>
     <div style="margin-bottom:16px">
       <p style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:8px">벌점 항목</p>
       <div id="pi-list-penalty">${renderList('penalty')}</div>
@@ -4971,12 +5030,18 @@ function syncPointItemsDraftFromDom(){
     rows.forEach(row=>{
       const id=row.dataset.id;
       const free=row.dataset.free==='1';
-      const label=(row.querySelector('.pi-label').value||'').trim();
-      const points=Number(row.querySelector('.pi-points').value)||0;
-      const detailsTa=row.querySelector('.pi-details');
-      const details=detailsTa?(detailsTa.value||'').split('\n').map(s=>s.trim()).filter(Boolean):[];
+      const group=(row.querySelector('.pi-group')?.value||'').trim();
+      const label=(row.querySelector('.pi-label')?.value||'').trim();
+      const points=Number(row.querySelector('.pi-points')?.value)||0;
+      const detailRows=row.querySelectorAll('.pi-detail-row');
+      const details=[];
+      detailRows.forEach(dr=>{
+        const dl=(dr.querySelector('.pi-detail-label')?.value||'').trim();
+        const dp=Number(dr.querySelector('.pi-detail-points')?.value)||0;
+        if(dl)details.push({label:dl,points:dp});
+      });
       const orig=(S.pointItemsDraft[kind]||[]).find(x=>x.id===id);
-      const item={id,label:label||(orig?.label||''),points,details};
+      const item={id,group:group||(orig?.group||''),label:label||(orig?.label||''),points,details};
       if(free)item.free=true;
       list.push(item);
     });
@@ -4985,7 +5050,7 @@ function syncPointItemsDraftFromDom(){
 }
 function addPointItem(kind){
   syncPointItemsDraftFromDom();
-  S.pointItemsDraft[kind].push({id:'i_'+uid(),label:'',points:1,details:[]});
+  S.pointItemsDraft[kind].push({id:'i_'+uid(),group:'',label:'',points:1,details:[]});
   renderPointItemsEditor();
 }
 function removePointItem(kind,id){
@@ -4993,11 +5058,26 @@ function removePointItem(kind,id){
   S.pointItemsDraft[kind]=S.pointItemsDraft[kind].filter(it=>it.id!==id);
   renderPointItemsEditor();
 }
+function addDetailRow(kind,itemId){
+  syncPointItemsDraftFromDom();
+  const it=S.pointItemsDraft[kind].find(x=>x.id===itemId);
+  if(it){
+    if(!Array.isArray(it.details))it.details=[];
+    it.details.push({label:'',points:Number(it.points)||0});
+  }
+  renderPointItemsEditor();
+}
+function removeDetailRow(kind,itemId,idx){
+  syncPointItemsDraftFromDom();
+  const it=S.pointItemsDraft[kind].find(x=>x.id===itemId);
+  if(it&&Array.isArray(it.details))it.details.splice(idx,1);
+  renderPointItemsEditor();
+}
 async function savePointItemsFromModal(){
   syncPointItemsDraftFromDom();
   const items=S.pointItemsDraft;
-  if(!items.penalty.some(it=>it.free))items.penalty.push({id:'p_etc',label:'기타',points:1,free:true,details:[]});
-  if(!items.merit.some(it=>it.free))items.merit.push({id:'m_etc',label:'기타',points:1,free:true,details:[]});
+  if(!items.penalty.some(it=>it.free))items.penalty.push({id:'p_etc',group:'기타',label:'기타',points:1,free:true,details:[]});
+  if(!items.merit.some(it=>it.free))items.merit.push({id:'m_etc',group:'기타',label:'기타',points:1,free:true,details:[]});
   for(const kind of ['penalty','merit']){
     for(const it of items[kind]){
       if(!it.label){showErr('mErr',`${kindLabel(kind)} 항목명을 모두 입력하세요.`);return;}
