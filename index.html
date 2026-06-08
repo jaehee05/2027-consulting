@@ -4712,7 +4712,7 @@ function normalizeDetails(item){
   return item.details.map(d=>{
     if(typeof d==='string')return {label:d,points:base};
     return {label:String(d.label||''),points:Number(d.points)||base};
-  }).filter(d=>d.label);
+  });
 }
 function getPointItems(){
   const cfg=S.config?.pointItems;
@@ -4844,14 +4844,15 @@ function openGrantPoints(stuId,editId){
     <div class="fg"><label class="fl">항목 <span id="gp-free-hint" style="font-size:11px;color:#9ca3af;font-weight:400;display:none">(기타 — 사유와 점수를 직접 입력하세요)</span></label>
       <select class="fi fsel" id="gp-item" onchange="onPointItemChange()"></select>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-      <div class="fg" style="flex:1 1 140px;min-width:120px;margin-bottom:0"><label class="fl">사유 <span style="font-size:11px;color:#9ca3af;font-weight:400">(대주제)</span></label>
-        <input class="fi" id="gp-label" value="${escapeHtml(curLabel)}" placeholder="사유">
-      </div>
-      <div class="fg" style="flex:2 1 240px;min-width:160px;margin-bottom:0"><label class="fl">세부 내용 <span style="font-size:11px;color:#9ca3af;font-weight:400">(소주제 — 선택 시 점수 자동 반영)</span></label>
-        <input class="fi" id="gp-detail" list="gp-detail-list" value="${escapeHtml(curMemo)}" placeholder="세부 내용" oninput="onGrantDetailInput()">
-        <datalist id="gp-detail-list"></datalist>
-      </div>
+    <div class="fg" id="gp-detail-chips-wrap" style="display:none"><label class="fl">세부 내용 빠른 선택 <span style="font-size:11px;color:#9ca3af;font-weight:400">(클릭하면 점수가 자동 반영됩니다)</span></label>
+      <div id="gp-detail-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+    <div class="fg" id="gp-label-wrap" style="display:none"><label class="fl">사유 직접 입력</label>
+      <input class="fi" id="gp-label" value="${escapeHtml(curLabel)}" placeholder="기타 사유">
+    </div>
+    <div class="fg"><label class="fl">세부 내용 <span style="font-size:11px;color:#9ca3af;font-weight:400">(직접 입력 가능)</span></label>
+      <input class="fi" id="gp-detail" list="gp-detail-list" value="${escapeHtml(curMemo)}" placeholder="세부 내용" oninput="onGrantDetailInput()">
+      <datalist id="gp-detail-list"></datalist>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <div class="fg" style="flex:1 1 120px;min-width:100px"><label class="fl">점수</label>
@@ -4887,7 +4888,7 @@ function populatePointItemSelect(kind,selectedId,curLabel,curPoints,isEdit){
     groups[g].push(it);
   });
   const optHtml=it=>{
-    const detailsJson=JSON.stringify(normalizeDetails(it)).replace(/"/g,'&quot;');
+    const detailsJson=JSON.stringify(normalizeDetails(it).filter(d=>d.label)).replace(/"/g,'&quot;');
     return `<option value="${it.id}" data-free="${it.free?'1':'0'}" data-group="${escapeHtml(it.group||'')}" data-label="${escapeHtml(it.label)}" data-points="${it.points||0}" data-details="${detailsJson}" ${initial===it.id?'selected':''}>${escapeHtml(it.label)}${it.free?'':` (${it.points}점)`}</option>`;
   };
   sel.innerHTML=groupOrder.map(g=>`<optgroup label="${escapeHtml(g)}">${groups[g].map(optHtml).join('')}</optgroup>`).join('');
@@ -4897,30 +4898,56 @@ function applyPointItemSelection(presetLabel,presetPoints){
   const sel=_('gp-item');if(!sel)return;
   const opt=sel.options[sel.selectedIndex];if(!opt)return;
   const free=opt.dataset.free==='1';
-  const labelInput=_('gp-label'),pointsInput=_('gp-points'),hint=_('gp-free-hint');
+  const labelInput=_('gp-label'),pointsInput=_('gp-points'),hint=_('gp-free-hint'),labelWrap=_('gp-label-wrap');
   if(free){
     labelInput.value=presetLabel||'';
     labelInput.removeAttribute('readonly');
     labelInput.style.background='';
-    labelInput.placeholder='사유를 직접 입력';
+    labelInput.placeholder='기타 사유 (직접 입력)';
     if(hint)hint.style.display='';
+    if(labelWrap)labelWrap.style.display='';
   }else{
     labelInput.value=opt.dataset.label||'';
     labelInput.setAttribute('readonly','readonly');
-    labelInput.style.background='#f9fafb';
     if(hint)hint.style.display='none';
+    if(labelWrap)labelWrap.style.display='none';
   }
   const isEdit=presetPoints!=null;
   pointsInput.value=isEdit?presetPoints:(opt.dataset.points||'1');
   let details=[];try{details=JSON.parse(opt.dataset.details||'[]');}catch(e){}
+  const validDetails=details.filter(d=>d.label);
   const dl=_('gp-detail-list');
-  if(dl)dl.innerHTML=details.map(d=>`<option value="${escapeHtml(d.label)}">`).join('');
+  if(dl)dl.innerHTML=validDetails.map(d=>`<option value="${escapeHtml(d.label)}">`).join('');
   const detailInput=_('gp-detail');
   if(detailInput){
-    const map={};details.forEach(d=>{map[d.label]=d.points;});
+    const map={};validDetails.forEach(d=>{map[d.label]=d.points;});
     detailInput._detailsMap=map;
     if(!isEdit)onGrantDetailInput();
   }
+  renderDetailChips(validDetails,detailInput?.value||'');
+}
+function renderDetailChips(details,currentDetail){
+  const wrap=_('gp-detail-chips-wrap'),chips=_('gp-detail-chips');
+  if(!wrap||!chips)return;
+  if(!details||details.length===0){wrap.style.display='none';chips.innerHTML='';return;}
+  wrap.style.display='';
+  chips.innerHTML=details.map(d=>{
+    const active=currentDetail===d.label;
+    const bg=active?'#1C64F2':'#fff',fg=active?'#fff':'#374151',bd=active?'#1C64F2':'#e5e7eb';
+    return `<button type="button" data-label="${escapeHtml(d.label)}" data-points="${d.points}" onclick="pickDetailChip(this)" style="background:${bg};color:${fg};border:1.5px solid ${bd};padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px">${escapeHtml(d.label)} <span style="font-size:11px;opacity:.75">${d.points}점</span></button>`;
+  }).join('');
+}
+function pickDetailChip(btn){
+  const label=btn.dataset.label;
+  const points=Number(btn.dataset.points)||0;
+  const di=_('gp-detail');if(di)di.value=label;
+  const pi=_('gp-points');if(pi)pi.value=points;
+  btn.parentElement.querySelectorAll('button').forEach(c=>{
+    const me=c===btn;
+    c.style.background=me?'#1C64F2':'#fff';
+    c.style.color=me?'#fff':'#374151';
+    c.style.borderColor=me?'#1C64F2':'#e5e7eb';
+  });
 }
 function onPointItemChange(){applyPointItemSelection();}
 function onGrantDetailInput(){
@@ -4929,6 +4956,15 @@ function onGrantDetailInput(){
   const map=di._detailsMap||{};
   if(v && Object.prototype.hasOwnProperty.call(map,v)){
     _('gp-points').value=map[v];
+  }
+  const chips=_('gp-detail-chips');
+  if(chips){
+    chips.querySelectorAll('button').forEach(c=>{
+      const me=c.dataset.label===v;
+      c.style.background=me?'#1C64F2':'#fff';
+      c.style.color=me?'#fff':'#374151';
+      c.style.borderColor=me?'#1C64F2':'#e5e7eb';
+    });
   }
 }
 async function submitGrantPoints(){
