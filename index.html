@@ -4755,7 +4755,7 @@ function renderAdminPoints(){
       <td data-label="종류" class="cell-hide">${kindBx}</td>
       <td data-label="항목">${escapeHtml(r.label||'')}</td>
       <td data-label="점수" style="color:${ptsColor};font-weight:700">${ptsSign}${r.points||0}</td>
-      <td data-label="메모" style="font-size:12px;color:#6b7280;max-width:240px">${escapeHtml(r.memo||'')}</td>
+      <td data-label="세부 내용" style="font-size:12px;color:#6b7280;max-width:260px;white-space:pre-wrap">${escapeHtml(r.memo||'')}</td>
       <td data-label="일시" style="font-size:12px;color:#6b7280;white-space:nowrap">${fmtPointTs(r.ts)}</td>
       <td data-label="부여자" style="font-size:12px;color:#6b7280">${escapeHtml(r.by?.name||'')}</td>
       <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:5px;justify-content:flex-end">
@@ -4765,7 +4765,7 @@ function renderAdminPoints(){
     </tr>`;
   }).join(''):'';
   const tableCard=`<div class="card" style="padding:0"><div class="tw tw-cards"><table>
-    <thead><tr><th>학생</th><th>종류</th><th>항목</th><th>점수</th><th>메모</th><th>일시</th><th>부여자</th><th>관리</th></tr></thead>
+    <thead><tr><th>학생</th><th>종류</th><th>항목</th><th>점수</th><th>세부 내용</th><th>일시</th><th>부여자</th><th>관리</th></tr></thead>
     <tbody>${rows||'<tr class="empty-row"><td colspan="8" class="empty">기록이 없습니다.</td></tr>'}</tbody>
   </table></div></div>`;
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">벌점 / 상점 관리 <span style="font-size:13px;font-weight:400;color:#6b7280">(${recs.length}건${filterKind!=='all'||filterStu?` / 전체 ${allRecs.length}건`:''})</span></span>
@@ -4810,20 +4810,24 @@ function openGrantPoints(stuId,editId){
     <div class="fg"><label class="fl">종류</label>
       <div style="display:flex;gap:8px">${kindRadio('penalty','벌점','#991b1b','#fee2e2')}${kindRadio('merit','상점','#166534','#dcfce7')}</div>
     </div>
-    <div class="fg"><label class="fl">항목</label>
+    <div class="fg"><label class="fl">항목 <span id="gp-free-hint" style="font-size:11px;color:#9ca3af;font-weight:400;display:none">(기타 — 사유와 점수를 직접 입력하세요)</span></label>
       <select class="fi fsel" id="gp-item" onchange="onPointItemChange()"></select>
     </div>
-    <div class="fg"><label class="fl">항목명 <span style="font-size:11px;color:#9ca3af;font-weight:400">(기타 선택 시 직접 입력)</span></label>
-      <input class="fi" id="gp-label" value="${escapeHtml(curLabel)}" placeholder="항목명">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="fg" style="flex:1 1 140px;min-width:120px;margin-bottom:0"><label class="fl">항목명</label>
+        <input class="fi" id="gp-label" value="${escapeHtml(curLabel)}" placeholder="항목명">
+      </div>
+      <div class="fg" style="flex:2 1 240px;min-width:160px;margin-bottom:0"><label class="fl">세부 내용 <span style="font-size:11px;color:#9ca3af;font-weight:400">(선택)</span></label>
+        <input class="fi" id="gp-memo" value="${escapeHtml(curMemo)}" placeholder="상세 사유·상황·비고 등">
+      </div>
     </div>
-    <div class="fg"><label class="fl">점수</label>
-      <input class="fi" id="gp-points" type="number" min="0" step="1" value="${curPoints}">
-    </div>
-    <div class="fg"><label class="fl">부여 일시</label>
-      <input class="fi" id="gp-ts" type="datetime-local" value="${tsToLocalInput(curTs)}">
-    </div>
-    <div class="fg"><label class="fl">메모 <span style="font-size:11px;color:#9ca3af;font-weight:400">(선택)</span></label>
-      <textarea class="fi ta" id="gp-memo" rows="2" placeholder="상세 사유 또는 비고">${escapeHtml(curMemo)}</textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="fg" style="flex:1 1 120px;min-width:100px"><label class="fl">점수</label>
+        <input class="fi" id="gp-points" type="number" min="0" step="1" value="${curPoints}">
+      </div>
+      <div class="fg" style="flex:2 1 200px;min-width:160px"><label class="fl">부여 일시</label>
+        <input class="fi" id="gp-ts" type="datetime-local" value="${tsToLocalInput(curTs)}">
+      </div>
     </div>
     <input type="hidden" id="gp-edit-id" value="${editId||''}">
     <div class="ferr" id="mErr"></div>
@@ -4851,16 +4855,18 @@ function applyPointItemSelection(presetLabel,presetPoints){
   const sel=_('gp-item');if(!sel)return;
   const opt=sel.options[sel.selectedIndex];if(!opt)return;
   const free=opt.dataset.free==='1';
-  const labelInput=_('gp-label'),pointsInput=_('gp-points');
+  const labelInput=_('gp-label'),pointsInput=_('gp-points'),hint=_('gp-free-hint');
   if(free){
     labelInput.value=presetLabel||'';
     labelInput.removeAttribute('readonly');
     labelInput.style.background='';
-    labelInput.placeholder='벌점/상점 사유를 직접 입력';
+    labelInput.placeholder='사유를 직접 입력';
+    if(hint)hint.style.display='';
   }else{
     labelInput.value=opt.dataset.label||'';
     labelInput.setAttribute('readonly','readonly');
     labelInput.style.background='#f9fafb';
+    if(hint)hint.style.display='none';
   }
   pointsInput.value=presetPoints!=null?presetPoints:(opt.dataset.points||'1');
 }
