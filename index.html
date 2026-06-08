@@ -259,6 +259,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 .home-card .hc-ico{width:44px;height:44px;border-radius:var(--radius-xl);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
 .home-card .hc-ico.blue{background:var(--primary-soft);color:var(--primary)}
 .home-card .hc-ico.green{background:#ecfdf5;color:#059669}
+.home-card .hc-ico.red{background:#fef2f2;color:#dc2626}
 .home-card .hc-title{font-size:18px;font-weight:800;color:var(--gray-900)}
 .home-card .hc-desc{font-size:12px;color:var(--gray-500);line-height:1.5;margin-top:-4px}
 .home-card .hc-cta{margin-top:auto;font-size:12px;font-weight:600;color:var(--primary);display:flex;align-items:center;gap:4px}
@@ -708,7 +709,7 @@ function updateAdminTabs(){
   if(!S.user||S.user.type==='student')return;
   const el=_('adminTabs');if(!el)return;
   const isAdmin=S.user.type==='admin';
-  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['points','벌점 관리'],['notices','공지사항'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['students','학생 목록'],['scores','학생 성적'],['bookings','예약 현황']];
+  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['notices','공지사항'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['students','학생 목록'],['scores','학생 성적'],['bookings','예약 현황']];
   const n=pendingReqCountForAdmin();
   const nAdd=isAdmin?pendingAddStudentCount():0;
   el.innerHTML=tabs.map(([id,label])=>{
@@ -4671,15 +4672,15 @@ async function setBookAttendance(docId,status){
 function defaultPointItems(){
   return {
     penalty:[
-      {id:'p_late',label:'지각',points:1},
-      {id:'p_absent',label:'무단 결석',points:2},
-      {id:'p_attitude',label:'수업 태도 불량',points:1},
-      {id:'p_etc',label:'기타',points:1,free:true}
+      {id:'p_late',label:'지각',points:1,details:['5분 미만','10분 미만','10분 이상']},
+      {id:'p_absent',label:'무단 결석',points:2,details:[]},
+      {id:'p_attitude',label:'수업 태도 불량',points:1,details:['휴대폰 사용','잡담','졸음']},
+      {id:'p_etc',label:'기타',points:1,free:true,details:[]}
     ],
     merit:[
-      {id:'m_active',label:'적극 참여',points:1},
-      {id:'m_homework',label:'우수 과제',points:1},
-      {id:'m_etc',label:'기타',points:1,free:true}
+      {id:'m_active',label:'적극 참여',points:1,details:['질문 적극','발표 우수']},
+      {id:'m_homework',label:'우수 과제',points:1,details:['만점','풀이 우수']},
+      {id:'m_etc',label:'기타',points:1,free:true,details:[]}
     ]
   };
 }
@@ -4814,11 +4815,12 @@ function openGrantPoints(stuId,editId){
       <select class="fi fsel" id="gp-item" onchange="onPointItemChange()"></select>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-      <div class="fg" style="flex:1 1 140px;min-width:120px;margin-bottom:0"><label class="fl">항목명</label>
-        <input class="fi" id="gp-label" value="${escapeHtml(curLabel)}" placeholder="항목명">
+      <div class="fg" style="flex:1 1 140px;min-width:120px;margin-bottom:0"><label class="fl">사유 <span style="font-size:11px;color:#9ca3af;font-weight:400">(대주제)</span></label>
+        <input class="fi" id="gp-label" value="${escapeHtml(curLabel)}" placeholder="사유">
       </div>
-      <div class="fg" style="flex:2 1 240px;min-width:160px;margin-bottom:0"><label class="fl">세부 내용 <span style="font-size:11px;color:#9ca3af;font-weight:400">(선택)</span></label>
-        <input class="fi" id="gp-memo" value="${escapeHtml(curMemo)}" placeholder="상세 사유·상황·비고 등">
+      <div class="fg" style="flex:2 1 240px;min-width:160px;margin-bottom:0"><label class="fl">세부 내용 <span style="font-size:11px;color:#9ca3af;font-weight:400">(소주제 — 선택 또는 직접 입력)</span></label>
+        <input class="fi" id="gp-detail" list="gp-detail-list" value="${escapeHtml(curMemo)}" placeholder="세부 내용">
+        <datalist id="gp-detail-list"></datalist>
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -4848,7 +4850,10 @@ function populatePointItemSelect(kind,selectedId,curLabel,curPoints,isEdit){
     if(m)initial=m.id;
   }
   if(!initial)initial=items.find(it=>it.free)?.id||items[0]?.id||'';
-  sel.innerHTML=items.map(it=>`<option value="${it.id}" data-free="${it.free?'1':'0'}" data-label="${escapeHtml(it.label)}" data-points="${it.points||0}" ${initial===it.id?'selected':''}>${escapeHtml(it.label)}${it.free?'':` (${it.points}점)`}</option>`).join('');
+  sel.innerHTML=items.map(it=>{
+    const detailsJson=JSON.stringify(Array.isArray(it.details)?it.details:[]).replace(/"/g,'&quot;');
+    return `<option value="${it.id}" data-free="${it.free?'1':'0'}" data-label="${escapeHtml(it.label)}" data-points="${it.points||0}" data-details="${detailsJson}" ${initial===it.id?'selected':''}>${escapeHtml(it.label)}${it.free?'':` (${it.points}점)`}</option>`;
+  }).join('');
   applyPointItemSelection(isEdit?curLabel:'',isEdit?curPoints:null);
 }
 function applyPointItemSelection(presetLabel,presetPoints){
@@ -4869,6 +4874,9 @@ function applyPointItemSelection(presetLabel,presetPoints){
     if(hint)hint.style.display='none';
   }
   pointsInput.value=presetPoints!=null?presetPoints:(opt.dataset.points||'1');
+  let details=[];try{details=JSON.parse(opt.dataset.details||'[]');}catch(e){}
+  const dl=_('gp-detail-list');
+  if(dl)dl.innerHTML=details.map(d=>`<option value="${escapeHtml(d)}">`).join('');
 }
 function onPointItemChange(){applyPointItemSelection();}
 async function submitGrantPoints(){
@@ -4877,7 +4885,7 @@ async function submitGrantPoints(){
   const itemId=_('gp-item').value;
   const label=(_('gp-label').value||'').trim();
   const points=Number(_('gp-points').value)||0;
-  const memo=(_('gp-memo').value||'').trim();
+  const memo=(_('gp-detail').value||'').trim();
   const tsStr=_('gp-ts').value;
   const ts=tsStr?new Date(tsStr).getTime():Date.now();
   const editId=_('gp-edit-id').value;
@@ -4922,14 +4930,19 @@ function renderPointItemsEditor(){
   const items=S.pointItemsDraft;
   const renderList=(kind)=>(items[kind]||[]).map(it=>{
     const isEtc=!!it.free;
-    return `<div class="pi-row" data-id="${it.id}" data-free="${isEtc?'1':'0'}" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-      <input class="fi pi-label" value="${escapeHtml(it.label)}" placeholder="항목명" style="flex:1${isEtc?';background:#f9fafb;color:#6b7280':''}" ${isEtc?'readonly title="기타 항목은 이름을 변경할 수 없습니다"':''}>
+    const detailsText=Array.isArray(it.details)?it.details.join('\n'):'';
+    const topRow=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <input class="fi pi-label" value="${escapeHtml(it.label)}" placeholder="사유 (대주제)" style="flex:1${isEtc?';background:#f9fafb;color:#6b7280':''}" ${isEtc?'readonly title="기타 항목은 사유를 변경할 수 없습니다"':''}>
       <input class="fi pi-points" type="number" min="0" step="1" value="${it.points||0}" style="width:80px" placeholder="점수">
       ${isEtc?'<span class="bx" style="background:#fef3c7;color:#92400e;font-size:10px;width:56px;text-align:center">기타</span>':`<button class="btn bd bsm" style="width:56px" onclick="removePointItem('${kind}','${it.id}')">삭제</button>`}
     </div>`;
+    const detailRow=isEtc?'':`<textarea class="fi ta pi-details" rows="2" placeholder="세부 내용 (소주제) — 한 줄에 하나씩, 부여 시 선택지로 표시" style="font-size:12px;margin-bottom:4px">${escapeHtml(detailsText)}</textarea>`;
+    return `<div class="pi-row" data-id="${it.id}" data-free="${isEtc?'1':'0'}" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:8px">
+      ${topRow}${detailRow}
+    </div>`;
   }).join('');
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:6px">벌점 / 상점 항목 편집</p>
-    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">기타 항목은 부여 시 항목명을 직접 입력할 수 있습니다.</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">사유(대주제)와 세부 내용(소주제)을 미리 설정해 두면 부여 시 빠르게 선택할 수 있습니다. 기타 항목은 부여 시 사유와 세부 내용을 모두 직접 입력합니다.</p>
     <div style="margin-bottom:16px">
       <p style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:8px">벌점 항목</p>
       <div id="pi-list-penalty">${renderList('penalty')}</div>
@@ -4952,8 +4965,10 @@ function syncPointItemsDraftFromDom(){
       const free=row.dataset.free==='1';
       const label=(row.querySelector('.pi-label').value||'').trim();
       const points=Number(row.querySelector('.pi-points').value)||0;
+      const detailsTa=row.querySelector('.pi-details');
+      const details=detailsTa?(detailsTa.value||'').split('\n').map(s=>s.trim()).filter(Boolean):[];
       const orig=(S.pointItemsDraft[kind]||[]).find(x=>x.id===id);
-      const item={id,label:label||(orig?.label||''),points};
+      const item={id,label:label||(orig?.label||''),points,details};
       if(free)item.free=true;
       list.push(item);
     });
@@ -4962,7 +4977,7 @@ function syncPointItemsDraftFromDom(){
 }
 function addPointItem(kind){
   syncPointItemsDraftFromDom();
-  S.pointItemsDraft[kind].push({id:'i_'+uid(),label:'',points:1});
+  S.pointItemsDraft[kind].push({id:'i_'+uid(),label:'',points:1,details:[]});
   renderPointItemsEditor();
 }
 function removePointItem(kind,id){
@@ -4973,8 +4988,8 @@ function removePointItem(kind,id){
 async function savePointItemsFromModal(){
   syncPointItemsDraftFromDom();
   const items=S.pointItemsDraft;
-  if(!items.penalty.some(it=>it.free))items.penalty.push({id:'p_etc',label:'기타',points:1,free:true});
-  if(!items.merit.some(it=>it.free))items.merit.push({id:'m_etc',label:'기타',points:1,free:true});
+  if(!items.penalty.some(it=>it.free))items.penalty.push({id:'p_etc',label:'기타',points:1,free:true,details:[]});
+  if(!items.merit.some(it=>it.free))items.merit.push({id:'m_etc',label:'기타',points:1,free:true,details:[]});
   for(const kind of ['penalty','merit']){
     for(const it of items[kind]){
       if(!it.label){showErr('mErr',`${kindLabel(kind)} 항목명을 모두 입력하세요.`);return;}
@@ -5461,8 +5476,7 @@ function enterHome(){
     ];
     const isStu=S.user?.type==='student';
     const isAdmin=S.user?.type==='admin';
-    const classPublic=S.config?.classroomPublic===true;
-    if(isAdmin||(isStu&&classPublic))items.push({ico:'📺',color:'blue',title:'강의실',desc:'온라인 강의를<br>시청합니다.',onclick:'goClassroom()'});
+    if(isAdmin)items.push({ico:'⚖️',color:'red',title:'벌점 관리',desc:'학생별 벌점·상점을<br>부여·조회합니다.',onclick:'goPoints()'});
     if(isStu)items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
       <div class="hc-ico ${it.color}">${it.ico}</div>
@@ -5528,6 +5542,14 @@ function goConsulting(){
     showView('vAdmin');applyChips();
     setTab(S.user.type==='admin'?'students':'bookings');
   }
+}
+function goPoints(){
+  if(!S.user){goLoginView();return;}
+  if(S.user.type!=='admin'){toast('ADMIN 전용 기능입니다.','warn');goHome();return;}
+  _('adminUname').textContent=S.user.name;
+  _('adminRoleLabel').textContent='ADMIN';
+  showView('vAdmin');applyChips();
+  setTab('points');
 }
 function goMyPage(){
   if(S.user?.type!=='student'){goHome();return;}
