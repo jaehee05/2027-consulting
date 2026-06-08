@@ -4827,10 +4827,11 @@ function openGrantPoints(stuId,editId){
   const stuOpts=[...S.students].sort((a,b)=>(a.seat||999)-(b.seat||999)||(a.name||'').localeCompare(b.name||''))
     .map(s=>`<option value="${s._docId}" ${curStuId===s._docId?'selected':''}>${escapeHtml(s.seat?`${s.seat}. ${s.name}`:s.name)}</option>`).join('');
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${rec?'기록 수정':'상벌점 부여'}</p>
-    <div class="fg"><label class="fl">학생</label>
-      <select class="fi fsel" id="gp-stu" ${rec?'disabled':''}>
-        <option value="">학생 선택</option>${stuOpts}
-      </select>
+    <div class="fg"><label class="fl">학생 ${rec?'':'<span style="font-size:11px;color:#9ca3af;font-weight:400">(여러 명 선택 시 일괄 부여)</span>'}</label>
+      <div id="gp-stu-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:32px;padding:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px"></div>
+      ${rec?'':`<select class="fi fsel" id="gp-stu-picker" onchange="addStudentToGrant(this)">
+        <option value="">+ 학생 추가</option>${stuOpts}
+      </select>`}
     </div>
     <div class="fg"><label class="fl">종류</label>
       <div id="gp-kind-toggle" style="display:flex;gap:8px"></div>
@@ -4861,8 +4862,38 @@ function openGrantPoints(stuId,editId){
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitGrantPoints()">${rec?'저장':'부여'}</button></div>`;
   openModal();
+  S.gpSelected=new Set();
+  if(curStuId)S.gpSelected.add(curStuId);
+  renderStuChips(!!rec);
   renderKindToggle(curKind);
   populatePointItemSelect(curKind,curItemId,curLabel,curPoints,!!rec);
+}
+function renderStuChips(isEdit){
+  const wrap=_('gp-stu-chips');if(!wrap)return;
+  const ids=[...(S.gpSelected||[])];
+  if(ids.length===0){
+    wrap.innerHTML='<span style="font-size:12px;color:#9ca3af;padding:4px 4px">학생을 1명 이상 추가하세요.</span>';
+    return;
+  }
+  wrap.innerHTML=ids.map(id=>{
+    const stu=S.students.find(s=>s._docId===id);
+    if(!stu)return '';
+    const label=stu.seat?`${stu.seat}. ${stu.name}`:(stu.name||'');
+    const removeBtn=isEdit?'':`<button type="button" onclick="removeStudentFromGrant('${id}')" style="background:none;border:none;color:#1e40af;cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 4px;font-weight:700">×</button>`;
+    return `<span style="display:inline-flex;align-items:center;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600">${escapeHtml(label)}${removeBtn}</span>`;
+  }).join('');
+}
+function addStudentToGrant(sel){
+  const id=sel.value;
+  if(!id)return;
+  if(!S.gpSelected)S.gpSelected=new Set();
+  S.gpSelected.add(id);
+  sel.value='';
+  renderStuChips(false);
+}
+function removeStudentFromGrant(id){
+  if(S.gpSelected)S.gpSelected.delete(id);
+  renderStuChips(false);
 }
 function renderKindToggle(curKind){
   const wrap=_('gp-kind-toggle');if(!wrap)return;
@@ -5035,7 +5066,7 @@ function onGrantDetailInput(){
   }
 }
 async function submitGrantPoints(){
-  const stuId=_('gp-stu').value;
+  const selectedIds=[...(S.gpSelected||[])];
   const kind=document.querySelector('input[name=gp-kind]:checked')?.value;
   const itemSel=_('gp-item');
   const itemId=itemSel.value;
@@ -5046,7 +5077,7 @@ async function submitGrantPoints(){
   const tsStr=_('gp-ts').value;
   const ts=tsStr?new Date(tsStr).getTime():Date.now();
   const editId=_('gp-edit-id').value;
-  if(!stuId){showErr('mErr','학생을 선택하세요.');return;}
+  if(selectedIds.length===0){showErr('mErr','학생을 1명 이상 선택하세요.');return;}
   if(!kind){showErr('mErr','종류를 선택하세요.');return;}
   if(!itemId){showErr('mErr','항목을 선택하세요.');return;}
   if(!label){showErr('mErr','항목명을 입력하세요.');return;}
@@ -5058,17 +5089,40 @@ async function submitGrantPoints(){
     else showErr('mErr','점수는 1 이상이어야 합니다.');
     return;
   }
-  const stu=S.students.find(s=>s._docId===stuId);if(!stu){showErr('mErr','학생을 찾을 수 없습니다.');return;}
-  const rec={_id:editId||uid(),kind,itemId,group,label,points,memo,ts,by:{id:S.user?.id||'',name:S.user?.name||'관리자'}};
-  const list=Array.isArray(stu.pointLog)?stu.pointLog:[];
-  const next=editId?list.map(r=>r._id===editId?{...r,...rec}:r):[...list,rec];
+  const byInfo={id:S.user?.id||'',name:S.user?.name||'관리자'};
   showLoad(true);
   try{
-    await db.collection('students').doc(stuId).update({pointLog:next});
-    stu.pointLog=next;
-    closeModal();
-    renderAdminPoints();
-    toast(editId?'기록을 수정했습니다.':`${kindLabel(kind)} ${points}점을 ${stu.name} 학생에게 부여했습니다.`,'success');
+    if(editId){
+      const stuId=selectedIds[0];
+      const stu=S.students.find(s=>s._docId===stuId);
+      if(!stu){showErr('mErr','학생을 찾을 수 없습니다.');showLoad(false);return;}
+      const rec={_id:editId,kind,itemId,group,label,points,memo,ts,by:byInfo};
+      const list=Array.isArray(stu.pointLog)?stu.pointLog:[];
+      const next=list.map(r=>r._id===editId?{...r,...rec}:r);
+      await db.collection('students').doc(stuId).update({pointLog:next});
+      stu.pointLog=next;
+      closeModal();renderAdminPoints();
+      toast('기록을 수정했습니다.','success');
+    }else{
+      const batch=db.batch();
+      const updates=[];
+      selectedIds.forEach(stuId=>{
+        const stu=S.students.find(s=>s._docId===stuId);
+        if(!stu)return;
+        const list=Array.isArray(stu.pointLog)?stu.pointLog:[];
+        const rec={_id:uid(),kind,itemId,group,label,points,memo,ts,by:byInfo};
+        const next=[...list,rec];
+        batch.update(db.collection('students').doc(stuId),{pointLog:next});
+        updates.push({stu,next});
+      });
+      await batch.commit();
+      updates.forEach(u=>{u.stu.pointLog=u.next;});
+      closeModal();renderAdminPoints();
+      const names=selectedIds.length<=2
+        ? selectedIds.map(id=>S.students.find(s=>s._docId===id)?.name||'').filter(Boolean).join(', ')
+        : `${selectedIds.length}명`;
+      toast(`${names} 학생에게 ${kindLabel(kind)} ${points}점을 부여했습니다.`,'success');
+    }
   }catch(e){showErr('mErr','저장 실패: '+e.message);}
   showLoad(false);
 }
