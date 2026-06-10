@@ -1842,10 +1842,10 @@ function qBoardHtml(booking,ctx){
   const postsHtml=posts.length?posts.map(p=>{
     const isEditing=editingPostId===p._id;
     const isPostStudent=p.role!=='admin';
-    const accent=isPostStudent?'#3b82f6':'#dc2626';
-    const bgCol=isPostStudent?'#eff6ff':'#fef2f2';
-    const borderCol=isPostStudent?'#bfdbfe':'#fecaca';
-    const badge=isPostStudent?'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>';
+    const accent=isPostStudent?'#72B768':'#dc2626';
+    const bgCol=isPostStudent?'#f1f8eb':'#fef2f2';
+    const borderCol=isPostStudent?'#c5dfb1':'#fecaca';
+    const badge=isPostStudent?'<span class="bx" style="font-size:10px;font-weight:700;background:#dcecd0;color:#3a6b30">학생</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>';
     const name=p.name||(isPostStudent?studentName:'관리자');
     const tsLine=p.ts?qbFmtTs(p.ts):'';
     const editedMark=p.editedTs?'<span style="color:#9ca3af;font-size:11px">· 수정됨</span>':'';
@@ -1878,10 +1878,10 @@ function qBoardHtml(booking,ctx){
     const commentsHtml=comments.length?comments.map(c=>{
       const isAdminCmt=c.role==='admin';
       const canDel=isAdmin||(isStudent&&c.role==='student');
-      const cBadge=isAdminCmt?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
+      const cBadge=isAdminCmt?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#dcecd0;color:#3a6b30">학생</span>';
       const cName=c.name||(isAdminCmt?'관리자':studentName);
       const cDel=canDel?`<button onclick="qbDelComment('${bid}','${p._id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1" title="삭제">×</button>`:'';
-      const cAccent=isAdminCmt?'#dc2626':'#3b82f6';
+      const cAccent=isAdminCmt?'#dc2626':'#72B768';
       return `<div style="border-left:3px solid ${cAccent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:6px;font-size:12px">${cBadge}<b>${escapeHtml(cName)}</b><span style="color:#9ca3af">· ${qbFmtTs(c.ts)}</span></div>
