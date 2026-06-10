@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1C64F2">
+<meta name="theme-color" content="#72B768">
 <meta name="format-detection" content="telephone=no">
 <meta name="robots" content="noindex, nofollow">
 <meta name="googlebot" content="noindex, nofollow">
@@ -14,11 +14,11 @@
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.5/dist/web/static/pretendard-dynamic-subset.css');
 :root{
   /* Brand */
-  --primary:#1C64F2;
-  --primary-hover:#1A56DB;
-  --primary-soft:#eff6ff;
-  --primary-soft-border:#bfdbfe;
-  --primary-text:#1d4ed8;
+  --primary:#72B768;
+  --primary-hover:#5FA056;
+  --primary-soft:#f1f8eb;
+  --primary-soft-border:#c5dfb1;
+  --primary-text:#3a6b30;
   /* Grays */
   --gray-50:#f9fafb;
   --gray-100:#f3f4f6;
@@ -56,7 +56,7 @@
   --bg:#f3f4f6;
   --surface:#fff;
   /* Focus */
-  --focus-ring:0 0 0 3px rgba(28,100,242,.35);
+  --focus-ring:0 0 0 3px rgba(114,183,104,.35);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--bg);min-height:100vh}
@@ -80,7 +80,7 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
 .fl{font-size:11px;font-weight:600;color:var(--gray-500)}
 .fi{height:40px;padding:0 12px;border:1px solid var(--gray-200);border-radius:var(--radius-lg);font-family:inherit;font-size:14px;color:var(--gray-900);background:var(--surface);outline:none;transition:.15s;width:100%}
-.fi:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(28,100,242,.1)}
+.fi:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(114,183,104,.1)}
 .fsel{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 10 6'%3e%3cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 1 4 4 4-4'/%3e%3c/svg%3e");background-position:right 10px center;background-repeat:no-repeat;background-size:.7em;padding-right:30px}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ferr{color:var(--danger);font-size:12px;margin-bottom:10px;display:none}
@@ -103,15 +103,15 @@ tr:last-child td{border-bottom:none}
 .adm-slot{appearance:none;-webkit-appearance:none;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 6px;border-radius:10px;font-family:inherit;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:transform .12s ease,box-shadow .15s,background .15s,border-color .15s;height:64px;width:100%;box-sizing:border-box;overflow:hidden;line-height:1;-webkit-tap-highlight-color:transparent}
 .adm-slot .adm-slot-time{display:block;font-size:13px;font-weight:800;letter-spacing:-.2px;line-height:1;flex:0 0 auto}
 .adm-slot .adm-slot-name{display:block;font-size:11px;font-weight:600;line-height:1;text-align:center;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto}
-.adm-slot.filled{background:linear-gradient(135deg,#1C64F2,#1A56DB);color:#fff;border-color:#1A56DB}
-.adm-slot.filled:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(28,100,242,.32)}
+.adm-slot.filled{background:linear-gradient(135deg,#72B768,#5FA056);color:#fff;border-color:#5FA056}
+.adm-slot.filled:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(114,183,104,.32)}
 .adm-slot.filled .adm-slot-name{opacity:.95}
 .adm-slot.vacant{background:#f9fafb;color:#9ca3af;border-color:#e5e7eb}
 .adm-slot.vacant:hover{background:#f3f4f6;border-color:#d1d5db;color:#6b7280}
 .dt{padding:7px 14px;border-radius:var(--radius-lg);font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--gray-200);background:var(--surface);color:var(--gray-500);transition:.15s;font-family:inherit}
 .dt.on{background:var(--primary);color:var(--surface);border-color:var(--primary)}.dt:hover:not(.on){border-color:var(--primary);color:var(--primary)}
 .bx{display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--radius-pill);font-size:11px;font-weight:600}
-.bb{background:#dbeafe;color:var(--primary-text)}.bg{background:var(--success-soft);color:var(--success)}
+.bb{background:#dcecd0;color:var(--primary-text)}.bg{background:var(--success-soft);color:var(--success)}
 .br{background:var(--danger-soft);color:var(--danger)}.bgr{background:var(--gray-300);color:var(--gray-700)}
 .bx.bpk{background:#fce7f3;color:#be185d}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -156,7 +156,7 @@ tr:last-child td{border-bottom:none}
 @keyframes swCircle{to{stroke-dashoffset:0}}
 @keyframes swCheck{to{stroke-dashoffset:0}}
 .gc-in{width:100%;height:32px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);text-align:center;font-size:12px;font-weight:600;font-family:inherit;outline:none;padding:0 2px;box-sizing:border-box}
-.gc-in:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(28,100,242,.1)}
+.gc-in:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(114,183,104,.1)}
 .gc-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .gc-tbl td,.gc-tbl th{border:1px solid var(--gray-200);padding:4px 6px;text-align:center;vertical-align:middle}
 .gc-tbl th{background:var(--gray-100);font-size:10px;font-weight:700;color:var(--gray-500)}
@@ -352,7 +352,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
     <div class="card">
       <div class="fg"><label class="fl">아이디</label><input class="fi" id="lId" placeholder="아이디 입력" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <div class="fg" style="margin-bottom:14px"><label class="fl">비밀번호</label><input class="fi" id="lPw" type="password" placeholder="비밀번호 입력" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;font-size:13px;color:#374151;font-weight:500"><input type="checkbox" id="lKeep" style="width:15px;height:15px;cursor:pointer;accent-color:#1C64F2">로그인 상태 유지</label>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;font-size:13px;color:#374151;font-weight:500"><input type="checkbox" id="lKeep" style="width:15px;height:15px;cursor:pointer;accent-color:#72B768">로그인 상태 유지</label>
       <div class="ferr" id="lErr"></div>
       <button class="btn bp bfw" onclick="doLogin()">로그인</button>
     </div>
@@ -885,10 +885,10 @@ function showCallModal(c){
   _activeCallModalId=c._docId;_modalLocked=true;
   const when=c.createdAt?new Date(c.createdAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'';
   const caller=escapeHtml(c.calledByName||'관리자');
-  const seat=c.studentSeat?`<span style="display:inline-block;background:#1C64F2;color:#fff;border-radius:8px;padding:3px 10px;font-size:14px;font-weight:800;margin-right:8px;vertical-align:middle">좌석 ${escapeHtml(String(c.studentSeat))}</span>`:'';
+  const seat=c.studentSeat?`<span style="display:inline-block;background:#72B768;color:#fff;border-radius:8px;padding:3px 10px;font-size:14px;font-weight:800;margin-right:8px;vertical-align:middle">좌석 ${escapeHtml(String(c.studentSeat))}</span>`:'';
   renderModal({
     title:'📢 학생 호출',
-    sub:`${seat}<b style="color:#1C64F2;font-size:18px">${escapeHtml(c.studentName||'')}</b> 학생을 호출했습니다.`,
+    sub:`${seat}<b style="color:#72B768;font-size:18px">${escapeHtml(c.studentName||'')}</b> 학생을 호출했습니다.`,
     body:`<div style="font-size:12px;color:#6b7280;margin-top:6px">${caller}${when?` · ${when}`:''}</div>`,
     actions:[
       {label:'미등원',kind:'danger',onclick:`resolveCall('${c._docId}','absent')`},
@@ -911,7 +911,7 @@ async function callStudent(stuId){
   if(S.user?.type!=='admin'){toast('ADMIN 권한이 필요합니다.','warn');return;}
   const stu=S.students.find(x=>x._docId===stuId);
   if(!stu){toast('학생을 찾을 수 없습니다.','error');return;}
-  const seatBadge=stu.seat?`<span style="display:inline-block;background:#1C64F2;color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:6px">좌석 ${escapeHtml(String(stu.seat))}</span>`:'';
+  const seatBadge=stu.seat?`<span style="display:inline-block;background:#72B768;color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:6px">좌석 ${escapeHtml(String(stu.seat))}</span>`:'';
   const ok=await confirmDialog({
     title:'학생 호출',
     message:`${seatBadge}<b>${escapeHtml(stu.name)}</b> 학생을 호출할까요? OP에게 알림이 표시됩니다.`,
@@ -1025,10 +1025,10 @@ function renderTabletConsult(stu){
     <div style="white-space:pre-wrap;font-size:14px;line-height:1.65;color:#1f2937;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;min-height:120px">${noteText?escapeHtml(noteText):'<span style="color:#9ca3af">멘토링 내용이 아직 기록되지 않았습니다.</span>'}</div>
   </div>`:'';
   _('tabletC').innerHTML=`
-    <div class="card np" style="margin-bottom:14px;padding:18px 20px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
+    <div class="card np" style="margin-bottom:14px;padding:18px 20px;background:linear-gradient(135deg,#f1f8eb,#dcecd0);border:1px solid #c5dfb1">
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        ${stu.seat?`<span style="display:inline-block;background:#1C64F2;color:#fff;border-radius:10px;padding:6px 14px;font-size:15px;font-weight:800">좌석 ${escapeHtml(String(stu.seat))}</span>`:''}
-        <div style="flex:1;min-width:140px"><p style="font-size:20px;font-weight:800;color:#111827">${escapeHtml(stu.name)}</p><p style="font-size:13px;color:#1d4ed8;margin-top:2px">${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}${booking?' · '+escapeHtml(booking.dateLabel||'')+' '+escapeHtml(booking.slot||''):''}</p></div>
+        ${stu.seat?`<span style="display:inline-block;background:#72B768;color:#fff;border-radius:10px;padding:6px 14px;font-size:15px;font-weight:800">좌석 ${escapeHtml(String(stu.seat))}</span>`:''}
+        <div style="flex:1;min-width:140px"><p style="font-size:20px;font-weight:800;color:#111827">${escapeHtml(stu.name)}</p><p style="font-size:13px;color:#3a6b30;margin-top:2px">${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}${booking?' · '+escapeHtml(booking.dateLabel||'')+' '+escapeHtml(booking.slot||''):''}</p></div>
       </div>
     </div>
     ${qInfo}
@@ -1231,8 +1231,8 @@ function updatePinSlots(){
     const filled=i<v.length;
     const active=focused&&!filled&&i===v.length;
     slot.textContent=filled?'●':'_';
-    if(filled){slot.style.borderColor='#1C64F2';slot.style.color='#1C64F2';slot.style.boxShadow='none';}
-    else if(active){slot.style.borderColor='#1C64F2';slot.style.color='#9ca3af';slot.style.boxShadow='0 0 0 3px rgba(28,100,242,0.15)';}
+    if(filled){slot.style.borderColor='#72B768';slot.style.color='#72B768';slot.style.boxShadow='none';}
+    else if(active){slot.style.borderColor='#72B768';slot.style.color='#9ca3af';slot.style.boxShadow='0 0 0 3px rgba(114,183,104,0.15)';}
     else{slot.style.borderColor='#d1d5db';slot.style.color='#9ca3af';slot.style.boxShadow='none';}
   }
 }
@@ -1345,7 +1345,7 @@ function renderStu(){
         bodyHtml='';
       }else if(st.kind==='before'){
         bodyHtml=`<p style="font-size:13px;color:#6b7280;margin-bottom:4px">예약 시작까지 남은 시간</p>
-          <p id="bookCountdown" style="font-size:22px;font-weight:700;color:#1d4ed8;letter-spacing:1px;margin-bottom:8px">계산 중...</p>
+          <p id="bookCountdown" style="font-size:22px;font-weight:700;color:#3a6b30;letter-spacing:1px;margin-bottom:8px">계산 중...</p>
           <p style="font-size:12px;color:#9ca3af">${pl?'예약 가능 기간: '+pl:''}</p>`;
       }else if(st.kind==='after'){
         bodyHtml=`<p style="color:#6b7280;font-size:13px">예약 기간이 종료되었습니다.</p>${pl?`<p style="color:#9ca3af;font-size:12px;margin-top:4px">종료: ${pl}</p>`:''}`;
@@ -1369,9 +1369,9 @@ function bookCardHtml(b){
   let statusHtml='';
   if(adminChangeReq){
     const slotBtns=adminChangeReq.offeredSlots.map((s,i)=>`<button class="sb" style="text-align:left;padding:10px 12px;height:auto" onclick="stuAcceptAdminChange('${adminChangeReq._docId}',${i})"><b>${s.dateLabel}</b> · ${s.slot}</button>`).join('');
-    statusHtml+=`<div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:14px 16px;margin-bottom:12px">
-      <p style="font-size:13px;color:#1d4ed8;font-weight:700;margin-bottom:4px">📣 관리자 예약 시간 변경 요청</p>
-      <p style="font-size:12px;color:#1e40af;margin-bottom:12px">현재 예약(<b>${adminChangeReq.currentDateLabel} ${adminChangeReq.currentSlot}</b>)을 아래 시간 중 하나로 변경해 주세요.</p>
+    statusHtml+=`<div style="background:#f1f8eb;border:1.5px solid #9fcf8b;border-radius:12px;padding:14px 16px;margin-bottom:12px">
+      <p style="font-size:13px;color:#3a6b30;font-weight:700;margin-bottom:4px">📣 관리자 예약 시간 변경 요청</p>
+      <p style="font-size:12px;color:#2d5524;margin-bottom:12px">현재 예약(<b>${adminChangeReq.currentDateLabel} ${adminChangeReq.currentSlot}</b>)을 아래 시간 중 하나로 변경해 주세요.</p>
       <div class="sg" style="margin-bottom:10px">${slotBtns}</div>
       <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="stuOpenRejectAdminChange('${adminChangeReq._docId}')">거절</button></div>
     </div>`;
@@ -1474,7 +1474,7 @@ function renderScoreWizard(){
     let grid=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;margin-top:8px">`;
     for(const item of st.items){
       const sel=item===cur;
-      grid+=`<button style="padding:16px 8px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':'#e5e7eb'};background:${sel?'#1C64F2':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}'){S.scoreWizard['${st.rawKey}']='';};S.scoreWizard['${st.subjKey}']='${item}';renderScoreWizard()">${item}</button>`;
+      grid+=`<button style="padding:16px 8px;border-radius:10px;font-size:14px;font-weight:600;border:1.5px solid ${sel?'#72B768':'#e5e7eb'};background:${sel?'#72B768':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}'){S.scoreWizard['${st.rawKey}']='';};S.scoreWizard['${st.subjKey}']='${item}';renderScoreWizard()">${item}</button>`;
     }
     grid+=`</div>`;
     const rawField=cur?`<div class="sw-field" style="margin-top:24px"><label class="sw-label on">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="swValidateRaw(this,${st.rawMax})" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`:'';
@@ -1494,7 +1494,7 @@ function renderScoreWizard(){
       let grid=`<p style="color:#6b7280;font-size:14px;margin:16px 0 8px">선택과목을 선택하세요.</p><div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px">`;
       for(const item of st.items){
         const sel=item===cur;
-        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':'#e5e7eb'};background:${sel?'#1C64F2':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}')S.scoreWizard['${st.rawKey}']='';S.scoreWizard['${st.subjKey}']='${item}';renderScoreWizard()">${item}</button>`;
+        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#72B768':'#e5e7eb'};background:${sel?'#72B768':'#f3f4f6'};color:${sel?'#fff':'#374151'};cursor:pointer;font-family:inherit;transition:.15s" onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}')S.scoreWizard['${st.rawKey}']='';S.scoreWizard['${st.subjKey}']='${item}';renderScoreWizard()">${item}</button>`;
       }
       grid+=`</div>`;
       const rawField=cur?`<div class="sw-field" style="margin-top:24px"><label class="sw-label on">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="swValidateRaw(this,${st.rawMax})" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`:'';
@@ -1503,7 +1503,7 @@ function renderScoreWizard(){
     c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
       <div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><p class="sw-title" style="margin:0">${st.title}</p>
         <div style="display:flex;border:1.5px solid #e5e7eb;border-radius:8px;overflow:hidden">
-          <button style="padding:8px 16px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${take?'#1C64F2':'#fff'};color:${take?'#fff':'#374151'};transition:.15s" onclick="S.scoreWizard.lang2Take=true;renderScoreWizard()">응시</button>
+          <button style="padding:8px 16px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${take?'#72B768':'#fff'};color:${take?'#fff':'#374151'};transition:.15s" onclick="S.scoreWizard.lang2Take=true;renderScoreWizard()">응시</button>
           <button style="padding:8px 16px;font-size:13px;font-weight:600;border:none;border-left:1.5px solid #e5e7eb;cursor:pointer;font-family:inherit;background:${!take?'#f3f4f6':'#fff'};color:#374151;transition:.15s" onclick="S.scoreWizard.lang2Take=false;S.scoreWizard.lang2Subj='';S.scoreWizard.lang2Raw='';renderScoreWizard()">미응시</button>
         </div></div>${content}</div>
       <div class="sw-bottom">${prevBtn}<button class="sw-next" onclick="swSaveStep();finishScoreWizard()">확인</button></div>
@@ -1522,7 +1522,7 @@ function renderScoreWizard(){
       for(const item of g.items){
         const idx=expSubjIndex(exam,item);
         const dis=st.excludeKey&&idx<=exp1Idx;const sel=item===cur;
-        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#1C64F2':dis?'#f3f4f6':'#e5e7eb'};background:${sel?'#1C64F2':dis?'#f9fafb':'#f3f4f6'};color:${sel?'#fff':dis?'#d1d5db':'#374151'};cursor:${dis?'default':'pointer'};font-family:inherit;transition:.15s" ${dis?'disabled':''}onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}')S.scoreWizard['${rawKey}']='';S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
+        grid+=`<button style="padding:14px 6px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid ${sel?'#72B768':dis?'#f3f4f6':'#e5e7eb'};background:${sel?'#72B768':dis?'#f9fafb':'#f3f4f6'};color:${sel?'#fff':dis?'#d1d5db':'#374151'};cursor:${dis?'default':'pointer'};font-family:inherit;transition:.15s" ${dis?'disabled':''}onclick="if(S.scoreWizard['${st.subjKey}']!=='${item}')S.scoreWizard['${rawKey}']='';S.scoreWizard['${st.subjKey}']='${item}';S.scoreStep++;renderScoreWizard()">${item}</button>`;
       }
       grid+=`</div>`;
     }
@@ -1534,7 +1534,7 @@ function renderScoreWizard(){
 
   let fields='';
   let subtitle='';
-  if(st.showSubjKey){subtitle=`<p style="color:#1C64F2;font-size:14px;font-weight:600;margin-bottom:4px">${w[st.showSubjKey]||''}</p>`;}
+  if(st.showSubjKey){subtitle=`<p style="color:#72B768;font-size:14px;font-weight:600;margin-bottom:4px">${w[st.showSubjKey]||''}</p>`;}
   const rawKey=st.rawKey;const curRaw=w[rawKey]||'';
   fields+=`<div class="sw-field"><label class="sw-label ${curRaw?'on':''}">원점수 입력</label><input class="sw-input" id="sw-raw" type="number" min="0" max="${st.rawMax}" placeholder="원점수 입력 (0~${st.rawMax})" value="${curRaw}" oninput="swValidateRaw(this,${st.rawMax})" onfocus="this.previousElementSibling.classList.add('on')" onblur="if(!this.value)this.previousElementSibling.classList.remove('on')"></div>`;
   c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
@@ -1588,7 +1588,7 @@ function cutDiffChips(raw,cuts){
   let grade=9;
   for(let i=0;i<cuts.length;i++){if(r>=Number(cuts[i])){grade=i+1;break;}}
   let cur='';
-  if(grade<=8){const diff=r-Number(cuts[grade-1]);cur=`<span style="display:inline-block;background:#dbeafe;color:#1d4ed8;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;vertical-align:middle;white-space:nowrap">${diff>=0?'+':''}${diff}</span>`;}
+  if(grade<=8){const diff=r-Number(cuts[grade-1]);cur=`<span style="display:inline-block;background:#dcecd0;color:#3a6b30;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;vertical-align:middle;white-space:nowrap">${diff>=0?'+':''}${diff}</span>`;}
   let upper='';
   if(grade>=2){const upperCut=Number(cuts[grade-2]);const gap=r-upperCut;upper=`<span style="display:inline-block;background:#fee2e2;color:#dc2626;font-size:8px;font-weight:700;border-radius:8px;padding:1px 4px;vertical-align:middle;white-space:nowrap">${gap}</span>`;}
   return {cur,upper};
@@ -2156,10 +2156,10 @@ function noticeBoardHtml(){
         <button class="btn bs bsm" style="font-size:11px;padding:3px 8px" onclick="noticeStartEdit('${n._docId}')">수정</button>
         <button class="btn bd bsm" style="font-size:11px;padding:3px 8px" onclick="noticeDelete('${n._docId}')">삭제</button>
       </div>`;
-      const accent=n.pinned?'#1d4ed8':'#e5e7eb';
-      const bg=n.pinned?'#eff6ff':'#fff';
+      const accent=n.pinned?'#3a6b30':'#e5e7eb';
+      const bg=n.pinned?'#f1f8eb':'#fff';
       if(isEditing){
-        return `<div style="border:1px solid #93c5fd;background:#eff6ff;border-radius:10px;padding:12px;margin-bottom:8px">
+        return `<div style="border:1px solid #9fcf8b;background:#f1f8eb;border-radius:10px;padding:12px;margin-bottom:8px">
           <p style="font-size:11px;color:#6b7280;margin-bottom:6px">공지 수정</p>
           <textarea class="fi ta" id="nt-edit-input-${n._docId}" rows="4">${escapeHtml(n.body||'')}</textarea>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="nt-edit-pin-${n._docId}" ${n.pinned?'checked':''}> <span>상단 고정</span></label>
@@ -2198,9 +2198,9 @@ function noticeRerender(){
 function renderAdminNotices(){
   const list=noticeSorted();
   const summary=`<div class="np" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
-    <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:14px;padding:14px 14px 12px">
-      <p style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px;letter-spacing:-.2px">전체 공지</p>
-      <p style="font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.1">${list.length}<span style="font-size:13px;font-weight:600;color:#3b82f6;margin-left:3px">건</span></p>
+    <div style="background:linear-gradient(135deg,#f1f8eb,#dcecd0);border:1px solid #c5dfb1;border-radius:14px;padding:14px 14px 12px">
+      <p style="font-size:11px;font-weight:700;color:#3a6b30;margin-bottom:4px;letter-spacing:-.2px">전체 공지</p>
+      <p style="font-size:22px;font-weight:800;color:#1e4d10;line-height:1.1">${list.length}<span style="font-size:13px;font-weight:600;color:#72B768;margin-left:3px">건</span></p>
     </div>
     <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:14px;padding:14px 14px 12px">
       <p style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:4px;letter-spacing:-.2px">고정 공지</p>
@@ -2507,7 +2507,7 @@ function renderAdminConsult(){
   const questionCount=baseStu.filter(s=>_qbHas(bookingByStu[s._docId])).length;
   const stat=(label,val,color)=>`<span style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:999px;padding:5px 12px;font-size:12px;white-space:nowrap"><span style="color:#6b7280;font-weight:600">${label}</span><b style="color:${color||'#111827'}">${val}</b></span>`;
   const summaryHtml=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-    ${stat('예약',`${bookedCount}/${total}`,'#1C64F2')}
+    ${stat('예약',`${bookedCount}/${total}`,'#72B768')}
     ${stat('질문',`${questionCount}/${bookedCount}`,'#ea580c')}
     ${examCounts.map(({ex,n})=>stat(ex.name.replace(/\s*모의.*$/,''),`${n}/${total}`,'#15803d')).join('')}
     ${stat('기록',`${noteAny}/${total}${noteVisible?` · 공개 ${noteVisible}`:''}`,'#7c3aed')}
@@ -2527,7 +2527,7 @@ function renderAdminConsult(){
         ? `<td style="text-align:center;line-height:1" title="기록 있음 (비공개)">${_PRV_SVG}</td>`
         : `<td style="text-align:center;line-height:1">${_NA_DOT}</td>`;
     return `<tr style="cursor:pointer" onclick="S.consultStuId='${s._docId}';S.consultScoreTab=0;S.consultGraphTab=0;S.consultNoteTab=0;renderAdminConsult()">
-      <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:#72B768">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
       <td style="text-align:center;line-height:1">${booked?_OK_SVG:_NA_DOT}</td>
@@ -2651,7 +2651,7 @@ function drawGradeGraph(exams,stu,subjInfo){
   });
   if(!pts.length&&!estPts.length)return `<div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px">입력된 성적이 없습니다.</div>`;
   /* tier bands (1·2 상위 / 3·4 중상 / 5·6 중하 / 7·9 하위) */
-  const tiers=[{from:1,to:2,color:'#dcfce7'},{from:3,to:4,color:'#dbeafe'},{from:5,to:6,color:'#fef3c7'},{from:7,to:9,color:'#fee2e2'}];
+  const tiers=[{from:1,to:2,color:'#dcfce7'},{from:3,to:4,color:'#dcecd0'},{from:5,to:6,color:'#fef3c7'},{from:7,to:9,color:'#fee2e2'}];
   let bands='';
   tiers.forEach(t=>{
     const yTop=t.from===1?PT:yFor(t.from)-(ch/16);
@@ -2685,14 +2685,14 @@ function drawGradeGraph(exams,stu,subjInfo){
       const cp=(pts[i].x-pts[i-1].x)*0.3;
       d+=` C${pts[i-1].x+cp},${pts[i-1].y} ${pts[i].x-cp},${pts[i].y} ${pts[i].x},${pts[i].y}`;
     }
-    path=`<path d="${d}" pathLength="1" class="gg-ln" fill="none" stroke="#1C64F2" stroke-width="2.5" stroke-linecap="round"/>`;
+    path=`<path d="${d}" pathLength="1" class="gg-ln" fill="none" stroke="#72B768" stroke-width="2.5" stroke-linecap="round"/>`;
   }
   pts.forEach((p,i)=>{
     const isLast=i===pts.length-1&&!estPts.length;
     const t=dotDelay(i,pts.length,0.08,T_LINE-0.02);
-    if(isLast)dots+=`<circle cx="${p.x}" cy="${p.y}" r="9.5" fill="#1C64F2" class="gg-dt" style="animation-delay:${t}s;--op:0.18"/>`;
-    dots+=`<circle cx="${p.x}" cy="${p.y}" r="${isLast?5.5:4.5}" fill="#fff" stroke="#1C64F2" stroke-width="${isLast?3:2.5}" class="gg-dt" style="animation-delay:${t}s"><title>${escapeHtml(p.exam)} · ${p.g}등급</title></circle>`;
-    dots+=`<text x="${p.x}" y="${p.y-11}" text-anchor="middle" font-size="11" fill="#1C64F2" font-weight="800" class="gg-dt" style="animation-delay:${t}s">${p.g}</text>`;
+    if(isLast)dots+=`<circle cx="${p.x}" cy="${p.y}" r="9.5" fill="#72B768" class="gg-dt" style="animation-delay:${t}s;--op:0.18"/>`;
+    dots+=`<circle cx="${p.x}" cy="${p.y}" r="${isLast?5.5:4.5}" fill="#fff" stroke="#72B768" stroke-width="${isLast?3:2.5}" class="gg-dt" style="animation-delay:${t}s"><title>${escapeHtml(p.exam)} · ${p.g}등급</title></circle>`;
+    dots+=`<text x="${p.x}" y="${p.y-11}" text-anchor="middle" font-size="11" fill="#72B768" font-weight="800" class="gg-dt" style="animation-delay:${t}s">${p.g}</text>`;
   });
   /* estimated paths (yellow dashed) */
   let estPath='',estDots='';
@@ -2750,7 +2750,7 @@ function drawGradeGraph(exams,stu,subjInfo){
   }
   const stat=(label,val,color)=>`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px;flex:1;min-width:0"><span style="font-size:10px;color:#6b7280;font-weight:600;letter-spacing:.3px">${label}</span><span style="font-size:14px;font-weight:800;color:${color||'#111827'};margin-top:3px;white-space:nowrap">${val}</span></div>`;
   const items=[];
-  if(lastLabel)items.push(stat('최근',`${lastLabel}등급${lastIsEst?' (추정)':''}`,lastIsEst?'#f59e0b':'#1C64F2'));
+  if(lastLabel)items.push(stat('최근',`${lastLabel}등급${lastIsEst?' (추정)':''}`,lastIsEst?'#f59e0b':'#72B768'));
   if(avg!==null)items.push(stat('평균',`${avg}등급`));
   if(best!==null)items.push(stat('최고',`${best}등급`,'#15803d'));
   if(worst!==null)items.push(stat('최저',`${worst}등급`,'#dc2626'));
@@ -2759,10 +2759,10 @@ function drawGradeGraph(exams,stu,subjInfo){
   /* legend */
   const lg=(sw,label)=>`<span style="display:inline-flex;align-items:center;gap:5px">${sw}<span>${label}</span></span>`;
   const legend=`<div style="display:flex;justify-content:center;gap:14px;margin-top:10px;flex-wrap:wrap;font-size:11px;color:#6b7280">
-    ${lg('<span style="display:inline-block;width:18px;height:2.5px;background:#1C64F2;border-radius:2px"></span>','실측')}
+    ${lg('<span style="display:inline-block;width:18px;height:2.5px;background:#72B768;border-radius:2px"></span>','실측')}
     ${lg('<span style="display:inline-block;width:18px;height:2.5px;background-image:linear-gradient(90deg,#f59e0b 50%,transparent 50%);background-size:6px 100%"></span>','추정')}
     ${lg('<span style="display:inline-block;width:11px;height:9px;background:#dcfce7;border-radius:2px"></span>','1·2등급')}
-    ${lg('<span style="display:inline-block;width:11px;height:9px;background:#dbeafe;border-radius:2px"></span>','3·4등급')}
+    ${lg('<span style="display:inline-block;width:11px;height:9px;background:#dcecd0;border-radius:2px"></span>','3·4등급')}
     ${lg('<span style="display:inline-block;width:11px;height:9px;background:#fef3c7;border-radius:2px"></span>','5·6등급')}
     ${lg('<span style="display:inline-block;width:11px;height:9px;background:#fee2e2;border-radius:2px"></span>','7·8·9등급')}
   </div>`;
@@ -2803,7 +2803,7 @@ function renderConsultDetail(){
   const _sessTitle=_isActive?'태블릿 표시 종료':(_otherActive?'현재 다른 학생 표시 중':'태블릿에 이 학생 표시');
   const _sessBtn=_isActive
     ?`<button class="btn bd bsm" onclick="endTabletSession()" title="${_sessTitle}">⏹ 멘토링 종료</button>`
-    :`<button class="btn bp bsm" style="background:#1C64F2;border-color:#1C64F2" onclick="startTabletSession('${stu._docId}')" title="${_sessTitle}">📺 ${_otherActive?'멘토링 변경':'멘토링 시작'}</button>`;
+    :`<button class="btn bp bsm" style="background:#72B768;border-color:#72B768" onclick="startTabletSession('${stu._docId}')" title="${_sessTitle}">📺 ${_otherActive?'멘토링 변경':'멘토링 시작'}</button>`;
   _('adminC').innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn bs bsm" onclick="autoSaveConsultNote()">← 목록</button>
@@ -3025,11 +3025,11 @@ function renderAdminLogins(){
     const badge=ever
       ?(hasTs
         ?'<span class="bx" style="background:#dcfce7;color:#166534">✓ 로그인</span>'
-        :'<span class="bx" style="background:#dbeafe;color:#1e40af" title="비밀번호 변경 이력으로 추정">✓ 접속함</span>')
+        :'<span class="bx" style="background:#dcecd0;color:#2d5524" title="비밀번호 변경 이력으로 추정">✓ 접속함</span>')
       :'<span class="bx" style="background:#fee2e2;color:#991b1b">미접속</span>';
     const lastCell=hasTs?fmtTs(s.lastLoginAt):(ever?'<span style="color:#6b7280;font-size:12px">시각 미기록</span>':'<span style="color:#9ca3af">—</span>');
     return `<tr>
-      <td data-label="좌석" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+      <td data-label="좌석" style="text-align:center;font-weight:700;color:#72B768">${s.seat||'—'}</td>
       <td data-label="학년"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td data-label="이름" style="font-weight:600">${s.name}</td>
       <td data-label="학교">${s.school||''}</td>
@@ -3080,7 +3080,7 @@ function renderOpStudents(){
     const stuPhone=s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':s.studentPhone;
     const hasMemo=!!(s.memo&&s.memo.trim());
     return `<tr>
-    <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+    <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#72B768">${s.seat||'—'}</td>
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
     <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}</span></td>
     <td data-label="학교">${s.school}</td>
@@ -3139,7 +3139,7 @@ function renderAdminStudents(){
     const trClick=inMode&&selectable?`onclick="cardTapSelect(event,'${s._docId}')"`:'';
     return `<tr ${trAttrs} ${trClick}>
     <td data-label="" class="cell-hide" style="text-align:center;width:36px">${cb}</td>
-    <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+    <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#72B768">${s.seat||'—'}</td>
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
     <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}${s.consultExcluded?' <span class="bx" style="background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:600" title="컨설팅 제외 학생">컨설팅 제외</span>':''}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}${s.consultExcluded?'<span class="bx" style="background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:600">제외</span>':''}</span></td>
     <td data-label="학교">${s.school}</td>
@@ -3497,7 +3497,7 @@ function renderOpScores(){
   const rows=sorted.map(s=>{
     const examCells=examsForRows.map(ex=>`<td style="text-align:center">${hasStuExamScore(s,ex.id)?_OK_SVG:_NA_DOT}</td>`).join('');
     return `<tr style="cursor:pointer" onclick="S.opScoreStuId='${s._docId}';S.opScoreTab=0;S.opGraphTab=0;renderAdminScores()">
-      <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:#72B768">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
       ${examCells}
@@ -3570,7 +3570,7 @@ function renderAdminScores(){
   const rows=sorted.map(s=>{
     const examCells=examsForRows.map(ex=>`<td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(s,ex.id)?'#22c55e':'#d1d5db'}"></span></td>`).join('');
     return `<tr>
-      <td style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:#72B768">${s.seat||'—'}</td>
       <td><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
       <td style="font-weight:600">${s.name}</td><td>${s.school}</td>
       ${examCells}
@@ -4049,7 +4049,7 @@ function renderAdminSchedule(){
       :'<p style="font-size:11px;color:#9ca3af;margin-top:14px;display:flex;align-items:center;gap:6px"><span>💡</span>비어있는 박스를 클릭하면 슬롯이 삭제됩니다. (우상단 × 도 동일) 점선 박스(12·18시 전후)는 클릭하여 활성/비활성 전환. 예약된 박스는 학생 상세로 이동.</p>';
     mainCard=`<div class="card np" style="padding:18px;margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-        <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#eff6ff;border-radius:6px">📅</span>일정 관리 <span style="font-size:11px;font-weight:500;color:#9ca3af;margin-left:4px">${d.date}</span></p>
+        <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#f1f8eb;border-radius:6px">📅</span>일정 관리 <span style="font-size:11px;font-weight:500;color:#9ca3af;margin-left:4px">${d.date}</span></p>
         ${headerRight}
       </div>
       <div class="dtabs">${dtabsHtml}</div>
@@ -4242,9 +4242,9 @@ function renderAdminBookings(){
   }
   /* 요약 통계 */
   const statsCard=`<div class="np" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
-    <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:14px;padding:14px 14px 12px">
-      <p style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px;letter-spacing:-.2px">예약 완료</p>
-      <p style="font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.1">${S.bookings.filter(b=>!isNoShow(b)).length}<span style="font-size:13px;font-weight:600;color:#3b82f6;margin-left:3px">건</span></p>
+    <div style="background:linear-gradient(135deg,#f1f8eb,#dcecd0);border:1px solid #c5dfb1;border-radius:14px;padding:14px 14px 12px">
+      <p style="font-size:11px;font-weight:700;color:#3a6b30;margin-bottom:4px;letter-spacing:-.2px">예약 완료</p>
+      <p style="font-size:22px;font-weight:800;color:#1e4d10;line-height:1.1">${S.bookings.filter(b=>!isNoShow(b)).length}<span style="font-size:13px;font-weight:600;color:#72B768;margin-left:3px">건</span></p>
     </div>
     <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:14px;padding:14px 14px 12px">
       <p style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:4px;letter-spacing:-.2px">미예약</p>
@@ -4282,8 +4282,8 @@ function renderAdminBookings(){
     const bookedCnt=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).length;
     slotGridHtml=`<div class="card np" style="padding:18px;margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-        <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#eff6ff;border-radius:6px">📅</span>시간대별 예약</p>
-        <span style="font-size:12px;color:#6b7280">예약 <b style="color:#1C64F2">${bookedCnt}</b> / ${sortedSlots.length}</span>
+        <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:#f1f8eb;border-radius:6px">📅</span>시간대별 예약</p>
+        <span style="font-size:12px;color:#6b7280">예약 <b style="color:#72B768">${bookedCnt}</b> / ${sortedSlots.length}</span>
       </div>
       <div class="dtabs">${dtabsHtml}</div>
       <div class="sg" style="margin-top:6px">${slotBtns||'<p style="font-size:13px;color:#9ca3af">시간대가 등록되지 않았습니다.</p>'}</div>
@@ -4293,7 +4293,7 @@ function renderAdminBookings(){
     slotGridHtml=`<div class="card np" style="padding:32px;text-align:center;margin-bottom:24px"><p style="font-size:32px;margin-bottom:10px">📅</p><p style="font-size:14px;font-weight:700;color:#374151;margin-bottom:4px">등록된 일정이 없습니다</p><p style="font-size:12px;color:#9ca3af">'일정 관리' 탭에서 먼저 일정을 추가하세요.</p></div>`;
   }
   const unbookedRows=unbooked.map(s=>`<tr>
-    <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
+    <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#72B768">${s.seat||'—'}</td>
     <td data-label="" class="cell-head"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}</span></td>
     <td data-label="학교">${s.school}</td>
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
@@ -4306,7 +4306,7 @@ function renderAdminBookings(){
     return `<tr>
       <td data-label="" class="cell-head"><span>${b.studentName}</span><span class="head-meta"><span class="bx" style="background:#fee2e2;color:#991b1b;font-size:10px">결석</span></span></td>
       <td data-label="원래 예약" style="text-align:center;font-size:12px"><b style="color:#991b1b">${b.dateLabel||'?'} ${b.slot||''}</b></td>
-      <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td>
+      <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#72B768">${stu?.seat||'—'}</td>
       <td data-label="학교">${stu?.school||'—'}</td>
       <td data-label="학년" class="cell-hide"><span class="bx ${stu?.grade==='고3'?'br':stu?.grade==='고2'?'bb':'bg'}">${stu?.grade||'—'}</span></td>
       <td data-label="연락처">${stu?(stu.noStudentPhone?stu.guardianPhone:stu.studentPhone):'—'}</td>
@@ -4336,12 +4336,12 @@ function renderAdminBookings(){
       return `<div class="adm-slot vacant" style="cursor:default;${inactiveStyle}"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">${lbl}</span></div>`;
     }).join('');
     return `<div style="margin-bottom:24px;page-break-inside:avoid">
-      <p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:10px">${d.label} <span style="font-size:11px;font-weight:500;color:#6b7280;margin-left:6px">예약 ${bookedCnt}/${sortedSlots.length}</span></p>
+      <p style="font-size:14px;font-weight:700;border-bottom:2px solid #72B768;padding-bottom:6px;margin-bottom:10px">${d.label} <span style="font-size:11px;font-weight:500;color:#6b7280;margin-left:6px">예약 ${bookedCnt}/${sortedSlots.length}</span></p>
       <div class="sg">${cells}</div>
     </div>`;
   }).join('');
   const printUnbookedRows=unbooked.map(s=>`<tr style="border-bottom:1px solid #f0f0f0">
-    <td style="padding:6px 8px;text-align:center;font-weight:700;color:#1C64F2;width:48px">${s.seat||'—'}</td>
+    <td style="padding:6px 8px;text-align:center;font-weight:700;color:#72B768;width:48px">${s.seat||'—'}</td>
     <td style="padding:6px 8px;font-weight:700">${escapeHtml(s.name||'')}</td>
     <td style="padding:6px 8px">${escapeHtml(s.school||'')}</td>
     <td style="padding:6px 8px;color:#6b7280;width:56px">${escapeHtml(s.grade||'')}</td>
@@ -4395,7 +4395,7 @@ function renderRequestsSection(){
   const adminChangeResolved=S.requests.filter(r=>r.type==='admin_change'&&r.status!=='pending').sort((a,b)=>(b.resolvedAt||b.createdAt||0)-(a.resolvedAt||a.createdAt||0)).slice(0,20);
   const pendingRows=pending.map(r=>{
     const typeLabel=r.type==='cancel'?'<span class="bx br">취소</span>':'<span class="bx bb">변경</span>';
-    const changeInfo=r.type==='change'?`<br><span style="font-size:11px;color:#1C64F2">→ ${r.newDateLabel} ${r.newSlot}</span>`:'';
+    const changeInfo=r.type==='change'?`<br><span style="font-size:11px;color:#72B768">→ ${r.newDateLabel} ${r.newSlot}</span>`:'';
     return `<tr><td>${typeLabel}</td><td style="font-weight:600">${r.studentName}</td>
       <td style="font-size:12px">${r.currentDateLabel} ${r.currentSlot}${changeInfo}</td>
       <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.reason||'').replace(/"/g,'&quot;')}">${r.reason||'—'}</td>
@@ -4424,7 +4424,7 @@ function renderRequestsSection(){
   }).join('');
   const acResolvedRows=adminChangeResolved.map(r=>{
     const statusLabel=r.status==='accepted'?'<span class="bx bg">수락</span>':'<span class="bx br">거절</span>';
-    const detail=r.status==='accepted'&&r.chosenSlot?`→ <b style="color:#1C64F2">${r.chosenSlot.dateLabel} ${r.chosenSlot.slot}</b>`:r.status==='rejected'&&r.rejectReason?`<span style="color:#dc2626">사유: ${r.rejectReason}</span>`:'';
+    const detail=r.status==='accepted'&&r.chosenSlot?`→ <b style="color:#72B768">${r.chosenSlot.dateLabel} ${r.chosenSlot.slot}</b>`:r.status==='rejected'&&r.rejectReason?`<span style="color:#dc2626">사유: ${r.rejectReason}</span>`:'';
     return `<tr><td style="font-weight:600">${r.studentName}</td>
       <td style="font-size:12px">${r.currentDateLabel} ${r.currentSlot}</td>
       <td style="font-size:12px">${statusLabel} <span style="font-size:11px">${detail}</span></td>
@@ -4477,7 +4477,7 @@ function rejectRequest(reqId){
   const typeLabel=req.type==='cancel'?'취소':'변경';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 ${typeLabel} 요청 거절</p>
     <p style="font-size:13px;color:#6b7280;margin-bottom:16px">${req.studentName} 학생</p>
-    <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px">현재 예약: <b>${req.currentDateLabel} ${req.currentSlot}</b></p>${req.type==='change'?`<p style="font-size:13px;margin-top:4px">변경 희망: <b style="color:#1C64F2">${req.newDateLabel} ${req.newSlot}</b></p>`:''}<p style="font-size:12px;color:#6b7280;margin-top:4px">학생 사유: ${req.reason}</p></div>
+    <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px">현재 예약: <b>${req.currentDateLabel} ${req.currentSlot}</b></p>${req.type==='change'?`<p style="font-size:13px;margin-top:4px">변경 희망: <b style="color:#72B768">${req.newDateLabel} ${req.newSlot}</b></p>`:''}<p style="font-size:12px;color:#6b7280;margin-top:4px">학생 사유: ${req.reason}</p></div>
     <div class="fg"><label class="fl">거절 사유</label><textarea class="fi ta" id="rejectReason" rows="3" placeholder="거절 사유를 입력해주세요."></textarea></div>
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bd" style="flex:1" onclick="confirmReject('${reqId}')">거절</button></div>`;
@@ -4548,8 +4548,8 @@ function openBookDetail(docId){
     <p style="font-size:11px;color:#9ca3af;margin-top:6px">결석 처리 시 슬롯이 비워지고 학생은 '결석 처리된 학생' 목록으로 이동합니다.</p>
   </div>`:'';
   const actionsHtml=isAdmin
-    ?`<div style="display:flex;gap:8px;margin:14px 0 4px;flex-wrap:wrap"><button class="btn bs" style="flex:1;min-width:80px" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1;min-width:90px;background:#ea580c;border-color:#ea580c" onclick="closeModal();callStudent('${stuId}')" title="OP에게 학생을 호출합니다">📢 호출</button><button class="btn bs" style="flex:1;min-width:100px;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button><button class="btn bp" style="flex:1;min-width:80px" onclick="openAdminBook('${docId}')">변경</button><button class="btn bd" style="flex:1;min-width:80px" onclick="closeModal();adminDelBook('${docId}')">삭제</button></div>`
-    :`<div style="display:flex;gap:8px;margin:14px 0 4px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bs" style="flex:1;color:#1C64F2;border-color:#bfdbfe" onclick="openAdminChangeReq('${docId}')">변경 요청</button></div>`;
+    ?`<div style="display:flex;gap:8px;margin:14px 0 4px;flex-wrap:wrap"><button class="btn bs" style="flex:1;min-width:80px" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1;min-width:90px;background:#ea580c;border-color:#ea580c" onclick="closeModal();callStudent('${stuId}')" title="OP에게 학생을 호출합니다">📢 호출</button><button class="btn bs" style="flex:1;min-width:100px;color:#72B768;border-color:#c5dfb1" onclick="openAdminChangeReq('${docId}')">변경 요청</button><button class="btn bp" style="flex:1;min-width:80px" onclick="openAdminBook('${docId}')">변경</button><button class="btn bd" style="flex:1;min-width:80px" onclick="closeModal();adminDelBook('${docId}')">삭제</button></div>`
+    :`<div style="display:flex;gap:8px;margin:14px 0 4px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bs" style="flex:1;color:#72B768;border-color:#c5dfb1" onclick="openAdminChangeReq('${docId}')">변경 요청</button></div>`;
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">예약 상세 정보</p>
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${b.studentName}${attLabel}</p></div>
@@ -4678,7 +4678,7 @@ function openAdminChangeReq(bookingId){
       <select class="fi fsel" id="reqDate" onchange="renderReqSlots()" style="margin-bottom:10px">${S.schedule.dates.map(d=>`<option value="${d.id}">${d.label}</option>`).join('')}</select>
       <div class="sg" id="reqSg"></div>
     </div>
-    <div id="reqSelBox" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:none"><p style="font-size:11px;font-weight:600;color:#1C64F2;margin-bottom:4px">선택된 시간 (<span id="reqSelCnt">0</span>개)</p><div id="reqSelList" style="font-size:12px;color:#1d4ed8"></div></div>
+    <div id="reqSelBox" style="background:#f1f8eb;border:1px solid #c5dfb1;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:none"><p style="font-size:11px;font-weight:600;color:#72B768;margin-bottom:4px">선택된 시간 (<span id="reqSelCnt">0</span>개)</p><div id="reqSelList" style="font-size:12px;color:#3a6b30"></div></div>
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="sendAdminChangeReq()">요청 전송</button></div>`;
   openModal();renderReqSlots();
@@ -4750,7 +4750,7 @@ function openStuDetail(stuDocId){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">학생 상세 정보</p>
     <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학생명</p><p style="font-weight:700;font-size:14px">${stu.name}</p></div>
-      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">좌석</p><p style="font-weight:700;font-size:14px;color:#1C64F2">${stu.seat||'—'}</p></div>
+      <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">좌석</p><p style="font-weight:700;font-size:14px;color:#72B768">${stu.seat||'—'}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">학교/학년</p><p style="font-weight:600">${stu.school} ${stu.grade}</p></div>
       <div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">연락처</p><p style="font-weight:600">${stu.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':stu.studentPhone}</p></div>
       ${stu.guardianPhone?`<div><p style="font-size:11px;color:#6b7280;margin-bottom:2px">보호자</p><p style="font-weight:600">${stu.guardianPhone}</p></div>`:''}
@@ -4830,13 +4830,13 @@ async function tryAssignSlot(dateId,slot){
 function _assignSlotRowHtml(s,dateId,slot,isNoShowStu){
   const gradeBx=s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg';
   const noshowChip=isNoShowStu?'<span class="bx" style="background:#fee2e2;color:#991b1b;font-size:9px;flex-shrink:0">결석 재배정</span>':'';
-  return `<button type="button" onclick="assignStuToSlot('${dateId}','${slot}','${s._docId}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid ${isNoShowStu?'#fecaca':'#e5e7eb'};border-radius:10px;background:${isNoShowStu?'#fef2f2':'#fff'};cursor:pointer;font-family:inherit;text-align:left;transition:.15s;margin-bottom:6px" onmouseover="this.style.background='${isNoShowStu?'#fee2e2':'#f9fafb'}';this.style.borderColor='#1C64F2'" onmouseout="this.style.background='${isNoShowStu?'#fef2f2':'#fff'}';this.style.borderColor='${isNoShowStu?'#fecaca':'#e5e7eb'}'">
-    <span style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 6px;border-radius:8px;background:#eff6ff;color:#1C64F2;font-weight:700;font-size:13px">${s.seat||'—'}</span>
+  return `<button type="button" onclick="assignStuToSlot('${dateId}','${slot}','${s._docId}')" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid ${isNoShowStu?'#fecaca':'#e5e7eb'};border-radius:10px;background:${isNoShowStu?'#fef2f2':'#fff'};cursor:pointer;font-family:inherit;text-align:left;transition:.15s;margin-bottom:6px" onmouseover="this.style.background='${isNoShowStu?'#fee2e2':'#f9fafb'}';this.style.borderColor='#72B768'" onmouseout="this.style.background='${isNoShowStu?'#fef2f2':'#fff'}';this.style.borderColor='${isNoShowStu?'#fecaca':'#e5e7eb'}'">
+    <span style="display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 6px;border-radius:8px;background:#f1f8eb;color:#72B768;font-weight:700;font-size:13px">${s.seat||'—'}</span>
     <span style="flex:1;min-width:0">
       <span style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:#111827"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</span><span class="bx ${gradeBx}" style="font-size:10px;flex-shrink:0">${s.grade}</span>${noshowChip}</span>
       <span style="display:block;font-size:11px;color:#6b7280;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.school||''}${s.studentPhone?' · '+s.studentPhone:''}</span>
     </span>
-    <span style="font-size:11px;color:#1C64F2;font-weight:600;flex-shrink:0">배정 →</span>
+    <span style="font-size:11px;color:#72B768;font-weight:600;flex-shrink:0">배정 →</span>
   </button>`;
 }
 
@@ -4864,7 +4864,7 @@ function _renderAssignSlotModal(){
   const noshowCount=list.filter(x=>x.isNoShowStu).length;
   const noshowHint=noshowCount?`<p style="font-size:11px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;margin-bottom:10px">🚫 결석 처리된 학생 ${noshowCount}명이 목록 상단에 표시됩니다. 선택 시 기존 예약이 이 슬롯으로 이동됩니다.</p>`:'';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 배정</p>
-    <p style="font-size:13px;color:#6b7280;margin-bottom:12px"><b style="color:#1C64F2">${date.label} ${slot}</b> 슬롯에 배정할 학생을 선택하세요.</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:12px"><b style="color:#72B768">${date.label} ${slot}</b> 슬롯에 배정할 학생을 선택하세요.</p>
     ${noshowHint}
     <input class="fi" id="assignSlotSearch" placeholder="이름·학교·좌석 검색" value="${escapeHtml(S.assignSlotQuery||'')}" oninput="S.assignSlotQuery=this.value;_renderAssignSlotList()" style="margin-bottom:10px">
     <div id="assignSlotList" style="max-height:55vh;overflow-y:auto;margin:0 -4px;padding:0 4px">${rows}${empty}</div>
@@ -4997,9 +4997,9 @@ function renderAdminPoints(){
       <p style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:4px;letter-spacing:-.2px">누적 상점</p>
       <p style="font-size:22px;font-weight:800;color:#14532d;line-height:1.1">${totalMer}<span style="font-size:13px;font-weight:600;color:#16a34a;margin-left:3px">점</span></p>
     </div>
-    <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:14px;padding:14px 14px 12px">
-      <p style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px;letter-spacing:-.2px">총 기록</p>
-      <p style="font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.1">${allRecs.length}<span style="font-size:13px;font-weight:600;color:#3b82f6;margin-left:3px">건</span></p>
+    <div style="background:linear-gradient(135deg,#f1f8eb,#dcecd0);border:1px solid #c5dfb1;border-radius:14px;padding:14px 14px 12px">
+      <p style="font-size:11px;font-weight:700;color:#3a6b30;margin-bottom:4px;letter-spacing:-.2px">총 기록</p>
+      <p style="font-size:22px;font-weight:800;color:#1e4d10;line-height:1.1">${allRecs.length}<span style="font-size:13px;font-weight:600;color:#72B768;margin-left:3px">건</span></p>
     </div>
   </div>`;
   const stuOpts=[...S.students].sort((a,b)=>(a.seat||999)-(b.seat||999)||(a.name||'').localeCompare(b.name||''))
@@ -5115,8 +5115,8 @@ function renderStuChips(isEdit){
     const stu=S.students.find(s=>s._docId===id);
     if(!stu)return '';
     const label=stu.seat?`${stu.seat}. ${stu.name}`:(stu.name||'');
-    const removeBtn=isEdit?'':`<button type="button" onclick="removeStudentFromGrant('${id}')" style="background:none;border:none;color:#1e40af;cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 4px;font-weight:700">×</button>`;
-    return `<span style="display:inline-flex;align-items:center;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600">${escapeHtml(label)}${removeBtn}</span>`;
+    const removeBtn=isEdit?'':`<button type="button" onclick="removeStudentFromGrant('${id}')" style="background:none;border:none;color:#2d5524;cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 4px;font-weight:700">×</button>`;
+    return `<span style="display:inline-flex;align-items:center;background:#f1f8eb;color:#2d5524;border:1px solid #c5dfb1;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600">${escapeHtml(label)}${removeBtn}</span>`;
   }).join('');
 }
 function addStudentToGrant(sel){
@@ -5182,9 +5182,9 @@ function renderItemGroups(kind,selectedId){
       const baseBg=free?'#fef3c7':'#fff';
       const baseFg=free?'#92400e':'#374151';
       const baseBd=free?'#fde68a':'#e5e7eb';
-      const bg=active?(free?'#f59e0b':'#1C64F2'):baseBg;
+      const bg=active?(free?'#f59e0b':'#72B768'):baseBg;
       const fg=active?'#fff':baseFg;
-      const bd=active?(free?'#f59e0b':'#1C64F2'):baseBd;
+      const bd=active?(free?'#f59e0b':'#72B768'):baseBd;
       const tail=free?'<span style="opacity:.75;font-weight:400;margin-left:4px">직접 입력</span>':`<span style="opacity:.75;font-weight:400;margin-left:4px">${it.points||0}점</span>`;
       const tip=it.description?escapeHtml(it.description):escapeHtml(it.label);
       return `<button type="button" data-id="${it.id}" title="${tip}" onclick="pickItemChip(this)" style="background:${bg};color:${fg};border:1.5px solid ${bd};padding:8px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin:0 6px 6px 0">${escapeHtml(it.label)}${tail}</button>`;
@@ -6539,8 +6539,8 @@ window.addEventListener('popstate',function(e){
   function showBanner(){
     if(banner)return;
     banner=document.createElement('div');
-    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#1C64F2,#1A56DB);color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.18);font-family:inherit';
-    banner.innerHTML='<span>🔔 새 버전이 배포되었습니다. 새 기능을 사용하려면 페이지를 새로고침해 주세요.</span><button type="button" style="background:#fff;color:#1C64F2;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">새로고침</button>';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#72B768,#5FA056);color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.18);font-family:inherit';
+    banner.innerHTML='<span>🔔 새 버전이 배포되었습니다. 새 기능을 사용하려면 페이지를 새로고침해 주세요.</span><button type="button" style="background:#fff;color:#72B768;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">새로고침</button>';
     banner.querySelector('button').addEventListener('click',function(){location.reload();});
     document.body.appendChild(banner);
     console.log('[verCheck] new version detected — banner shown');
