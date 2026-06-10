@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 질문 게시판 첨부 이미지. 인증된 사용자(학생/관리자)만 업로드 가능.
+    // 읽기는 공개 — 첨부 URL 을 가진 사람만 직접 다운로드 가능.
+    match /qboard/{bookingId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 8 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+  }
+}

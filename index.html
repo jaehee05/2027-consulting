@@ -312,6 +312,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -497,6 +498,7 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 const auth = firebase.auth();
+const storage = firebase.storage();
 
 // 뿌리오 알림톡 관리자용 Cloud Function URL.
 // `firebase deploy --only functions` 최초 배포 후 출력되는 URL로 교체하세요.
@@ -541,7 +543,8 @@ const S = {
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
   consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0,
   opScoreStuId:null, opScoreTab:0, opGraphTab:0,
-  notices:[], noticeEditId:null, noticeComposerOpen:false
+  notices:[], noticeEditId:null, noticeComposerOpen:false,
+  qbComposerOpen:null, qbPostEditId:null, qbDraftFiles:{}, qbCommentDraftFiles:{}
 };
 
 const _=id=>document.getElementById(id);
@@ -1280,6 +1283,7 @@ function doLogout(){
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];
   S.noticeEditId=null;S.noticeComposerOpen=false;
+  S.qbComposerOpen=null;S.qbPostEditId=null;S.qbDraftFiles={};S.qbCommentDraftFiles={};
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   S._pendingAdmin=null;
@@ -1690,7 +1694,7 @@ function stuConsultNotesCardHtml(stu){
   </div>`;
 }
 
-// 상담 전 질문 & 고민 — 게시판 형식. 학생 메인 글 + ADMIN/학생 댓글.
+// 상담 전 질문 & 고민 — 게시판 형식. 학생/관리자 모두 새 글 작성 가능. 각 글에 댓글 + 사진 첨부.
 function qbFmtTs(ts){
   if(!ts)return '';
   const d=new Date(ts),diff=Date.now()-ts,day=86400000;
@@ -1702,133 +1706,384 @@ function qbFmtTs(ts){
   else rel=d.toLocaleDateString('ko-KR');
   return `<span title="${d.toLocaleString('ko-KR')}">${rel}</span>`;
 }
+// 레거시 booking.question/booking.comments → posts[0] 형태로 일관성 있게 노출.
+function qbGetPosts(booking){
+  if(Array.isArray(booking.posts))return booking.posts;
+  if(booking.question){
+    return [{
+      _id:'legacy',
+      body:booking.question,
+      photos:[],
+      ts:booking.questionTs||0,
+      role:'student',
+      name:booking.studentName||'',
+      comments:Array.isArray(booking.comments)?booking.comments:[]
+    }];
+  }
+  return [];
+}
+// 저장 전 posts 정규화 (undefined 제거 — Firestore 거부).
+function qbNormalizePosts(posts){
+  return posts.map(p=>{
+    const out={
+      _id:p._id||uid(),
+      body:p.body||'',
+      photos:Array.isArray(p.photos)?p.photos.map(x=>({url:x.url,path:x.path,name:x.name||''})):[],
+      ts:p.ts||Date.now(),
+      role:p.role||'student',
+      name:p.name||'',
+      comments:Array.isArray(p.comments)?p.comments.map(c=>({
+        _id:c._id||uid(),
+        role:c.role||'student',
+        name:c.name||'',
+        body:c.body||'',
+        photos:Array.isArray(c.photos)?c.photos.map(x=>({url:x.url,path:x.path,name:x.name||''})):[],
+        ts:c.ts||Date.now()
+      })):[]
+    };
+    if(p.editedTs)out.editedTs=p.editedTs;
+    return out;
+  });
+}
+async function qbCompressImage(file,maxDim=1600,quality=0.85){
+  if(!file||!file.type||!file.type.startsWith('image/'))return file;
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);
+  });
+  const img=await new Promise((resolve,reject)=>{
+    const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=dataUrl;
+  });
+  let w=img.width,h=img.height;
+  const scale=Math.min(1,maxDim/Math.max(w,h));
+  w=Math.round(w*scale);h=Math.round(h*scale);
+  const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+  canvas.getContext('2d').drawImage(img,0,0,w,h);
+  return await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
+}
+async function qbUploadPhoto(file,bid,scopeId){
+  const blob=await qbCompressImage(file);
+  const fname=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
+  const path=`qboard/${bid}/${scopeId}/${fname}`;
+  const ref=storage.ref(path);
+  await ref.put(blob,{contentType:'image/jpeg'});
+  const url=await ref.getDownloadURL();
+  return {url,path,name:file.name||fname};
+}
+async function qbDeletePhotos(photos){
+  if(!Array.isArray(photos)||!photos.length)return;
+  await Promise.all(photos.map(p=>p?.path?storage.ref(p.path).delete().catch(()=>{}):null));
+}
+function qbPhotosHtml(photos){
+  if(!Array.isArray(photos)||!photos.length)return '';
+  const cells=photos.map(p=>`<a href="${p.url}" target="_blank" rel="noopener" style="display:block;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb"><img src="${p.url}" alt="${escapeHtml(p.name||'')}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" loading="lazy"></a>`).join('');
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${cells}</div>`;
+}
+function qbDraftPreviewHtml(scopeKey,kind){
+  const list=(kind==='comment'?S.qbCommentDraftFiles:S.qbDraftFiles)[scopeKey]||[];
+  if(!list.length)return '';
+  const items=list.map((f,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb"><img src="${f.dataUrl}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="qbRemoveDraftFile('${scopeKey}',${i},'${kind}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('');
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" id="qb-draft-preview-${kind}-${scopeKey}">${items}</div>`;
+}
+function qbHandleFileInput(input,scopeKey,kind){
+  const files=Array.from(input.files||[]);
+  if(!files.length)return;
+  const bucket=kind==='comment'?S.qbCommentDraftFiles:S.qbDraftFiles;
+  if(!bucket[scopeKey])bucket[scopeKey]=[];
+  let pending=files.length;
+  files.forEach(f=>{
+    if(!f.type.startsWith('image/')){pending--;if(!pending)qbRerenderDraftPreview(scopeKey,kind);return;}
+    const r=new FileReader();
+    r.onload=()=>{bucket[scopeKey].push({file:f,dataUrl:r.result});pending--;if(!pending)qbRerenderDraftPreview(scopeKey,kind);};
+    r.onerror=()=>{pending--;if(!pending)qbRerenderDraftPreview(scopeKey,kind);};
+    r.readAsDataURL(f);
+  });
+  input.value='';
+}
+function qbRemoveDraftFile(scopeKey,idx,kind){
+  const bucket=kind==='comment'?S.qbCommentDraftFiles:S.qbDraftFiles;
+  if(!bucket[scopeKey])return;
+  bucket[scopeKey].splice(idx,1);
+  qbRerenderDraftPreview(scopeKey,kind);
+}
+function qbRerenderDraftPreview(scopeKey,kind){
+  const anchor=document.getElementById(`qb-draft-anchor-${kind}-${scopeKey}`);
+  if(anchor)anchor.innerHTML=qbDraftPreviewHtml(scopeKey,kind);
+}
+function qbCanEdit(post,role){
+  if(role==='admin')return true;
+  return post.role==='student';
+}
 function qBoardHtml(booking,ctx){
   const role=ctx?.role||'student';
   const isStudent=role==='student',isAdmin=!isStudent;
   const stu=S.students.find(s=>s._docId===booking.studentId);
   const studentName=booking.studentName||stu?.name||'학생';
-  const q=booking.question||'';
-  const comments=Array.isArray(booking.comments)?booking.comments:[];
   const bid=booking._docId;
-  let postHtml='';
-  if(q){
-    const tsLine=booking.questionTs?qbFmtTs(booking.questionTs):'';
-    const editBtn=isStudent?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qbEditTogglePost('${bid}',true)">수정</button>`:'';
-    const delBtn=`<button class="btn bd bsm" style="font-size:11px;padding:4px 10px" onclick="qbDelPost('${bid}')">삭제</button>`;
-    postHtml=`<div id="qb-post-view-${bid}" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="bx bb" style="font-size:10px;font-weight:700">학생</span><b>${escapeHtml(studentName)}</b>${tsLine?`<span style="color:#9ca3af">· ${tsLine}</span>`:''}</div>
-        <div style="display:flex;gap:6px">${editBtn}${delBtn}</div>
-      </div>
-      <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6;margin-top:6px">${escapeHtml(q)}</p>
+  const posts=qbGetPosts(booking).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const composerOpen=S.qbComposerOpen===bid;
+  const editingPostId=S.qbPostEditId&&S.qbPostEditId.bid===bid?S.qbPostEditId.pid:null;
+
+  const composerBtn=composerOpen?'':`<button class="btn bp bsm" style="font-size:12px;padding:6px 12px" onclick="qbOpenComposer('${bid}')">+ 새 질문</button>`;
+  const composerScope='new_'+bid;
+  const composerHtml=composerOpen?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
+    <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 질문 작성</p>
+    <textarea class="fi ta" id="qb-new-input-${bid}" rows="4" placeholder="${isStudent?'예) 수학 미적분 단원이 어려워요':'학생들에게 안내할 내용을 입력하세요'}"></textarea>
+    <div style="margin-top:8px">
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="qbHandleFileInput(this,'${composerScope}','post')"></label>
+      <span style="font-size:11px;color:#9ca3af;margin-left:8px">최대 8MB, JPEG/PNG</span>
     </div>
-    <div id="qb-post-edit-${bid}" style="display:none;margin-bottom:14px">
-      <p style="font-size:11px;color:#6b7280;margin-bottom:6px">질문 수정</p>
-      <textarea class="fi ta" id="qb-post-input-${bid}" rows="4">${escapeHtml(q)}</textarea>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <button class="btn bs bsm" style="flex:1" onclick="qbEditTogglePost('${bid}',false)">취소</button>
-        <button class="btn bp bsm" style="flex:1" onclick="qbSavePost('${bid}')">저장</button>
+    <div id="qb-draft-anchor-post-${composerScope}">${qbDraftPreviewHtml(composerScope,'post')}</div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn bs bsm" style="flex:1" onclick="qbCloseComposer('${bid}')">취소</button>
+      <button class="btn bp bsm" style="flex:1" onclick="qbCreatePost('${bid}','${role}')">작성</button>
+    </div>
+  </div>`:'';
+
+  const postsHtml=posts.length?posts.map(p=>{
+    const isEditing=editingPostId===p._id;
+    const isPostStudent=p.role!=='admin';
+    const accent=isPostStudent?'#3b82f6':'#dc2626';
+    const bgCol=isPostStudent?'#eff6ff':'#fef2f2';
+    const borderCol=isPostStudent?'#bfdbfe':'#fecaca';
+    const badge=isPostStudent?'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>';
+    const name=p.name||(isPostStudent?studentName:'관리자');
+    const tsLine=p.ts?qbFmtTs(p.ts):'';
+    const editedMark=p.editedTs?'<span style="color:#9ca3af;font-size:11px">· 수정됨</span>':'';
+    const canEditPost=isStudent?(p.role==='student'):true;
+    const canDelPost=isAdmin||(isStudent&&p.role==='student');
+    const editBtn=canEditPost?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qbStartEditPost('${bid}','${p._id}')">수정</button>`:'';
+    const delBtn=canDelPost?`<button class="btn bd bsm" style="font-size:11px;padding:4px 10px" onclick="qbDelPost('${bid}','${p._id}')">삭제</button>`:'';
+
+    const editScope='edit_'+bid+'_'+p._id;
+    let bodyHtml;
+    if(isEditing){
+      bodyHtml=`<div>
+        <textarea class="fi ta" id="qb-edit-input-${bid}-${p._id}" rows="4">${escapeHtml(p.body||'')}</textarea>
+        <div style="margin-top:8px;font-size:11px;color:#6b7280">기존 사진:</div>
+        ${(p.photos||[]).length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${p.photos.map((ph,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb"><img src="${ph.url}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="qbRemoveExistingPhoto('${bid}','${p._id}',${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('')}</div>`:'<p style="font-size:11px;color:#9ca3af;margin-top:4px">없음</p>'}
+        <div style="margin-top:8px">
+          <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 추가<input type="file" accept="image/*" multiple style="display:none" onchange="qbHandleFileInput(this,'${editScope}','post')"></label>
+        </div>
+        <div id="qb-draft-anchor-post-${editScope}">${qbDraftPreviewHtml(editScope,'post')}</div>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn bs bsm" style="flex:1" onclick="qbCancelEditPost()">취소</button>
+          <button class="btn bp bsm" style="flex:1" onclick="qbSaveEditPost('${bid}','${p._id}')">저장</button>
+        </div>
+      </div>`;
+    }else{
+      bodyHtml=`<p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6;margin-top:6px">${escapeHtml(p.body||'')}</p>${qbPhotosHtml(p.photos)}`;
+    }
+
+    const comments=Array.isArray(p.comments)?p.comments:[];
+    const commentsHtml=comments.length?comments.map(c=>{
+      const isAdminCmt=c.role==='admin';
+      const canDel=isAdmin||(isStudent&&c.role==='student');
+      const cBadge=isAdminCmt?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
+      const cName=c.name||(isAdminCmt?'관리자':studentName);
+      const cDel=canDel?`<button onclick="qbDelComment('${bid}','${p._id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1" title="삭제">×</button>`:'';
+      const cAccent=isAdminCmt?'#dc2626':'#3b82f6';
+      return `<div style="border-left:3px solid ${cAccent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px">${cBadge}<b>${escapeHtml(cName)}</b><span style="color:#9ca3af">· ${qbFmtTs(c.ts)}</span></div>
+          ${cDel}
+        </div>
+        <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body||'')}</p>
+        ${qbPhotosHtml(c.photos)}
+      </div>`;
+    }).join(''):'';
+
+    const cScope='cmt_'+bid+'_'+p._id;
+    const cPlaceholder=isAdmin?'학생에게 댓글로 답변하기':'추가 질문이나 코멘트 남기기';
+    const commentInputHtml=`<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb">
+      <textarea class="fi ta" id="qb-cmt-input-${bid}-${p._id}" rows="2" placeholder="${cPlaceholder}"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="qbHandleFileInput(this,'${cScope}','comment')"></label>
+        <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="qbAddComment('${bid}','${p._id}','${role}')">댓글 등록</button>
       </div>
+      <div id="qb-draft-anchor-comment-${cScope}">${qbDraftPreviewHtml(cScope,'comment')}</div>
     </div>`;
-  }else if(isStudent){
-    postHtml=`<div style="margin-bottom:14px">
-      <p style="font-size:12px;color:#6b7280;margin-bottom:6px">상담에서 다루고 싶은 내용을 자유롭게 적어주세요</p>
-      <textarea class="fi ta" id="qb-post-input-${bid}" rows="4" placeholder="예) 수학 미적분 단원이 어려워요"></textarea>
-      <button class="btn bp bsm" style="margin-top:8px" onclick="qbSavePost('${bid}')">작성</button>
-    </div>`;
-  }else{
-    postHtml=`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:14px;text-align:center;color:#9ca3af;font-size:12px;margin-bottom:14px">학생이 아직 질문을 작성하지 않았습니다.</div>`;
-  }
-  const commentsHtml=comments.length?comments.map(c=>{
-    const isAdminCmt=c.role==='admin';
-    const canDel=isAdmin||(isStudent&&c.role==='student');
-    const badge=isAdminCmt?'':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
-    const name=c.name||(isAdminCmt?'관리자':studentName);
-    const delBtn=canDel?`<button onclick="qbDelComment('${bid}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1" title="삭제">×</button>`:'';
-    const accent=isAdminCmt?'#dc2626':'#3b82f6';
-    return `<div style="border-left:3px solid ${accent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px">${badge}<b>${escapeHtml(name)}</b><span style="color:#9ca3af">· ${qbFmtTs(c.ts)}</span></div>
-        ${delBtn}
+
+    return `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px">${badge}<b>${escapeHtml(name)}</b>${tsLine?`<span style="color:#9ca3af">· ${tsLine}</span>`:''}${editedMark}</div>
+        ${isEditing?'':`<div style="display:flex;gap:6px">${editBtn}${delBtn}</div>`}
       </div>
-      <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body)}</p>
+      ${bodyHtml}
+      ${comments.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:12px 0 6px">댓글 (${comments.length})</p>${commentsHtml}`:''}
+      ${commentInputHtml}
     </div>`;
-  }).join(''):'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:12px 0;background:#f9fafb;border-radius:8px">아직 답변이 없습니다.</p>';
-  const placeholder=isAdmin?'학생에게 댓글로 답변하기':'추가 질문이나 코멘트 남기기';
-  const inputHtml=`<div style="margin-top:14px;padding-top:14px;border-top:1px solid #f3f4f6">
-    <textarea class="fi ta qb-cmt-input" data-bid="${bid}" rows="2" placeholder="${placeholder}"></textarea>
-    <button class="btn bp bsm" style="margin-top:8px;width:100%" onclick="qbAddComment(this,'${bid}','${role}')">댓글 등록</button>
-  </div>`;
-  const cmtCount=comments.length;
-  const statusBadge=q?'<span class="bx bg">작성됨</span>':'<span class="bx bgr">미작성</span>';
-  const showComments=q||comments.length;
+  }).join(''):(composerOpen?'':`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px;margin-bottom:14px">${isStudent?'아직 작성된 질문이 없습니다. 위 [+ 새 질문] 버튼으로 작성하세요.':'학생이 아직 질문을 작성하지 않았습니다.'}</div>`);
+
+  const totalComments=posts.reduce((n,p)=>n+(Array.isArray(p.comments)?p.comments.length:0),0);
+
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-      ${statusBadge}<p style="font-size:15px;font-weight:700">상담 게시판 · 질문 & 고민</p>${cmtCount?`<span style="font-size:11px;color:#6b7280">댓글 ${cmtCount}</span>`:''}
+      <p style="font-size:15px;font-weight:700">상담 게시판 · 질문 & 고민</p>
+      <span style="font-size:11px;color:#6b7280">글 ${posts.length}${totalComments?` · 댓글 ${totalComments}`:''}</span>
+      <div style="margin-left:auto">${composerBtn}</div>
     </div>
-    ${postHtml}
-    ${showComments?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:14px 0 8px">답변${cmtCount?` (${cmtCount})`:''}</p>${commentsHtml}`:''}
-    ${inputHtml}
+    ${composerHtml}
+    ${postsHtml}
   </div>`;
 }
-function qbEditTogglePost(bid,edit){
-  const v=_('qb-post-view-'+bid),e=_('qb-post-edit-'+bid);
-  if(!v||!e)return;
-  v.style.display=edit?'none':'';
-  e.style.display=edit?'':'none';
-  if(edit){const t=_('qb-post-input-'+bid);if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length);}}
+
+function qbOpenComposer(bid){S.qbComposerOpen=bid;S.qbPostEditId=null;qbRerenderFor(bid);}
+function qbCloseComposer(bid){
+  S.qbComposerOpen=null;
+  delete S.qbDraftFiles['new_'+bid];
+  qbRerenderFor(bid);
 }
-async function qbSavePost(bid){
-  const t=_('qb-post-input-'+bid);
+function qbStartEditPost(bid,pid){
+  S.qbPostEditId={bid,pid};S.qbComposerOpen=null;
+  // 편집 진입 시 기존 사진 사본 보관 (편집 중 제거 추적용)
+  const myB=S.bookings.find(b=>b._docId===bid);
+  const post=qbGetPosts(myB||{}).find(p=>p._id===pid);
+  if(post)S.qbPostEditId.keepPhotos=(post.photos||[]).slice();
+  qbRerenderFor(bid);
+}
+function qbCancelEditPost(){
+  const e=S.qbPostEditId;
+  if(e){delete S.qbDraftFiles['edit_'+e.bid+'_'+e.pid];}
+  S.qbPostEditId=null;
+  if(e)qbRerenderFor(e.bid);
+}
+function qbRemoveExistingPhoto(bid,pid,idx){
+  const e=S.qbPostEditId;if(!e||e.bid!==bid||e.pid!==pid)return;
+  if(!Array.isArray(e.keepPhotos))return;
+  e.keepPhotos.splice(idx,1);
+  // 편집 패널만 다시 그림
+  qbRerenderFor(bid);
+}
+
+async function qbCreatePost(bid,role){
+  const t=_('qb-new-input-'+bid);
   const txt=(t?.value||'').trim();
-  if(!txt){toast('내용을 입력하세요.','warn');return;}
-  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
-  const now=Date.now();
-  showLoad(true);
-  try{
-    await db.collection('bookings').doc(bid).update({question:txt,questionTs:now});
-    myB.question=txt;myB.questionTs=now;
-    qbRerenderFor(bid);
-  }catch(e){toast('저장 실패: '+e.message,'error');}
-  showLoad(false);
-}
-async function qbDelPost(bid){
-  if(!(await confirmDialog({title:'질문 삭제',message:'학생의 질문 글을 삭제하시겠습니까? 댓글은 유지됩니다.',confirmLabel:'삭제',kind:'danger'})))return;
-  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
-  showLoad(true);
-  try{
-    await db.collection('bookings').doc(bid).update({question:'',questionTs:firebase.firestore.FieldValue.delete()});
-    myB.question='';delete myB.questionTs;
-    qbRerenderFor(bid);
-  }catch(e){toast('삭제 실패: '+e.message,'error');}
-  showLoad(false);
-}
-async function qbAddComment(btn,bid,role){
-  const t=btn?.parentElement?.querySelector('textarea.qb-cmt-input')||_('qb-cmt-input-'+bid);
-  const txt=(t?.value||'').trim();
-  if(!txt){toast('내용을 입력하세요.','warn');return;}
+  const scope='new_'+bid;
+  const drafts=S.qbDraftFiles[scope]||[];
+  if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
   let name='';
   if(role==='admin')name=S.user?.name||'관리자';
   else{const stu=S.students.find(s=>s._docId===myB.studentId);name=stu?.name||myB.studentName||'학생';}
-  const cmt={_id:uid(),role,name,body:txt,ts:Date.now()};
-  const next=[...(myB.comments||[]),cmt];
+  const pid=uid();
   showLoad(true);
   try{
-    await db.collection('bookings').doc(bid).update({comments:next});
-    myB.comments=next;
+    const photos=[];
+    for(const f of drafts){
+      const ph=await qbUploadPhoto(f.file,bid,pid);
+      photos.push(ph);
+    }
+    const newPost={_id:pid,body:txt,photos,ts:Date.now(),role,name,comments:[]};
+    const existing=qbGetPosts(myB);
+    const next=qbNormalizePosts([...existing,newPost]);
+    const upd={posts:next};
+    if(myB.question!==undefined)upd.question=firebase.firestore.FieldValue.delete();
+    if(myB.questionTs!==undefined)upd.questionTs=firebase.firestore.FieldValue.delete();
+    if(myB.comments!==undefined)upd.comments=firebase.firestore.FieldValue.delete();
+    await db.collection('bookings').doc(bid).update(upd);
+    myB.posts=next;delete myB.question;delete myB.questionTs;delete myB.comments;
+    delete S.qbDraftFiles[scope];
+    S.qbComposerOpen=null;
     qbRerenderFor(bid);
   }catch(e){toast('등록 실패: '+e.message,'error');}
   showLoad(false);
 }
-async function qbDelComment(bid,cid){
-  if(!(await confirmDialog({title:'댓글 삭제',message:'이 댓글을 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
+async function qbSaveEditPost(bid,pid){
+  const t=_('qb-edit-input-'+bid+'-'+pid);
+  const txt=(t?.value||'').trim();
+  const scope='edit_'+bid+'_'+pid;
+  const drafts=S.qbDraftFiles[scope]||[];
+  const editState=S.qbPostEditId;
+  const keep=editState&&editState.bid===bid&&editState.pid===pid&&Array.isArray(editState.keepPhotos)?editState.keepPhotos:null;
   const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
-  const next=(myB.comments||[]).filter(c=>c._id!==cid);
+  const existing=qbGetPosts(myB);
+  const target=existing.find(p=>p._id===pid);if(!target){toast('글을 찾을 수 없습니다.','error');return;}
+  if(!txt&&!drafts.length&&(!keep||!keep.length)){toast('내용 또는 사진을 입력하세요.','warn');return;}
   showLoad(true);
   try{
-    await db.collection('bookings').doc(bid).update({comments:next});
-    myB.comments=next;
+    const removed=(target.photos||[]).filter(orig=>!(keep||[]).some(k=>k.path===orig.path));
+    await qbDeletePhotos(removed);
+    const newPhotos=[];
+    for(const f of drafts){
+      const ph=await qbUploadPhoto(f.file,bid,pid);
+      newPhotos.push(ph);
+    }
+    const next=qbNormalizePosts(existing.map(p=>{
+      if(p._id!==pid)return p;
+      return {...p,body:txt,photos:[...(keep||[]),...newPhotos],editedTs:Date.now()};
+    }));
+    await db.collection('bookings').doc(bid).update({posts:next});
+    myB.posts=next;
+    delete S.qbDraftFiles[scope];
+    S.qbPostEditId=null;
+    qbRerenderFor(bid);
+  }catch(e){toast('저장 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function qbDelPost(bid,pid){
+  if(!(await confirmDialog({title:'질문 삭제',message:'이 글을 삭제하시겠습니까? 댓글과 첨부 사진도 함께 삭제됩니다.',confirmLabel:'삭제',kind:'danger'})))return;
+  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
+  const existing=qbGetPosts(myB);
+  const target=existing.find(p=>p._id===pid);if(!target)return;
+  showLoad(true);
+  try{
+    const allPhotos=[...(target.photos||[]),...((target.comments||[]).flatMap(c=>c.photos||[]))];
+    await qbDeletePhotos(allPhotos);
+    const next=qbNormalizePosts(existing.filter(p=>p._id!==pid));
+    const upd={posts:next};
+    if(myB.question!==undefined)upd.question=firebase.firestore.FieldValue.delete();
+    if(myB.questionTs!==undefined)upd.questionTs=firebase.firestore.FieldValue.delete();
+    if(myB.comments!==undefined)upd.comments=firebase.firestore.FieldValue.delete();
+    await db.collection('bookings').doc(bid).update(upd);
+    myB.posts=next;delete myB.question;delete myB.questionTs;delete myB.comments;
+    qbRerenderFor(bid);
+  }catch(e){toast('삭제 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function qbAddComment(bid,pid,role){
+  const t=_('qb-cmt-input-'+bid+'-'+pid);
+  const txt=(t?.value||'').trim();
+  const scope='cmt_'+bid+'_'+pid;
+  const drafts=S.qbCommentDraftFiles[scope]||[];
+  if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
+  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
+  let name='';
+  if(role==='admin')name=S.user?.name||'관리자';
+  else{const stu=S.students.find(s=>s._docId===myB.studentId);name=stu?.name||myB.studentName||'학생';}
+  const cid=uid();
+  showLoad(true);
+  try{
+    const photos=[];
+    for(const f of drafts){
+      const ph=await qbUploadPhoto(f.file,bid,pid+'_'+cid);
+      photos.push(ph);
+    }
+    const cmt={_id:cid,role,name,body:txt,photos,ts:Date.now()};
+    const existing=qbGetPosts(myB);
+    const next=qbNormalizePosts(existing.map(p=>p._id===pid?{...p,comments:[...(p.comments||[]),cmt]}:p));
+    const upd={posts:next};
+    if(myB.question!==undefined)upd.question=firebase.firestore.FieldValue.delete();
+    if(myB.questionTs!==undefined)upd.questionTs=firebase.firestore.FieldValue.delete();
+    if(myB.comments!==undefined)upd.comments=firebase.firestore.FieldValue.delete();
+    await db.collection('bookings').doc(bid).update(upd);
+    myB.posts=next;delete myB.question;delete myB.questionTs;delete myB.comments;
+    delete S.qbCommentDraftFiles[scope];
+    qbRerenderFor(bid);
+  }catch(e){toast('등록 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function qbDelComment(bid,pid,cid){
+  if(!(await confirmDialog({title:'댓글 삭제',message:'이 댓글을 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
+  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
+  const existing=qbGetPosts(myB);
+  const target=existing.find(p=>p._id===pid);if(!target)return;
+  const cmt=(target.comments||[]).find(c=>c._id===cid);
+  showLoad(true);
+  try{
+    if(cmt)await qbDeletePhotos(cmt.photos);
+    const next=qbNormalizePosts(existing.map(p=>p._id===pid?{...p,comments:(p.comments||[]).filter(c=>c._id!==cid)}:p));
+    await db.collection('bookings').doc(bid).update({posts:next});
+    myB.posts=next;
     qbRerenderFor(bid);
   }catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);
@@ -2248,7 +2503,8 @@ function renderAdminConsult(){
   const examCounts=cExams.map(ex=>({ex,n:baseStu.filter(s=>hasStuExamScore(s,ex.id)).length}));
   const noteAny=baseStu.filter(s=>_consultNoteState(s)!=='none').length;
   const noteVisible=baseStu.filter(s=>_consultNoteState(s)==='visible').length;
-  const questionCount=baseStu.filter(s=>{const bk=bookingByStu[s._docId];return bk&&bk.question&&bk.question.trim();}).length;
+  const _qbHas=bk=>{if(!bk)return false;if(Array.isArray(bk.posts)&&bk.posts.length)return true;return !!(bk.question&&bk.question.trim());};
+  const questionCount=baseStu.filter(s=>_qbHas(bookingByStu[s._docId])).length;
   const stat=(label,val,color)=>`<span style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:999px;padding:5px 12px;font-size:12px;white-space:nowrap"><span style="color:#6b7280;font-weight:600">${label}</span><b style="color:${color||'#111827'}">${val}</b></span>`;
   const summaryHtml=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
     ${stat('예약',`${bookedCount}/${total}`,'#1C64F2')}
@@ -2259,7 +2515,7 @@ function renderAdminConsult(){
   const rows=sorted.map(s=>{
     const bk=bookingByStu[s._docId];
     const booked=!!bk;
-    const hasQuestion=!!(bk&&bk.question&&bk.question.trim());
+    const hasQuestion=_qbHas(bk);
     const noteState=_consultNoteState(s);
     const scoreCells=cExams.map(ex=>`<td style="text-align:center;line-height:1">${hasStuExamScore(s,ex.id)?_OK_SVG:_NA_DOT}</td>`).join('');
     const questionCell=hasQuestion
