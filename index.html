@@ -3175,6 +3175,7 @@ function renderAdminStudents(){
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
     <span style="flex:1"></span>
     ${mode?`<button class="btn bs bsm" onclick="selectUnbookedStudents()">미예약만 선택 (${unbookedIds.length})</button>`:''}
+    ${mode?'':`<button class="btn bd bsm" onclick="resetAllPw()">🔑 비밀번호 일괄 초기화</button>`}
     ${ddBtn}
   </div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table>
@@ -3831,6 +3832,29 @@ async function resetPw(docId){
   const newPw=initPw(effectivePhone(s));showLoad(true);
   try{await db.collection('students').doc(docId).update({accountPw:newPw,isFirstLogin:true});s.accountPw=newPw;s.isFirstLogin=true;closeModal();toast(`초기 비밀번호: ${newPw}`,'success',{duration:6000});renderAdminStudents();}
   catch(e){toast('초기화 실패: '+e.message,'error');}
+  showLoad(false);}
+
+async function resetAllPw(){
+  const all=realStu();
+  const targets=all.filter(s=>effectivePhoneDigits(s).length>=4);
+  const skipped=all.length-targets.length;
+  if(!targets.length){toast('연락처가 등록된 학생이 없어 초기화할 대상이 없습니다.','error');return;}
+  const skipMsg=skipped?` 연락처가 없는 ${skipped}명은 제외됩니다.`:'';
+  if(!(await confirmDialog({title:'비밀번호 일괄 초기화',message:`재원 학생 ${targets.length}명의 비밀번호를 연락처 숫자로 초기화하고 첫 로그인 상태로 되돌립니다.${skipMsg}`,confirmLabel:'다음',kind:'danger'})))return;
+  if(!(await confirmDialog({title:'정말 초기화하시겠습니까?',message:`${targets.length}명이 기존 비밀번호로 로그인할 수 없게 되며, 되돌릴 수 없습니다.`,confirmLabel:`${targets.length}명 초기화`,kind:'danger'})))return;
+  showLoad(true);
+  let done=0;
+  try{
+    for(let i=0;i<targets.length;i+=400){
+      const chunk=targets.slice(i,i+400);const batch=db.batch();
+      chunk.forEach(s=>batch.update(db.collection('students').doc(s._docId),{accountPw:initPw(effectivePhone(s)),isFirstLogin:true}));
+      await batch.commit();
+      chunk.forEach(s=>{s.accountPw=initPw(effectivePhone(s));s.isFirstLogin=true;});
+      done+=chunk.length;
+    }
+    toast(`${done}명의 비밀번호를 연락처 숫자로 초기화했습니다.${skipMsg}`,'success',{duration:6000});
+  }catch(e){toast(`초기화 실패 (${done}명 처리됨): `+e.message,'error');}
+  renderAdminStudents();
   showLoad(false);}
 
 /* ── ADMIN: 시험 관리 ── */
