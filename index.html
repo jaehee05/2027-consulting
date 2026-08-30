@@ -117,6 +117,29 @@ tr.selected>td:last-child{box-shadow:inset -1px 1px 0 var(--primary-soft-border)
 .tabs-wrap::before{left:0;background:linear-gradient(to left,transparent,var(--surface))}
 .tabs-wrap::after{right:0;background:linear-gradient(to right,transparent,var(--surface))}
 .tabs-wrap.can-l::before,.tabs-wrap.can-r::after{opacity:1}
+/* 탭이 10개라 모바일에선 스트립 탐색이 부담스럽다.
+   우측 고정 버튼으로 그룹별 시트를 열어 한 번에 점프. */
+.tabs-more{display:none;position:absolute;right:0;top:0;bottom:1px;width:46px;z-index:2;align-items:center;justify-content:center;border:none;border-left:1px solid var(--gray-200);background:var(--surface);color:var(--gray-500);font-size:16px;font-family:inherit;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
+.tabs-more:active{background:var(--gray-100)}
+.tabs-more .tm-dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:1.5px solid var(--surface)}
+@media(max-width:640px){
+  .tabs-more{display:inline-flex}
+  .tabs-wrap>.tabs{padding-right:46px}
+  .tabs-wrap::after{right:46px}
+}
+/* 목록 검색 */
+.srch{position:relative;flex:1;min-width:180px}
+.srch>input{height:34px;width:100%;padding:0 30px 0 30px;border:1px solid var(--gray-200);border-radius:var(--radius-lg);font-family:inherit;font-size:13px;color:var(--gray-900);background:var(--surface);outline:none;transition:.15s}
+.srch>input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(28,100,242,.1)}
+.srch>.srch-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:13px;pointer-events:none;line-height:1}
+.srch>.srch-x{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--gray-400);font-size:15px;cursor:pointer;font-family:inherit;padding:3px 5px;border-radius:var(--radius-sm);line-height:1}
+.srch>.srch-x:hover{color:var(--gray-700);background:var(--gray-100)}
+@media(max-width:640px){.srch{min-width:0;flex-basis:100%}}
+.tab-sheet-group{font-size:11px;font-weight:700;color:var(--gray-400);letter-spacing:.02em;margin:14px 2px 6px}
+.tab-sheet-group:first-child{margin-top:2px}
+.sheet-item.on{border-color:var(--primary);background:var(--primary-soft)}
+.sheet-item.on .sheet-text b{color:var(--primary-text)}
+.sheet-badge{flex:0 0 auto;background:var(--danger);color:#fff;border-radius:var(--radius-pill);padding:1px 7px;font-size:11px;font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:var(--gray-100);padding:10px 12px;text-align:center;font-weight:600;color:var(--gray-500);border-bottom:1px solid var(--gray-200);white-space:nowrap}
 td{padding:10px 12px;border-bottom:1px solid var(--gray-100);vertical-align:middle;text-align:center}
@@ -459,7 +482,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
     <div class="tr"><span class="uname" id="adminUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page">
-    <div class="tabs-wrap np"><div class="tabs" id="adminTabs"></div></div>
+    <div class="tabs-wrap np"><div class="tabs" id="adminTabs"></div><button class="tabs-more" id="adminTabsMore" onclick="openTabSheet()" aria-label="전체 메뉴" title="전체 메뉴">☰</button></div>
     <div id="adminC"></div>
   </div>
 </div>
@@ -588,8 +611,8 @@ const S = {
   bookings:[], config:{scoreStart:'',scoreEnd:''},
   admins:[], requests:[], reqSlots:[],
   lectures:[], classSub:'list', classLectureId:null,
-  tab:null, selDate:null, adminSel:null, adminBookSelDate:null, adminSchedSelDate:null,
-  editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), alimtalkMode:null, stuSubView:'active',
+  tab:null, selDate:null, adminSel:null, adminBookSelDate:null, adminSchedSelDate:null, printOpts:null,
+  editingExamId:null, lang2Open:false, stuSort:'seat', stuSelected:new Set(), alimtalkMode:null, stuSubView:'active', stuQuery:'',
   scoreStep:0, scoreWizard:{}, scoreWizardExamId:null,
   consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0,
   opScoreStuId:null, opScoreTab:0, opGraphTab:0,
@@ -767,20 +790,67 @@ var _reqListener=null, _reqSeedDone=false;
 var _bkListener=null, _bkSeedDone=false;
 function pendingReqCountForAdmin(){return S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change'&&r.type!=='add_student').length;}
 function pendingAddStudentCount(){return S.requests.filter(r=>r.type==='add_student'&&r.status==='pending').length;}
+/* 관리자 탭 정의 — 탭바와 전체 메뉴 시트가 같은 목록을 쓴다. */
+const ADMIN_TABS=[
+  {id:'students', label:'학생 관리', opLabel:'학생 목록', group:'학생',  icon:'👥', desc:'등록·수정·퇴원, 알림톡 발송'},
+  {id:'scores',   label:'학생 성적', group:'학생',  icon:'📊', desc:'시험별 성적 입력 및 등급'},
+  {id:'consult',  label:'멘토링',   group:'학생',  icon:'🗣️', desc:'상담 기록과 성적 그래프'},
+  {id:'logins',   label:'로그인 현황', group:'학생', icon:'🔑', desc:'학생 접속 여부 확인'},
+  {id:'bookings', label:'예약 현황', group:'예약',  icon:'🎟️', desc:'시간대별 예약, 변경/취소 요청'},
+  {id:'schedule', label:'일정 관리', group:'예약',  icon:'📅', desc:'날짜·시간대와 예약 기간 설정'},
+  {id:'exams',    label:'시험 관리', group:'운영',  icon:'📝', desc:'시험 추가와 등급컷'},
+  {id:'notices',  label:'공지사항',  group:'운영',  icon:'📢', desc:'학생에게 보이는 공지'},
+  {id:'alimtalk', label:'알림톡',    group:'운영',  icon:'📩', desc:'템플릿과 발송 설정'},
+  {id:'accounts', label:'계정 관리', group:'운영',  icon:'⚙️', desc:'ADMIN / OP / TEST 계정'},
+];
+const OP_TAB_IDS=['students','scores','bookings'];
+function adminTabList(){
+  const isAdmin=S.user?.type==='admin';
+  return isAdmin?ADMIN_TABS:OP_TAB_IDS.map(id=>ADMIN_TABS.find(t=>t.id===id));
+}
+function adminTabBadge(id){
+  if(id==='bookings')return pendingReqCountForAdmin();
+  if(id==='students')return S.user?.type==='admin'?pendingAddStudentCount():0;
+  return 0;
+}
+function adminTabLabel(t){return (S.user?.type==='admin'?t.label:(t.opLabel||t.label));}
 function updateAdminTabs(){
   if(!S.user||S.user.type==='student')return;
   const el=_('adminTabs');if(!el)return;
-  const isAdmin=S.user.type==='admin';
-  const tabs=isAdmin?[['students','학생 관리'],['scores','학생 성적'],['consult','멘토링'],['exams','시험 관리'],['schedule','일정 관리'],['bookings','예약 현황'],['notices','공지사항'],['logins','로그인 현황'],['accounts','계정 관리'],['alimtalk','알림톡']]:[['students','학생 목록'],['scores','학생 성적'],['bookings','예약 현황']];
-  const n=pendingReqCountForAdmin();
-  const nAdd=isAdmin?pendingAddStudentCount():0;
-  el.innerHTML=tabs.map(([id,label])=>{
-    let badge='';
-    if(id==='bookings'&&n>0)badge=` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${n}</span>`;
-    else if(id==='students'&&nAdd>0)badge=` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${nAdd}</span>`;
-    return `<button class="tab ${S.tab===id?'on':''}" onclick="setTab('${id}')" data-tab="${id}">${label}${badge}</button>`;
+  const tabs=adminTabList();
+  let totalBadge=0;
+  el.innerHTML=tabs.map(t=>{
+    const c=adminTabBadge(t.id);totalBadge+=c;
+    const badge=c>0?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${c}</span>`:'';
+    return `<button class="tab ${S.tab===t.id?'on':''}" onclick="setTab('${t.id}')" data-tab="${t.id}">${adminTabLabel(t)}${badge}</button>`;
   }).join('');
+  /* 시트를 열지 않아도 처리할 일이 있다는 걸 알 수 있게 더보기 버튼에 점 표시 */
+  const more=_('adminTabsMore');
+  if(more)more.innerHTML='☰'+(totalBadge>0?'<span class="tm-dot"></span>':'');
   syncTabScroll();
+}
+/* 전체 메뉴 시트 — 탭 10개를 그룹으로 묶어 한 번에 이동 */
+function openTabSheet(){
+  const tabs=adminTabList();
+  const groups=[];
+  for(const t of tabs){
+    let g=groups.find(x=>x.name===t.group);
+    if(!g){g={name:t.group,items:[]};groups.push(g);}
+    g.items.push(t);
+  }
+  const body=groups.map(g=>`<p class="tab-sheet-group">${g.name}</p><div class="sheet-list">${g.items.map(t=>{
+    const c=adminTabBadge(t.id);
+    return `<button class="sheet-item ${S.tab===t.id?'on':''}" onclick="closeModal();setTab('${t.id}')">
+      <span class="sheet-icon">${t.icon}</span>
+      <span class="sheet-text"><b>${escapeHtml(adminTabLabel(t))}</b><span>${escapeHtml(t.desc)}</span></span>
+      ${c>0?`<span class="sheet-badge">${c}</span>`:''}
+      <span class="sheet-arrow" ${S.tab===t.id?'style="color:var(--primary);font-weight:700"':''}>${S.tab===t.id?'✓':'›'}</span>
+    </button>`;}).join('')}</div>`).join('');
+  _('mCt').innerHTML=`<p class="mtitle">전체 메뉴</p>
+    <p class="msub">이동할 화면을 선택하세요.</p>
+    ${body}
+    <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">닫기</button></div>`;
+  openModal();
 }
 /* 탭바는 innerHTML 재생성 때마다 scrollLeft 가 0 으로 돌아간다.
    선택된 탭이 화면 밖(특히 모바일에서 뒤쪽 탭)으로 사라지지 않게 되돌려 놓고,
@@ -790,9 +860,13 @@ function syncTabScroll(){
   const wrap=el.parentElement;
   const on=el.querySelector('.tab.on');
   if(on){
+    /* 모바일에선 우측에 ☰ 버튼이 얹혀 있어 .tabs 에 padding-right 가 붙는다.
+       그만큼 빼지 않으면 마지막 탭이 버튼 뒤에 가린다. */
+    const padR=parseFloat(getComputedStyle(el).paddingRight)||0;
     const l=on.offsetLeft,r=l+on.offsetWidth;
+    const viewR=el.scrollLeft+el.clientWidth-padR;
     if(l<el.scrollLeft) el.scrollLeft=Math.max(0,l-16);
-    else if(r>el.scrollLeft+el.clientWidth) el.scrollLeft=r-el.clientWidth+16;
+    else if(r>viewR) el.scrollLeft=r-el.clientWidth+padR+12;
   }
   if(wrap&&wrap.classList.contains('tabs-wrap')){
     const max=el.scrollWidth-el.clientWidth;
@@ -3147,28 +3221,24 @@ function renderAdminLogins(){
   </table></div></div>`;
 }
 
-function renderOpStudents(){
-  const gradeOrder={'고3':0,'고2':1,'고1':2};
-  const baseStu=realStu();
-  const sorted=[...baseStu].sort((a,b)=>{
-    if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
-    if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
-    if(S.stuSort==='seat') return ((a.seat||999))-(b.seat||999);
-    if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
-    return 0;
-  });
-  const rows=sorted.map(s=>{
+function _opStuRowHtml(s){
     const stuPhone=s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':escapeHtml(s.studentPhone||'');
     const hasMemo=!!(s.memo&&s.memo.trim());
     return `<tr>
     <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
-    <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${s.grade}</span></td>
-    <td data-label="" class="cell-head" style="font-weight:600"><span>${s.name}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}</span></td>
-    <td data-label="학교">${s.school}</td>
+    <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${escapeHtml(s.grade||'')}</span></td>
+    <td data-label="" class="cell-head" style="font-weight:600"><span>${escapeHtml(s.name||'')}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}<span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${escapeHtml(s.grade||'')}</span></span></td>
+    <td data-label="학교">${escapeHtml(s.school||'')}</td>
     <td data-label="학생 연락처">${stuPhone}</td>
-    <td data-label="보호자 연락처">${s.guardianPhone}</td>
+    <td data-label="보호자 연락처">${escapeHtml(s.guardianPhone||'')}</td>
     <td data-label="메모" class="cell-actions" style="white-space:nowrap;text-align:right"><button class="btn ${hasMemo?'bp':'bs'} bsm" onclick="openStuMemoModal('${s._docId}')">${hasMemo?'메모 ✓':'메모'}</button></td>
-  </tr>`;}).join('');
+  </tr>`;
+}
+function renderOpStudents(){
+  const baseStu=realStu();
+  const q=S.stuQuery.trim();
+  const sorted=stuFiltered();
+  const rows=sorted.map(_opStuRowHtml).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
   const myReqs=S.requests.filter(r=>r.type==='add_student'&&r.createdBy===S.user.id).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
@@ -3182,37 +3252,30 @@ function renderOpStudents(){
     return `<tr><td data-label="상태" class="cell-hide">${status}</td><td data-label="" class="cell-head"><span>${escapeHtml(p.name||'')}</span><span class="head-meta">${status}</span></td><td data-label="학교/학년" style="font-size:12px">${escapeHtml(p.school||'')} ${escapeHtml(p.grade||'')}</td><td data-label="연락처" style="font-size:12px">${escapeHtml(p.guardianPhone||p.studentPhone||'')}</td><td data-label="요청일" style="font-size:11px;color:#6b7280">${fmtDate(r.createdAt)}${rej}</td>${r.status==='pending'?`<td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;justify-content:flex-end"><button class="btn bd bsm" onclick="cancelAddStudentRequest('${r._docId}')">취소</button></div></td>`:'<td data-label="" class="cell-hide"></td>'}</tr>`;
   }).join('');
   const myReqCard=(myPending.length||myRecent.length)?`<div class="card" style="margin-bottom:14px;padding:0"><div style="padding:12px 14px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:700">내가 요청한 학생 추가</span><span style="font-size:12px;color:#6b7280">대기 ${myPending.length}건${myRecent.length?` · 최근 처리 ${myRecent.length}건`:''}</span></div><div class="tw tw-cards"><table><thead><tr><th>상태</th><th>이름</th><th>학교/학년</th><th>연락처</th><th>요청일</th><th>관리</th></tr></thead><tbody>${myReqRows}</tbody></table></div></div>`:'';
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가 요청</button></div>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span id="stuCount" style="font-size:13px;font-weight:400;color:#6b7280">${q?`(${sorted.length}명 / 전체 ${baseStu.length}명)`:`(${baseStu.length}명)`}</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가 요청</button></div>
   ${myReqCard}
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <span class="srch">
+      <span class="srch-ico">🔍</span>
+      <input id="stuSrch" type="text" inputmode="search" autocomplete="off" placeholder="이름 · 학교 · 연락처 · 좌석 검색" value="${escapeHtml(S.stuQuery)}" oninput="onStuSearch(this.value)" onkeydown="if(event.key==='Escape'){event.preventDefault();clearStuSearch();}">
+      <button id="stuSrchX" class="srch-x" style="display:${S.stuQuery?'block':'none'}" onclick="clearStuSearch()" aria-label="검색어 지우기">✕</button>
+    </span>
+  </div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
   </div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table>
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th style="text-align:right">메모</th></tr></thead>
-    <tbody>${rows||'<tr class="empty-row"><td colspan="7" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+    <tbody id="stuTbody">${rows||`<tr class="empty-row"><td colspan="7" class="empty">${q?'검색 결과가 없습니다.':'등록된 학생이 없습니다.'}</td></tr>`}</tbody>
   </table></div></div>`;
 }
 
-function renderAdminStudents(){
-  if(S.user?.type!=='admin')return renderOpStudents();
-  if(S.stuSubView==='withdrawn')return renderWithdrawnStudents();
-  const gradeOrder={'고3':0,'고2':1,'고1':2};
-  const baseStu=realStu();
-  const sorted=[...baseStu].sort((a,b)=>{
-    if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
-    if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
-    if(S.stuSort==='seat') return ((a.seat||999))-(b.seat||999);
-    if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
-    return 0;
-  });
-  const selectableIds=sorted.filter(s=>!s.isTest).map(s=>s._docId);
-  const allSelected=selectableIds.length>0&&selectableIds.every(id=>S.stuSelected.has(id));
-  const inMode=!!S.alimtalkMode;
-  const rows=sorted.map(s=>{
+/* 학생 목록 한 줄 — 검색 시 tbody 만 다시 그리므로 행 생성을 분리했다. */
+function _stuRowHtml(s,inMode){
     const selectable=!s.isTest;
     const checked=S.stuSelected.has(s._docId);
     const cb=selectable?`<input type="checkbox" ${checked?'checked':''} onchange="toggleStuSelect('${s._docId}',this.checked)">`:'';
-    const stuPhone=s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':s.studentPhone;
+    const stuPhone=s.noStudentPhone?'<span style="color:#9ca3af">(없음)</span>':escapeHtml(s.studentPhone||'');
     const trCls=[];
     if(checked)trCls.push('selected');
     if(inMode&&selectable)trCls.push('selectable');
@@ -3228,10 +3291,21 @@ function renderAdminStudents(){
     <td data-label="보호자 연락처">${escapeHtml(s.guardianPhone||'')}</td>
     <td data-label="계정 ID"><code>${escapeHtml(s.accountId||'')}</code></td>
     <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bs bsm" onclick="previewAsStudent('${s._docId}')" title="이 학생의 화면을 미리봅니다">학생뷰</button><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
-  </tr>`;}).join('');
+  </tr>`;
+}
+function renderAdminStudents(){
+  if(S.user?.type!=='admin')return renderOpStudents();
+  if(S.stuSubView==='withdrawn')return renderWithdrawnStudents();
+  const baseStu=realStu();
+  const q=S.stuQuery.trim();
+  const sorted=stuFiltered();
+  const selectableIds=sorted.filter(s=>!s.isTest).map(s=>s._docId);
+  const allSelected=selectableIds.length>0&&selectableIds.every(id=>S.stuSelected.has(id));
+  const inMode=!!S.alimtalkMode;
+  const rows=sorted.map(s=>_stuRowHtml(s,inMode)).join('');
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminStudents()">${l}</button>`).join('');
-  const selCount=selectableIds.filter(id=>S.stuSelected.has(id)).length;
+  const selCount=[...S.stuSelected].length;
   const wCount=withdrawnStu().length;
   const unbookedIds=sorted.filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
   const mode=ALIMTALK_MODES[S.alimtalkMode];
@@ -3242,19 +3316,25 @@ function renderAdminStudents(){
     <div class="ab-actions"><button class="btn bs bsm" onclick="exitAlimtalkMode()">취소</button><button class="btn ${selCount?'bp':'bs'} bsm" ${selCount?'':'disabled style="opacity:.5;cursor:not-allowed"'} onclick="confirmAlimtalkBulk()">발송 →</button></div>
   </div>`:'';
   const addReqCard=adminAddStudentRequestsHtml();
-  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
+  _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 목록 <span id="stuCount" style="font-size:13px;font-weight:400;color:#6b7280">${q?`(${sorted.length}명 / 전체 ${baseStu.length}명)`:`(${baseStu.length}명)`}</span></span><button class="btn bp bsm" onclick="openStuModal(null)">+ 학생 추가</button></div>
   ${addReqCard}
   ${modeBanner}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
-    <span style="flex:1"></span>
+    <span class="srch">
+      <span class="srch-ico">🔍</span>
+      <input id="stuSrch" type="text" inputmode="search" autocomplete="off" placeholder="이름 · 학교 · 계정 ID · 연락처 · 좌석 검색" value="${escapeHtml(S.stuQuery)}" oninput="onStuSearch(this.value)" onkeydown="if(event.key==='Escape'){event.preventDefault();clearStuSearch();}">
+      <button id="stuSrchX" class="srch-x" style="display:${S.stuQuery?'block':'none'}" onclick="clearStuSearch()" aria-label="검색어 지우기">✕</button>
+    </span>
     ${mode?`<button class="btn bs bsm" onclick="selectUnbookedStudents()">미예약만 선택 (${unbookedIds.length})</button>`:''}
     ${mode?'':`<button class="btn bd bsm" onclick="resetAllPw()">🔑 비밀번호 일괄 초기화</button>`}
     ${ddBtn}
   </div>
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
+  </div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table>
-    <thead><tr><th style="width:36px;text-align:center"><input type="checkbox" ${allSelected?'checked':''} ${selectableIds.length===0?'disabled':''} onchange="toggleStuSelectAll(this.checked)"></th><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>계정 ID</th><th>관리</th></tr></thead>
-    <tbody>${rows||'<tr class="empty-row"><td colspan="9" class="empty">등록된 학생이 없습니다.</td></tr>'}</tbody>
+    <thead><tr><th style="width:36px;text-align:center"><input id="stuSelAll" type="checkbox" ${allSelected?'checked':''} ${selectableIds.length===0?'disabled':''} onchange="toggleStuSelectAll(this.checked)"></th><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>계정 ID</th><th>관리</th></tr></thead>
+    <tbody id="stuTbody">${rows||`<tr class="empty-row"><td colspan="9" class="empty">${q?'검색 결과가 없습니다.':'등록된 학생이 없습니다.'}</td></tr>`}</tbody>
   </table></div></div>
   <div style="text-align:right;margin-top:16px"><button class="btn bs" style="font-size:11px;padding:6px 10px" onclick="S.stuSubView='withdrawn';renderAdminStudents()">퇴원 학생 관리 (${wCount})</button></div>`;}
 
@@ -3304,10 +3384,58 @@ async function restoreStu(docId){
   showLoad(false);}
 function toggleStuSelect(id,checked){if(checked)S.stuSelected.add(id);else S.stuSelected.delete(id);renderAdminStudents();}
 function toggleStuSelectAll(checked){
-  const ids=realStu().filter(s=>!s.isTest).map(s=>s._docId);
+  /* 검색 중이면 화면에 보이는 학생에만 적용한다 — 검색 → 전체선택 → 알림톡 흐름 */
+  const ids=stuFiltered().filter(s=>!s.isTest).map(s=>s._docId);
   if(checked)ids.forEach(id=>S.stuSelected.add(id));
   else ids.forEach(id=>S.stuSelected.delete(id));
   renderAdminStudents();
+}
+/* 이름·학교·계정ID·연락처·좌석·학년으로 검색. 연락처는 하이픈 무시.
+   숫자만 입력하면 좌석을 먼저 본다 — 안 그러면 "7" 이 연락처의 7 에 죄다 걸린다.
+   연락처 부분검색은 3자리 이상부터. */
+function stuMatchesQuery(s,q){
+  if(!q)return true;
+  const ql=q.trim().toLowerCase();
+  if(!ql)return true;
+  const phoneHit=d=>d.length>=3&&[s.studentPhone,s.guardianPhone].some(v=>String(v||'').replace(/\D/g,'').includes(d));
+  if(/^#\d+$/.test(ql))return String(s.seat||'')===ql.slice(1);
+  if(/^\d+$/.test(ql))return String(s.seat||'')===ql||phoneHit(ql);
+  const fields=[s.name,s.school,s.accountId,s.grade,s.studentPhone,s.guardianPhone];
+  if(fields.some(v=>String(v||'').toLowerCase().includes(ql)))return true;
+  return phoneHit(ql.replace(/\D/g,''));
+}
+function stuSorted(list){
+  const gradeOrder={'고3':0,'고2':1,'고1':2};
+  return [...list].sort((a,b)=>{
+    if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
+    if(S.stuSort==='seat') return ((a.seat||999))-(b.seat||999);
+    if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
+    return 0;
+  });
+}
+function stuFiltered(){return stuSorted(realStu()).filter(s=>stuMatchesQuery(s,S.stuQuery));}
+/* 타이핑 중에는 tbody 만 갈아끼운다 — 전체 재렌더면 입력 포커스가 날아간다. */
+function onStuSearch(v){
+  S.stuQuery=v;
+  const tb=_('stuTbody');if(!tb){renderAdminStudents();return;}
+  const isAdmin=S.user?.type==='admin';
+  const list=stuFiltered();
+  const inMode=!!S.alimtalkMode;
+  const body=isAdmin?list.map(s=>_stuRowHtml(s,inMode)).join(''):list.map(_opStuRowHtml).join('');
+  tb.innerHTML=body||`<tr class="empty-row"><td colspan="${isAdmin?9:7}" class="empty">${S.stuQuery.trim()?'검색 결과가 없습니다.':'등록된 학생이 없습니다.'}</td></tr>`;
+  const cnt=_('stuCount');if(cnt)cnt.textContent=S.stuQuery.trim()?`(${list.length}명 / 전체 ${realStu().length}명)`:`(${realStu().length}명)`;
+  const x=_('stuSrchX');if(x)x.style.display=S.stuQuery?'block':'none';
+  const all=_('stuSelAll');
+  if(all){const ids=list.filter(s=>!s.isTest).map(s=>s._docId);
+    all.disabled=ids.length===0;
+    all.checked=ids.length>0&&ids.every(id=>S.stuSelected.has(id));}
+}
+function clearStuSearch(){
+  S.stuQuery='';
+  const i=_('stuSrch');if(i)i.value='';
+  onStuSearch('');
+  if(i)i.focus();
 }
 const ALIMTALK_MODES={
   accountInfo:{title:'계정 정보 안내',icon:'🔑',desc:'로그인 ID와 초기 비밀번호 안내',send:'sendAccountInfoBulk'},
@@ -3397,7 +3525,7 @@ async function sendConsultUpcomingBulk(){
   showLoad(false);
 }
 function selectUnbookedStudents(){
-  const ids=realStu().filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
+  const ids=stuFiltered().filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
   S.stuSelected=new Set(ids);
   renderAdminStudents();
 }
@@ -4309,6 +4437,165 @@ async function doBulk(){
   d.slots.sort();showLoad(true);try{await saveScheduleToDb();closeModal();renderAdminSchedule();toast(`${added}개 추가됨`,'success');} catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);}
 
 /* ── ADMIN: 예약 현황 ── */
+/* ── 예약 현황 인쇄 ──
+   기존엔 window.print() 로 직행해서 범위도 못 고르고 결석 학생은 아예 빠졌다.
+   옵션(날짜 선택 / 포함 항목)을 받아 인쇄 영역을 그리고, 모달에서 미리보기까지 보여준다. */
+const PRINT_DEFAULTS={dateIds:null, grid:true, unbooked:true, noshow:true};
+function bookPrintOpts(){
+  const o=Object.assign({},PRINT_DEFAULTS,S.printOpts||{});
+  const valid=(S.schedule.dates||[]).filter(d=>(d.slots||[]).length>0).map(d=>d.id);
+  /* dateIds 가 null 이면 "전체". 일정이 바뀌어 사라진 날짜는 걸러낸다. */
+  o.dateIds = o.dateIds===null ? valid.slice() : o.dateIds.filter(id=>valid.includes(id));
+  return o;
+}
+function buildBookingPrintHtml(opts){
+  const o=opts||bookPrintOpts();
+  const dates=(S.schedule.dates||[]).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const printDates=dates.filter(d=>(d.slots||[]).length>0&&o.dateIds.includes(d.id));
+  const dateKeys=new Set(printDates.map(d=>d.date));
+  const live=S.bookings.filter(b=>!isNoShow(b));
+  const inRange=live.filter(b=>dateKeys.has(b.date));
+  const bookedIds=new Set(live.map(b=>b.studentId));
+  const noshowList=S.bookings.filter(isNoShow).filter(b=>dateKeys.has(b.date))
+    .sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.slot||'').localeCompare(b.slot||''));
+  const noshowIds=new Set(S.bookings.filter(isNoShow).map(b=>b.studentId));
+  const unbooked=bookableStu().filter(s=>!bookedIds.has(s._docId)&&!noshowIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
+
+  const gridHtml=!o.grid?'':printDates.map(d=>{
+    const sortedSlots=[...(d.slots||[])].sort((a,b)=>a.localeCompare(b));
+    const bookedCnt=live.filter(b=>b.date===d.date).length;
+    const cells=sortedSlots.map(slot=>{
+      const b=live.find(x=>x.date===d.date&&x.slot===slot);
+      if(b){
+        const att=b.attendance==='attended'?' \u2713':'';
+        return `<div class="adm-slot filled" style="cursor:default"><span class="adm-slot-time">${escapeHtml(slot)}${att}</span><span class="adm-slot-name">${escapeHtml(b.studentName||'')}</span></div>`;
+      }
+      const slotActive=isSlotActive(d.id,slot);
+      const inactiveStyle=slotActive?'':'background:repeating-linear-gradient(135deg,#d1d5db 0,#d1d5db 8px,#9ca3af 8px,#9ca3af 16px);color:#1f2937;border-color:#6b7280;border-style:dashed';
+      const lbl=slotActive?'비어있음':'비활성';
+      return `<div class="adm-slot vacant" style="cursor:default;${inactiveStyle}"><span class="adm-slot-time">${escapeHtml(slot)}</span><span class="adm-slot-name">${lbl}</span></div>`;
+    }).join('');
+    return `<div style="margin-bottom:24px;page-break-inside:avoid">
+      <p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:10px">${escapeHtml(d.label||'')} <span style="font-size:11px;font-weight:500;color:#6b7280;margin-left:6px">예약 ${bookedCnt}/${sortedSlots.length}</span></p>
+      <div class="sg">${cells}</div>
+    </div>`;
+  }).join('');
+
+  const noshowHtml=(!o.noshow||!noshowList.length)?'':`<div style="margin-top:24px;page-break-inside:avoid">
+    <p style="font-size:14px;font-weight:700;border-bottom:2px solid #991b1b;padding-bottom:6px;margin-bottom:10px;color:#991b1b">결석 처리된 학생 <span style="font-size:11px;font-weight:500;color:#b91c1c;margin-left:6px">총 ${noshowList.length}명</span></p>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#fee2e2;color:#991b1b">
+        <th style="padding:6px 8px;text-align:center;width:48px">좌석</th>
+        <th style="padding:6px 8px;text-align:center">이름</th>
+        <th style="padding:6px 8px;text-align:center">원래 예약</th>
+        <th style="padding:6px 8px;text-align:center">학교</th>
+        <th style="padding:6px 8px;text-align:center">연락처</th>
+      </tr></thead>
+      <tbody>${noshowList.map(b=>{const stu=S.students.find(x=>x._docId===b.studentId);
+        return `<tr style="border-bottom:1px solid #f0f0f0">
+        <td style="padding:6px 8px;text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td>
+        <td style="padding:6px 8px;font-weight:700">${escapeHtml(b.studentName||'')}</td>
+        <td style="padding:6px 8px;text-align:center;color:#991b1b">${escapeHtml(b.dateLabel||'')} ${escapeHtml(b.slot||'')}</td>
+        <td style="padding:6px 8px">${escapeHtml(stu?.school||'—')}</td>
+        <td style="padding:6px 8px;color:#374151">${escapeHtml(stu?(stu.noStudentPhone?stu.guardianPhone:stu.studentPhone)||'—':'—')}</td>
+      </tr>`;}).join('')}</tbody>
+    </table>
+  </div>`;
+
+  const unbookedHtml=(!o.unbooked||!unbooked.length)?'':`<div style="margin-top:24px;page-break-inside:avoid">
+    <p style="font-size:14px;font-weight:700;border-bottom:2px solid #b45309;padding-bottom:6px;margin-bottom:10px;color:#78350f">미예약 학생 <span style="font-size:11px;font-weight:500;color:#9a3412;margin-left:6px">총 ${unbooked.length}명</span></p>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#fef3c7;color:#78350f">
+        <th style="padding:6px 8px;text-align:center;width:48px">좌석</th>
+        <th style="padding:6px 8px;text-align:center">이름</th>
+        <th style="padding:6px 8px;text-align:center">학교</th>
+        <th style="padding:6px 8px;text-align:center;width:56px">학년</th>
+        <th style="padding:6px 8px;text-align:center">학생 연락처</th>
+        <th style="padding:6px 8px;text-align:center">보호자 연락처</th>
+      </tr></thead>
+      <tbody>${unbooked.map(s=>`<tr style="border-bottom:1px solid #f0f0f0">
+        <td style="padding:6px 8px;text-align:center;font-weight:700;color:#1C64F2;width:48px">${s.seat||'—'}</td>
+        <td style="padding:6px 8px;font-weight:700">${escapeHtml(s.name||'')}</td>
+        <td style="padding:6px 8px">${escapeHtml(s.school||'')}</td>
+        <td style="padding:6px 8px;color:#6b7280;width:56px">${escapeHtml(s.grade||'')}</td>
+        <td style="padding:6px 8px;color:#374151">${escapeHtml(s.noStudentPhone?'(없음)':(s.studentPhone||''))}</td>
+        <td style="padding:6px 8px;color:#6b7280">${escapeHtml(s.guardianPhone||'')}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+
+  const dateLbl=printDates.length===0?'선택된 날짜 없음'
+    :printDates.length===(S.schedule.dates||[]).filter(d=>(d.slots||[]).length>0).length?'전체 일정'
+    :printDates.map(d=>d.label).join(', ');
+  const body=gridHtml+noshowHtml+unbookedHtml;
+  return {
+    html:`<p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 멘토링 예약 현황</p>
+      <p style="font-size:12px;color:#6b7280;margin-bottom:20px">${escapeHtml(dateLbl)} · 예약 ${inRange.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
+      ${body||'<p style="color:#9ca3af">인쇄할 내용이 없습니다. 포함 항목을 선택해 주세요.</p>'}`,
+    counts:{dates:printDates.length, booked:inRange.length, noshow:noshowList.length, unbooked:unbooked.length}
+  };
+}
+function openBookPrintModal(){
+  const o=bookPrintOpts();
+  S.printOpts=o;
+  const avail=(S.schedule.dates||[]).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).filter(d=>(d.slots||[]).length>0);
+  const allOn=avail.length>0&&avail.every(d=>o.dateIds.includes(d.id));
+  const dateChips=avail.map(d=>{
+    const on=o.dateIds.includes(d.id);
+    const cnt=S.bookings.filter(b=>b.date===d.date&&!isNoShow(b)).length;
+    return `<button class="dt ${on?'on':''}" onclick="togglePrintDate('${d.id}')">${escapeHtml(d.label||'')} <span style="font-size:11px;opacity:.75">(${cnt})</span></button>`;
+  }).join('');
+  const chk=(key,label,desc)=>`<label class="sheet-item" style="cursor:pointer">
+    <input type="checkbox" ${o[key]?'checked':''} onchange="setPrintOpt('${key}',this.checked)" style="width:16px;height:16px;accent-color:#1C64F2;flex:0 0 auto">
+    <span class="sheet-text"><b>${label}</b><span>${desc}</span></span></label>`;
+  _('mCt').innerHTML=`<p class="mtitle">예약 현황 인쇄</p>
+    <p class="msub">인쇄할 날짜와 항목을 고르고 미리보기로 확인하세요.</p>
+    <div style="margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:#6b7280">날짜</span>
+      <button class="btn bs bsm" onclick="setAllPrintDates(${allOn?'false':'true'})">${allOn?'전체 해제':'전체 선택'}</button>
+    </div>
+    <div class="dtabs">${dateChips||'<span style="font-size:12px;color:#9ca3af">등록된 일정이 없습니다.</span>'}</div>
+    <p style="font-size:12px;font-weight:700;color:#6b7280;margin:14px 0 6px">포함 항목</p>
+    <div class="sheet-list">
+      ${chk('grid','시간대별 예약표','날짜별 슬롯 그리드')}
+      ${chk('noshow','결석 처리된 학생','원래 예약과 연락처')}
+      ${chk('unbooked','미예약 학생 명단','좌석·학교·연락처')}
+    </div>
+    <p style="font-size:12px;font-weight:700;color:#6b7280;margin:14px 0 6px">미리보기</p>
+    <div id="printPrev" style="border:1px solid var(--gray-200);border-radius:10px;padding:14px;background:#fff;max-height:44vh;overflow:auto"></div>
+    <div class="mactions">
+      <button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button>
+      <button class="btn bp" style="flex:1" id="printGo" onclick="doBookPrint()">🖨 인쇄</button>
+    </div>`;
+  openModal();
+  refreshPrintPreview();
+}
+function refreshPrintPreview(){
+  const el=_('printPrev');if(!el)return;
+  const r=buildBookingPrintHtml(bookPrintOpts());
+  el.innerHTML=r.html;
+  const go=_('printGo');
+  if(go){const empty=r.counts.dates===0;go.disabled=empty;go.classList.toggle('is-disabled',empty);}
+}
+function setPrintOpt(k,v){S.printOpts=Object.assign({},bookPrintOpts(),{[k]:v});refreshPrintPreview();}
+function togglePrintDate(id){
+  const o=bookPrintOpts();
+  const ids=o.dateIds.includes(id)?o.dateIds.filter(x=>x!==id):o.dateIds.concat([id]);
+  S.printOpts=Object.assign({},o,{dateIds:ids});
+  openBookPrintModal();
+}
+function setAllPrintDates(on){
+  const avail=(S.schedule.dates||[]).filter(d=>(d.slots||[]).length>0).map(d=>d.id);
+  S.printOpts=Object.assign({},bookPrintOpts(),{dateIds:on?avail:[]});
+  openBookPrintModal();
+}
+function doBookPrint(){
+  const area=_('bookPrintArea');
+  if(!area){toast('인쇄 영역을 찾지 못했습니다.','error');return;}
+  area.innerHTML=buildBookingPrintHtml(bookPrintOpts()).html;
+  closeModal();
+  setTimeout(()=>window.print(),80);
+}
 function renderAdminBookings(){
   const bookedIds=new Set(S.bookings.filter(b=>!isNoShow(b)).map(b=>b.studentId));
   const noshowList=S.bookings.filter(isNoShow).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.slot||'').localeCompare(b.slot||''));
@@ -4425,51 +4712,6 @@ function renderAdminBookings(){
       <thead><tr><th>학생</th><th>원래 예약</th><th>좌석</th><th>학교</th><th>학년</th><th>연락처</th><th>관리</th></tr></thead>
       <tbody>${noshowRows}</tbody>
     </table></div></div>`:'';
-  /* 인쇄: 날짜별 시간대 박스 그리드 (예약 현황 화면과 동일한 .adm-slot 레이아웃) */
-  const printSorted=S.bookings.filter(b=>!isNoShow(b));
-  const printDates=dates.filter(d=>(d.slots||[]).length>0);
-  const printGridHtml=printDates.map(d=>{
-    const sortedSlots=[...(d.slots||[])].sort((a,b)=>a.localeCompare(b));
-    const bookedCnt=S.bookings.filter(b=>b.date===d.date&&!isNoShow(b)).length;
-    const cells=sortedSlots.map(slot=>{
-      const b=S.bookings.find(x=>x.date===d.date&&x.slot===slot&&!isNoShow(x));
-      if(b){
-        const att=b.attendance==='attended'?' ✓':'';
-        return `<div class="adm-slot filled" style="cursor:default"><span class="adm-slot-time">${slot}${att}</span><span class="adm-slot-name">${escapeHtml(b.studentName||'')}</span></div>`;
-      }
-      const slotActive=isSlotActive(d.id,slot);
-      const inactiveStyle=slotActive?'':'background:repeating-linear-gradient(135deg,#d1d5db 0,#d1d5db 8px,#9ca3af 8px,#9ca3af 16px);color:#1f2937;border-color:#6b7280;border-style:dashed';
-      const lbl=slotActive?'비어있음':'비활성';
-      return `<div class="adm-slot vacant" style="cursor:default;${inactiveStyle}"><span class="adm-slot-time">${slot}</span><span class="adm-slot-name">${lbl}</span></div>`;
-    }).join('');
-    return `<div style="margin-bottom:24px;page-break-inside:avoid">
-      <p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:10px">${d.label} <span style="font-size:11px;font-weight:500;color:#6b7280;margin-left:6px">예약 ${bookedCnt}/${sortedSlots.length}</span></p>
-      <div class="sg">${cells}</div>
-    </div>`;
-  }).join('');
-  const printUnbookedRows=unbooked.map(s=>`<tr style="border-bottom:1px solid #f0f0f0">
-    <td style="padding:6px 8px;text-align:center;font-weight:700;color:#1C64F2;width:48px">${s.seat||'—'}</td>
-    <td style="padding:6px 8px;font-weight:700">${escapeHtml(s.name||'')}</td>
-    <td style="padding:6px 8px">${escapeHtml(s.school||'')}</td>
-    <td style="padding:6px 8px;color:#6b7280;width:56px">${escapeHtml(s.grade||'')}</td>
-    <td style="padding:6px 8px;color:#374151">${escapeHtml(s.studentPhone||'')}</td>
-    <td style="padding:6px 8px;color:#6b7280">${escapeHtml(s.guardianPhone||'')}</td>
-  </tr>`).join('');
-  const printUnbookedHtml=unbooked.length?`<div style="margin-top:24px;page-break-inside:avoid">
-    <p style="font-size:14px;font-weight:700;border-bottom:2px solid #b45309;padding-bottom:6px;margin-bottom:10px;color:#78350f">미예약 학생 <span style="font-size:11px;font-weight:500;color:#9a3412;margin-left:6px">총 ${unbooked.length}명</span></p>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="background:#fef3c7;color:#78350f">
-        <th style="padding:6px 8px;text-align:center;width:48px">좌석</th>
-        <th style="padding:6px 8px;text-align:center">이름</th>
-        <th style="padding:6px 8px;text-align:center">학교</th>
-        <th style="padding:6px 8px;text-align:center;width:56px">학년</th>
-        <th style="padding:6px 8px;text-align:center">학생 연락처</th>
-        <th style="padding:6px 8px;text-align:center">보호자 연락처</th>
-      </tr></thead>
-      <tbody>${printUnbookedRows}</tbody>
-    </table>
-  </div>`:'';
-  const printHtml=printGridHtml+printUnbookedHtml;
   const adminDisabled=bookingAdminDisabled();
   const disableCard=S.user.type==='admin'?`<div class="card np" style="margin-bottom:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:${adminDisabled?'linear-gradient(135deg,#fef2f2,#fee2e2)':'linear-gradient(135deg,#f9fafb,#f3f4f6)'};border:1px solid ${adminDisabled?'#fecaca':'#e5e7eb'}">
     <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:10px">
@@ -4480,11 +4722,11 @@ function renderAdminBookings(){
     <button class="btn ${adminDisabled?'bp':'bd'} bsm" onclick="toggleBookingDisabled()">${adminDisabled?'예약 활성화':'예약 비활성화'}</button>
   </div>`:'';
   _('adminC').innerHTML=`<div class="sh np" style="margin-bottom:14px"><span class="shtitle" style="font-size:17px;font-weight:800">예약 현황</span>
-    <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">↻ 새로고침</button><button class="btn bs bsm" onclick="window.print()">🖨 인쇄</button></div></div>
+    <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">↻ 새로고침</button><button class="btn bs bsm" onclick="openBookPrintModal()">🖨 인쇄</button></div></div>
     ${statsCard}
     ${dupCard}
     ${disableCard}
-    <div class="po" style="display:none;margin-bottom:24px"><p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 멘토링 예약 현황</p><p style="font-size:12px;color:#6b7280;margin-bottom:20px">총 ${printSorted.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>${printHtml||'<p style="color:#9ca3af">예약 내역이 없습니다.</p>'}</div>
+    <div class="po" id="bookPrintArea" style="display:none;margin-bottom:24px"></div>
     ${slotGridHtml}
     ${renderRequestsSection()}
     ${noshowSection}
