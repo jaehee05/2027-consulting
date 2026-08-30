@@ -10,8 +10,12 @@
 <title>KJHEDU</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="favicon.png">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.5/dist/web/static/pretendard-dynamic-subset.css">
 <style>
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.5/dist/web/static/pretendard-dynamic-subset.css');
 :root{
   /* Brand */
   --primary:#1C64F2;
@@ -312,7 +316,6 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -505,7 +508,17 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 const auth = firebase.auth();
-const storage = firebase.storage();
+
+// 부팅 시 인증 복원(토큰 검증)과 데이터 조회를 직렬로 하면 왕복이 두 번이라,
+// 로그인 이력이 있는 브라우저에서는 조회를 미리 띄워 두고 loadAll 이 받아 쓴다.
+let _bootSnaps=null;
+try{if(localStorage.getItem('sessHint')==='1'){_bootSnaps=fetchCoreSnaps();_bootSnaps.catch(()=>{});}}catch(_){}
+let _storageP=null;
+function getStorage(){
+  if(firebase.storage)return Promise.resolve(firebase.storage());
+  if(!_storageP)_storageP=new Promise((res,rej)=>{const el=document.createElement('script');el.src='https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js';el.onload=()=>res(firebase.storage());el.onerror=()=>rej(new Error('스토리지 모듈 로딩 실패'));document.head.appendChild(el);});
+  return _storageP;
+}
 
 // 뿌리오 알림톡 관리자용 Cloud Function URL.
 // `firebase deploy --only functions` 최초 배포 후 출력되는 URL로 교체하세요.
@@ -1096,18 +1109,23 @@ function showView(id){
 }
 
 /* ── DATA ── */
+function fetchCoreSnaps(){
+  return Promise.all([
+    db.collection('students').get(),
+    db.collection('schedule').doc('main').get(),
+    db.collection('config').doc('main').get(),
+    db.collection('bookings').get(),
+    db.collection('requests').get(),
+    db.collection('lectures').get(),
+    db.collection('notices').get()
+  ]);
+}
 async function loadAll(){
   showLoad(true);
   try{
-    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap]=await Promise.all([
-      db.collection('students').get(),
-      db.collection('schedule').doc('main').get(),
-      db.collection('config').doc('main').get(),
-      db.collection('bookings').get(),
-      db.collection('requests').get(),
-      db.collection('lectures').get(),
-      db.collection('notices').get()
-    ]);
+    try{localStorage.setItem('sessHint','1');}catch(_){}
+    const pending=_bootSnaps||fetchCoreSnaps();_bootSnaps=null;
+    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap]=await pending;
     S.notices=ntSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.lectures=lecSnap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0));
     S.students=stuSnap.docs.map(d=>({_docId:d.id,...d.data()}));
@@ -1159,7 +1177,7 @@ function saveSession(sess,keep){
   if(keep){localStorage.setItem('session',str);sessionStorage.removeItem('session');}
   else{sessionStorage.setItem('session',str);localStorage.removeItem('session');}
 }
-function clearSession(){sessionStorage.removeItem('session');localStorage.removeItem('session');}
+function clearSession(){sessionStorage.removeItem('session');localStorage.removeItem('session');try{localStorage.removeItem('sessHint');}catch(_){}}
 function readSession(){return localStorage.getItem('session')||sessionStorage.getItem('session');}
 
 // Firebase Auth 영속성 설정. keep=true면 IndexedDB 영속(브라우저 재시작 후에도 유지),
@@ -1771,14 +1789,15 @@ async function qbUploadPhoto(file,bid,scopeId){
   const blob=await qbCompressImage(file);
   const fname=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
   const path=`qboard/${bid}/${scopeId}/${fname}`;
-  const ref=storage.ref(path);
+  const ref=(await getStorage()).ref(path);
   await ref.put(blob,{contentType:'image/jpeg'});
   const url=await ref.getDownloadURL();
   return {url,path,name:file.name||fname};
 }
 async function qbDeletePhotos(photos){
   if(!Array.isArray(photos)||!photos.length)return;
-  await Promise.all(photos.map(p=>p?.path?storage.ref(p.path).delete().catch(()=>{}):null));
+  const st=await getStorage();
+  await Promise.all(photos.map(p=>p?.path?st.ref(p.path).delete().catch(()=>{}):null));
 }
 function qbPhotosHtml(photos){
   if(!Array.isArray(photos)||!photos.length)return '';
@@ -6428,14 +6447,19 @@ function waitForAuthState(){
 async function init(){
   showLoad(true);
   try{
-    const has=await adminApiCall('hasAny',null).catch(()=>null);
-    if(has&&!has.any){showLoad(false);showView('vSetup');return;}
+    let setupDone=false;try{setupDone=localStorage.getItem('setupDone')==='1';}catch(_){}
+    if(!setupDone){
+      const has=await adminApiCall('hasAny',null).catch(()=>null);
+      if(has&&!has.any){showLoad(false);showView('vSetup');return;}
+      if(has&&has.any){try{localStorage.setItem('setupDone','1');}catch(_){}}
+    }
 
     // 1) Firebase Auth 영속 세션이 있으면 그 클레임으로 복원 (admin/viewer 우선, student는 fallback)
     const fbUser=await waitForAuthState();
     if(fbUser){
       try{
-        const tr=await fbUser.getIdTokenResult(true);
+        let tr=await fbUser.getIdTokenResult();
+        if(!tr.claims||!tr.claims.role) tr=await fbUser.getIdTokenResult(true);
         const c=tr.claims||{};
         if(c.role==='admin'||c.role==='viewer'||c.role==='tablet'){
           S.user={type:c.role,id:c.loginId,name:c.name||''};
@@ -6595,12 +6619,13 @@ window.addEventListener('popstate',function(e){
       window.addEventListener('focus',check);
     });
   }
-  if(document.readyState==='complete')init();
-  else window.addEventListener('load',init);
+  function start(){setTimeout(init,3000);}
+  if(document.readyState==='complete')start();
+  else window.addEventListener('load',start);
 })();
 </script>
 <script>
-  (function(){var w=window;if(w.ChannelIO){return w.console.error("ChannelIO script included twice.");}var ch=function(){ch.c(arguments);};ch.q=[];ch.c=function(args){ch.q.push(args);};w.ChannelIO=ch;function l(){if(w.ChannelIOInitialized){return;}w.ChannelIOInitialized=true;var s=document.createElement("script");s.type="text/javascript";s.async=true;s.src="https://cdn.channel.io/plugin/ch-plugin-web.js";var x=document.getElementsByTagName("script")[0];if(x.parentNode){x.parentNode.insertBefore(s,x);}}if(document.readyState==="complete"){l();}else{w.addEventListener("DOMContentLoaded",l);w.addEventListener("load",l);}})();
+  (function(){var w=window;if(w.ChannelIO){return w.console.error("ChannelIO script included twice.");}var ch=function(){ch.c(arguments);};ch.q=[];ch.c=function(args){ch.q.push(args);};w.ChannelIO=ch;function l(){if(w.ChannelIOInitialized){return;}w.ChannelIOInitialized=true;var s=document.createElement("script");s.type="text/javascript";s.async=true;s.src="https://cdn.channel.io/plugin/ch-plugin-web.js";var x=document.getElementsByTagName("script")[0];if(x.parentNode){x.parentNode.insertBefore(s,x);}}function defer(){var ric=w.requestIdleCallback||function(f){setTimeout(f,1200);};ric(l,{timeout:5000});}if(document.readyState==="complete"){defer();}else{w.addEventListener("load",defer);}})();
   ChannelIO('boot', {
     "pluginKey": "c28c40e4-3516-4d29-956b-a34e5637f293"
   });
