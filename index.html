@@ -1243,24 +1243,38 @@ function showView(id){
 }
 
 /* ── DATA ── */
+// get() 은 SDK 가 오프라인이라고 판단하면 캐시를 보고 즉시 실패한다("client is offline").
+// 부팅 프리페치는 연결이 붙기 전에 나가므로 이 경우에 정확히 걸린다.
+// onSnapshot 은 연결될 때까지 스스로 재시도하므로, 부팅 조회는 서버 스냅샷이 도착하면
+// 곧바로 구독을 끊는 1회성 리스너로 받는다.
+function snapOnce(ref,ms){
+  return new Promise((res,rej)=>{
+    let done=false,un=null,tm=null;
+    const fin=fn=>{if(done)return;done=true;if(tm)clearTimeout(tm);if(un){try{un();}catch(e){}}fn();};
+    tm=setTimeout(()=>fin(()=>rej(new Error('서버 응답이 없습니다. 네트워크 상태를 확인해 주세요.'))),ms||20000);
+    un=ref.onSnapshot({includeMetadataChanges:true},sn=>{
+      if(sn.metadata&&sn.metadata.fromCache)return;
+      fin(()=>res(sn));
+    },e=>fin(()=>rej(e)));
+    if(done&&un){try{un();}catch(e){}}
+  });
+}
 function fetchCoreSnaps(){
   return Promise.all([
-    db.collection('students').get(),
-    db.collection('schedule').doc('main').get(),
-    db.collection('config').doc('main').get(),
-    db.collection('bookings').get(),
-    db.collection('requests').get(),
-    db.collection('lectures').get(),
-    db.collection('notices').get()
+    snapOnce(db.collection('students')),
+    snapOnce(db.collection('schedule').doc('main')),
+    snapOnce(db.collection('config').doc('main')),
+    snapOnce(db.collection('bookings')),
+    snapOnce(db.collection('requests')),
+    snapOnce(db.collection('lectures')),
+    snapOnce(db.collection('notices'))
   ]);
 }
-// 부팅 프리페치는 네트워크가 올라오기 전에 나갈 수 있어 "client is offline" 으로 즉시 실패한다.
-// 그 거절된 promise 를 그대로 쓰면 로그인 시점엔 온라인인데도 로딩이 실패하므로, 새로 받아 재시도한다.
 async function fetchCoreSnapsRetry(pre){
   let last=null;
-  for(let i=0;i<3;i++){
+  for(let i=0;i<2;i++){
     try{return await(i===0&&pre?pre:fetchCoreSnaps());}
-    catch(e){last=e;if(i<2)await new Promise(r=>setTimeout(r,400*(i+1)));}
+    catch(e){last=e;if(i===0){try{await db.enableNetwork();}catch(_){}}}
   }
   throw last;
 }
