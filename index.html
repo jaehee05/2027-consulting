@@ -560,6 +560,11 @@ firebase.initializeApp({
   appId:"1:226684451545:web:2c495b64e538e31c0f1cc8"
 });
 const db = firebase.firestore();
+// 일부 네트워크/프록시/WebView 가 Firestore 의 WebChannel 스트리밍을 끊는다
+// ('Listen' stream transport errored + 404). 그러면 SDK 가 스스로를 오프라인으로 보고
+// get() 이 즉시 실패하므로, 자동 감지에 맡기지 않고 long polling 으로 고정한다.
+// settings() 는 첫 Firestore 호출 이전에만 적용되므로 부팅 프리페치보다 앞서야 한다.
+try{db.settings({experimentalForceLongPolling:true,experimentalAutoDetectLongPolling:false});}catch(e){console.error('firestore settings',e);}
 const auth = firebase.auth();
 
 // 부팅 시 인증 복원(토큰 검증)과 데이터 조회를 직렬로 하면 왕복이 두 번이라,
