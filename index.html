@@ -4575,7 +4575,7 @@ function buildBookingPrintHtml(opts){
     :printDates.map(d=>d.label).join(', ');
   const body=gridHtml+noshowHtml+unbookedHtml;
   return {
-    html:`<p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 6월 모의평가 멘토링 예약 현황</p>
+    html:`<p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 9월 모의평가 멘토링 예약 현황</p>
       <p style="font-size:12px;color:#6b7280;margin-bottom:20px">${escapeHtml(dateLbl)} · 예약 ${inRange.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
       ${body||'<p style="color:#9ca3af">인쇄할 내용이 없습니다. 포함 항목을 선택해 주세요.</p>'}`,
     counts:{dates:printDates.length, booked:inRange.length, noshow:noshowList.length, unbooked:unbooked.length}
