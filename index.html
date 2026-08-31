@@ -1320,6 +1320,10 @@ async function loadAdmins(){
   }
 }
 function realStu(){return S.students.filter(s=>!s.isTest&&!s.withdrawn);}
+// 로그인 판정: lastLoginAt 기록이 있거나, isFirstLogin이 명시적으로 false인 경우
+// (첫 로그인 시 비밀번호를 변경한 학생은 isFirstLogin=false로 마이그레이션됨)
+function everLoggedIn(s){return !!s.lastLoginAt||s.isFirstLogin===false;}
+function neverLoggedInStu(){return realStu().filter(s=>!s.isTest&&!everLoggedIn(s));}
 function bookableStu(){return realStu().filter(s=>!s.consultExcluded);}
 function withdrawnStu(){return S.students.filter(s=>!s.isTest&&s.withdrawn);}
 function isNoShow(b){return b&&b.attendance==='noshow';}
@@ -3169,9 +3173,6 @@ function renderAdminLogins(){
     return;
   }
   const baseStu=realStu();
-  // 로그인 판정: lastLoginAt 기록이 있거나, isFirstLogin이 명시적으로 false인 경우
-  // (첫 로그인 시 비밀번호를 변경한 학생은 isFirstLogin=false로 마이그레이션됨)
-  const everLoggedIn=(s)=>!!s.lastLoginAt||s.isFirstLogin===false;
   const sortKey=S.loginSort||'recent';
   const sorted=[...baseStu].sort((a,b)=>{
     if(sortKey==='never'){
@@ -3224,7 +3225,7 @@ function renderAdminLogins(){
   const sortOpts=[['recent','최근 로그인순'],['never','미접속 우선'],['count','로그인 횟수순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${sortKey===k?'bp':'bs'} bsm" onclick="S.loginSort='${k}';renderAdminLogins()">${l}</button>`).join('');
   _('adminC').innerHTML=`
-  <div class="sh"><span class="shtitle">로그인 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(${loggedIn}/${total}명 접속)</span></span><button class="btn bs bsm" onclick="refreshLoginStatus()">↻ 새로고침</button></div>
+  <div class="sh"><span class="shtitle">로그인 현황 <span style="font-size:13px;font-weight:400;color:#6b7280">(${loggedIn}/${total}명 접속)</span></span><span style="display:flex;gap:6px;flex-wrap:wrap">${never?`<button class="btn bp bsm" onclick="startAccountInfoForNeverLoggedIn()">🔑 미접속 ${never}명 계정 안내</button>`:''}<button class="btn bs bsm" onclick="refreshLoginStatus()">↻ 새로고침</button></span></div>
   <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
     <div class="card" style="flex:1;min-width:140px;padding:14px">
       <div style="font-size:11px;color:#6b7280;font-weight:600;margin-bottom:4px">전체 학생</div>
@@ -3335,6 +3336,7 @@ function renderAdminStudents(){
   const selCount=[...S.stuSelected].length;
   const wCount=withdrawnStu().length;
   const unbookedIds=sorted.filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
+  const neverIds=sorted.filter(s=>!s.isTest&&!everLoggedIn(s)).map(s=>s._docId);
   const mode=ALIMTALK_MODES[S.alimtalkMode];
   const ddBtn=mode?'':`<button class="btn bp bsm" onclick="openAlimtalkSheet()">📩 알림톡 발송</button>`;
   const modeBanner=mode?`<div class="alimtalk-bar">
@@ -3353,6 +3355,7 @@ function renderAdminStudents(){
       <button id="stuSrchX" class="srch-x" style="display:${S.stuQuery?'block':'none'}" onclick="clearStuSearch()" aria-label="검색어 지우기">✕</button>
     </span>
     ${mode?`<button class="btn bs bsm" onclick="selectUnbookedStudents()">미예약만 선택 (${unbookedIds.length})</button>`:''}
+    ${S.alimtalkMode==='accountInfo'?`<button class="btn bs bsm" onclick="selectNeverLoggedInStudents()">미접속만 선택 (${neverIds.length})</button>`:''}
     ${mode?'':`<button class="btn bd bsm" onclick="resetAllPw()">🔑 비밀번호 일괄 초기화</button>`}
     ${ddBtn}
   </div>
@@ -3555,6 +3558,22 @@ function selectUnbookedStudents(){
   const ids=stuFiltered().filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
   S.stuSelected=new Set(ids);
   renderAdminStudents();
+}
+function selectNeverLoggedInStudents(){
+  const ids=stuFiltered().filter(s=>!s.isTest&&!everLoggedIn(s)).map(s=>s._docId);
+  if(!ids.length){toast('미접속 학생이 없습니다.','warn');return;}
+  S.stuSelected=new Set(ids);
+  renderAdminStudents();
+}
+// 로그인 현황에서 바로 진입 — 학생 탭으로 옮겨 계정 정보 안내 모드를 켜고 미접속 학생을 미리 선택해 둔다.
+async function startAccountInfoForNeverLoggedIn(){
+  const targets=neverLoggedInStu();
+  if(!targets.length){toast('미접속 학생이 없습니다.','warn');return;}
+  S.alimtalkMode='accountInfo';
+  S.stuSubView='active';
+  S.stuQuery='';
+  S.stuSelected=new Set(targets.map(s=>s._docId));
+  await setTab('students');
 }
 function fmtDeadlineKR(ymd){
   const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd||''));if(!m)return '';
