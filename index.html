@@ -985,29 +985,35 @@ function stopNoticesListener(){if(_ntListener){try{_ntListener();}catch(e){}_ntL
 // 학생 호출(calls) 실시간 리스너.
 // OP: status=pending 인 호출을 차단 모달로 표시.
 // ADMIN: 자기가 만든 호출이 OP에 의해 acknowledged 되면 토스트로 알림.
-let _callsListener=null,_adminCallsListener=null,_adminCallsSeedDone=false;
+// 첫 스냅샷 seed 플래그로 과거 호출을 걸러내면, 오프라인 상태로 붙었을 때
+// 빈 캐시 스냅샷이 seed 를 소진해 버려 이후 서버 스냅샷의 전체 이력이 토스트로 쏟아진다.
+// 그래서 리스너 시작 시각 이후에 처리된 호출만 알리고, 같은 전환은 한 번만 띄운다.
+let _callsListener=null,_adminCallsListener=null,_adminCallsSince=0,_adminCallsSeen=null;
 let _activeCallModalId=null;
 let _modalLocked=false;
 function startCallsListener(){
   stopCallsListener();
   if(!S.user||S.user.type==='student'||S.user.type==='tablet')return;
   if(S.user.type==='admin'){
-    _adminCallsSeedDone=false;
+    _adminCallsSince=Date.now()-120000;
+    _adminCallsSeen=new Set();
     _adminCallsListener=db.collection('calls').where('calledBy','==',S.user.id).onSnapshot(snap=>{
       snap.docChanges().forEach(ch=>{
-        if(!_adminCallsSeedDone)return;
-        if(ch.type==='added'||ch.type==='modified'){
-          const d=ch.doc.data();
-          const ackBy=d.acknowledgedByName||'OP';
-          const sname=d.studentName||'';
-          if(d.status==='acknowledged'){
-            toast(`✓ ${ackBy}님이 ${sname} 학생 호출을 확인했습니다.`,'success',{duration:5000});
-          }else if(d.status==='absent'){
-            toast(`⚠ ${ackBy}: ${sname} 학생이 자리에 없거나 미등원입니다.`,'warn',{duration:6000});
-          }
+        if(ch.type==='removed')return;
+        const d=ch.doc.data();
+        if(d.status!=='acknowledged'&&d.status!=='absent')return;
+        if(!(Number(d.acknowledgedAt)>_adminCallsSince))return;
+        const key=ch.doc.id+':'+d.status;
+        if(_adminCallsSeen.has(key))return;
+        _adminCallsSeen.add(key);
+        const ackBy=d.acknowledgedByName||'OP';
+        const sname=d.studentName||'';
+        if(d.status==='acknowledged'){
+          toast(`✓ ${ackBy}님이 ${sname} 학생 호출을 확인했습니다.`,'success',{duration:5000});
+        }else{
+          toast(`⚠ ${ackBy}: ${sname} 학생이 자리에 없거나 미등원입니다.`,'warn',{duration:6000});
         }
       });
-      _adminCallsSeedDone=true;
     },err=>console.error('admin calls listener error',err));
     return;
   }
@@ -1026,7 +1032,7 @@ function startCallsListener(){
 function stopCallsListener(){
   if(_callsListener){try{_callsListener();}catch(e){}_callsListener=null;}
   if(_adminCallsListener){try{_adminCallsListener();}catch(e){}_adminCallsListener=null;}
-  _adminCallsSeedDone=false;
+  _adminCallsSince=0;_adminCallsSeen=null;
   if(_activeCallModalId){_modalLocked=false;_activeCallModalId=null;closeModal();}
 }
 function showCallModal(c){
@@ -1248,12 +1254,22 @@ function fetchCoreSnaps(){
     db.collection('notices').get()
   ]);
 }
+// 부팅 프리페치는 네트워크가 올라오기 전에 나갈 수 있어 "client is offline" 으로 즉시 실패한다.
+// 그 거절된 promise 를 그대로 쓰면 로그인 시점엔 온라인인데도 로딩이 실패하므로, 새로 받아 재시도한다.
+async function fetchCoreSnapsRetry(pre){
+  let last=null;
+  for(let i=0;i<3;i++){
+    try{return await(i===0&&pre?pre:fetchCoreSnaps());}
+    catch(e){last=e;if(i<2)await new Promise(r=>setTimeout(r,400*(i+1)));}
+  }
+  throw last;
+}
 async function loadAll(){
   showLoad(true);
   try{
     try{localStorage.setItem('sessHint','1');}catch(_){}
-    const pending=_bootSnaps||fetchCoreSnaps();_bootSnaps=null;
-    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap]=await pending;
+    const pre=_bootSnaps;_bootSnaps=null;
+    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap]=await fetchCoreSnapsRetry(pre);
     S.notices=ntSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.lectures=lecSnap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0));
     S.students=stuSnap.docs.map(d=>({_docId:d.id,...d.data()}));
