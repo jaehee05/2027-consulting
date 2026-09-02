@@ -104,6 +104,23 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .tab{padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray-500);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;flex-shrink:0;white-space:nowrap}
 .tab.on{color:var(--primary);border-bottom-color:var(--primary)}.tab:hover{color:var(--gray-900)}
 .tw{overflow-x:auto}
+/* 시험 열이 많은 표(학년별 시험) — 칸을 찌그러뜨리는 대신 가로로 스크롤한다. */
+.tw-wide>table{min-width:max-content}
+.tw-wide>table td,.tw-wide>table th{white-space:nowrap}
+.tw-wide>table td[data-label="학교"]{max-width:180px;overflow:hidden;text-overflow:ellipsis;text-align:left}
+/* 가로 스크롤 시 학생을 알아볼 수 있도록 좌석·학년·이름 열을 고정한다. */
+.tw-wide>table th:nth-child(-n+3),.tw-wide>table td:nth-child(-n+3){position:sticky;z-index:1;background:var(--surface)}
+.tw-wide>table th:nth-child(-n+3){z-index:3;background:var(--gray-100)}
+.tw-wide>table th:nth-child(1),.tw-wide>table td:nth-child(1){left:0;min-width:56px}
+.tw-wide>table th:nth-child(2),.tw-wide>table td:nth-child(2){left:56px;min-width:58px}
+.tw-wide>table th:nth-child(3),.tw-wide>table td:nth-child(3){left:114px;min-width:92px;box-shadow:1px 0 0 var(--gray-200)}
+.tw-wide>table tbody tr:hover td:nth-child(-n+3){background:var(--gray-50)}
+/* 요약 타일 — 시험 수만큼 세로로 쌓이지 않도록 한 줄 가로 스크롤 */
+.sum-row{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.sum-row>div{flex:0 0 auto;min-width:112px;background:var(--gray-50,#f9fafb);border:1px solid var(--gray-100,#f3f4f6);border-radius:10px;padding:8px 12px}
+.sum-row .sum-name{font-size:10.5px;font-weight:700;color:var(--gray-500);display:block;white-space:nowrap}
+.sum-row .sum-val{font-size:17px;font-weight:800;margin-top:1px;white-space:nowrap}
+.sum-row .sum-tot{font-size:11px;font-weight:400;color:var(--gray-500)}
 /* 알림톡 수신자 선택 모드 — PC/모바일 공통 피드백 */
 tr.selectable{cursor:pointer;-webkit-tap-highlight-color:transparent}
 tr.selectable:hover>td{background:var(--primary-soft)}
@@ -274,6 +291,12 @@ tr:last-child td{border-bottom:none}
   .gc-tbl .gc-subj{font-size:10px;min-width:60px}
   .gc-tbl th{font-size:9px}
   .info p{font-size:11px}
+  .tw-cards.tw-wide>table{min-width:0}
+  .tw-cards.tw-wide>table th:nth-child(-n+3),.tw-cards.tw-wide>table td:nth-child(-n+3){position:static;min-width:0;box-shadow:none;background:transparent}
+  .tw-cards.tw-wide>table td,.tw-cards.tw-wide>table th{white-space:normal}
+  .tw-cards.tw-wide>table td[data-label="학교"]{max-width:none;text-align:right}
+  .sum-row>div{min-width:98px;padding:7px 10px}
+  .sum-row .sum-val{font-size:15px}
   .tw-cards>table{display:block}
   .tw-cards>table>thead{display:none}
   .tw-cards>table>tbody{display:block}
@@ -2979,7 +3002,7 @@ function renderAdminConsult(){
     const booked=!!bk;
     const hasQuestion=_qbHas(bk);
     const noteState=_consultNoteState(s);
-    const scoreCells=cExams.map(ex=>`<td data-label="${escapeHtml(ex.name)}" style="text-align:center;line-height:1">${examScoreCell(ex,s,_OK_SVG)}</td>`).join('');
+    const scoreCells=cExams.map(ex=>`<td data-label="${escapeHtml(ex.name)}" class="${examAppliesTo(ex,s)?'':'cell-hide'}" style="text-align:center;line-height:1">${examScoreCell(ex,s,_OK_SVG)}</td>`).join('');
     const questionCell=hasQuestion
       ? `<td data-label="질문" style="text-align:center;line-height:1" title="질문 작성됨"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M9.5 9a2.5 2.5 0 1 1 4.5 1.5c-.7.6-1.5.9-1.5 2"/><circle cx="12" cy="17" r="0.9" fill="#ea580c" stroke="none"/></svg></td>`
       : `<td data-label="질문" style="text-align:center;line-height:1">${_NA_DOT}</td>`;
@@ -3005,7 +3028,7 @@ function renderAdminConsult(){
   <div class="sh"><span class="shtitle">멘토링 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
   ${summaryHtml}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
-  <div class="card" style="padding:0"><div class="tw tw-cards"><table class="consult-tbl">
+  <div class="card" style="padding:0"><div class="tw tw-cards tw-wide"><table class="consult-tbl">
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>질문</th>${examHeaders}<th>기록</th></tr></thead>
     <tbody>${rows||`<tr class="empty-row"><td colspan="${7+cExams.length}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
   </table></div></div>`;
@@ -4047,7 +4070,7 @@ function renderOpScores(){
   });
   const examsForRows=scoreGradeExams();
   const rows=sorted.map(s=>{
-    const examCells=examsForRows.map(ex=>`<td data-label="${escapeHtml(ex.name)}" style="text-align:center">${examScoreCell(ex,s,_OK_SVG)}</td>`).join('');
+    const examCells=examsForRows.map(ex=>`<td data-label="${escapeHtml(ex.name)}" class="${examAppliesTo(ex,s)?'':'cell-hide'}" style="text-align:center">${examScoreCell(ex,s,_OK_SVG)}</td>`).join('');
     return `<tr style="cursor:pointer" onclick="S.opScoreStuId='${s._docId}';S.opScoreTab=0;S.opGraphTab=0;renderAdminScores()">
       <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${escapeHtml(s.grade||'')}</span></td>
@@ -4063,9 +4086,9 @@ function renderOpScores(){
   _('adminC').innerHTML=`<style>#adminC .opscore-tbl tbody tr:hover{background:#f9fafb}</style>
   <div class="sh"><span class="shtitle">학생 성적 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
   ${scoreGradeTabsHtml(allStu)}
-  <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">${examTotals.map(({ex,total,target})=>`<div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1;min-width:120px"><span style="font-size:11px;font-weight:600;color:#6b7280">${ex.name}${ex.grade?' · '+ex.grade:''}</span><p style="font-size:18px;font-weight:800;margin-top:2px">${total}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${target}명</span></p></div>`).join('')}</div>
+  <div class="sum-row">${examTotals.map(({ex,total,target})=>`<div><span class="sum-name">${escapeHtml(ex.name)}${ex.grade&&!S.scoreGradeTab?' · '+ex.grade:''}</span><p class="sum-val">${total}<span class="sum-tot"> / ${target}명</span></p></div>`).join('')}</div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
-  <div class="card" style="padding:0"><div class="tw tw-cards"><table class="opscore-tbl">
+  <div class="card" style="padding:0"><div class="tw tw-cards tw-wide"><table class="opscore-tbl">
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th>${examHeaders}</tr></thead>
     <tbody>${rows||`<tr class="empty-row"><td colspan="${colCount}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
   </table></div></div>`;
@@ -4124,7 +4147,7 @@ function renderAdminScores(){
   });
   const examsForRows=scoreGradeExams();
   const rows=sorted.map(s=>{
-    const examCells=examsForRows.map(ex=>`<td data-label="${escapeHtml(ex.name)}" style="text-align:center">${examAppliesTo(ex,s)?`<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(s,ex.id)?'#22c55e':'#d1d5db'}"></span>`:_OFF_GRADE}</td>`).join('');
+    const examCells=examsForRows.map(ex=>`<td data-label="${escapeHtml(ex.name)}" class="${examAppliesTo(ex,s)?'':'cell-hide'}" style="text-align:center">${examAppliesTo(ex,s)?`<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(s,ex.id)?'#22c55e':'#d1d5db'}"></span>`:_OFF_GRADE}</td>`).join('');
     return `<tr>
       <td data-label="좌석" class="cell-hide" style="text-align:center;font-weight:700;color:#1C64F2">${s.seat||'—'}</td>
       <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${escapeHtml(s.grade||'')}</span></td>
@@ -4142,9 +4165,9 @@ function renderAdminScores(){
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 성적 관리 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span>
     <button class="btn bs bsm" onclick="refreshStudents()">새로고침</button></div>
   ${scoreGradeTabsHtml(allStu)}
-  <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">${examTotals.map(({ex,total,target})=>`<div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1;min-width:120px"><span style="font-size:11px;font-weight:600;color:#6b7280">${ex.name}${ex.grade?' · '+ex.grade:''}</span><p style="font-size:18px;font-weight:800;margin-top:2px">${total}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${target}명</span></p></div>`).join('')}</div>
+  <div class="sum-row">${examTotals.map(({ex,total,target})=>`<div><span class="sum-name">${escapeHtml(ex.name)}${ex.grade&&!S.scoreGradeTab?' · '+ex.grade:''}</span><p class="sum-val">${total}<span class="sum-tot"> / ${target}명</span></p></div>`).join('')}</div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
-  <div class="card" style="padding:0"><div class="tw tw-cards"><table>
+  <div class="card" style="padding:0"><div class="tw tw-cards tw-wide"><table>
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th>${examHeaders}<th>관리</th></tr></thead>
     <tbody>${rows||`<tr class="empty-row"><td colspan="${colCount}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
   </table></div></div>`;}

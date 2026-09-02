@@ -46,8 +46,11 @@ Score documents keep the **same field names in every mode** (`korSubj/korRaw`, `
 Central helpers (all near `getExams`/`gcRelGroups` in `index.html`):
 
 - `examsForStu(stu)` / `examsForGrade(g)` — the exam list for one student. **Every per-student view uses this, not `getExams()`**: student home, tablet session, 멘토링 상세, 성적 상세, 예약 상세, 학생 상세, 등급 추이 tabs, and the 멘토링 내용 tab index (`consultNotesEditorHtml`, `_currentConsultExamId`, and the tablet auto-save in `init`) — the note tabs and their auto-save must index the *same* filtered array or notes get written to the wrong exam.
+- Score-management screens (`renderAdminScores`, `renderOpScores`) carry a 학년 탭 (`S.scoreGradeTab`): `scoreGradeFilter` narrows the students and `scoreGradeExams` narrows the exam columns together. `scoreGradeNormalize` clears the tab when the selected grade has no students left, and the tab bar hides itself when fewer than two grades are present.
 - `examAppliesTo(exam, stu)` — for admin tables that list **all** students against **all** exams. Those keep every exam column and render `_OFF_GRADE` (`—`) instead of the 미입력 dot for off-grade pairs; per-exam counters divide by `examTargetCount(ex, list)`, not the whole roster. 성적 미입력 알림톡 targets are filtered the same way.
 - `examKorCommon` / `examMatCommon` / `examExpInteg` / `examKorSubjs` / `examMatSubjs` / `examSciSubjs` — mode predicates + subject lists. Subject arrays live in the `*_SUBJS` consts; don't re-inline them.
+
+Wide tables (many exam columns) use `class="tw tw-cards tw-wide"`. `.tw-wide` sets `min-width:max-content` + `white-space:nowrap` so the table **scrolls horizontally instead of crushing 이름/학교 into multi-line cells**, and pins the first three columns (좌석·학년·이름) with `position:sticky` so rows stay identifiable while scrolling. The `@media(max-width:640px)` card mode resets all of that. Off-grade exam cells also get `cell-hide`, which does nothing on desktop but removes the row of `—` entries from mobile cards.
 
 `gcRelGroups(exam)` derives the 등급컷 table from these, so both cut modals (`openExamGradeCuts`, `openEstGradeCuts`) adapt automatically. Note that saving a cut modal rebuilds `gradeCuts` from only the currently-visible subjects — switching a mode and re-saving cuts discards the old mode's cuts.
 
