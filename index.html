@@ -750,7 +750,7 @@ const S = {
   opScoreStuId:null, opScoreTab:0, opGraphTab:0,
   notices:[], noticeEditId:null, noticeComposerOpen:false,
   popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false, scoreGradeTab:'',
-  akExamId:null, akSubj:'', akDraft:null,
+  akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'',
   qbComposerOpen:null, qbPostEditId:null, qbDraftFiles:{}, qbCommentDraftFiles:{}
 };
 
@@ -4802,6 +4802,105 @@ async function deleteExam(examId){
   catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);}
 
+/* ── 평가원(KICE) 정답표 PDF 가져오기 ──
+   cdn.kice.re.kr 이 CORS 를 열어둬서 브라우저가 직접 받아 파싱한다(서버 불필요).
+   공통 문항은 표에 한 번, 선택 문항은 선택과목 수만큼 반복되는 구조를 이용해 과목별로 나눈다. */
+const AK_CIRCLES='①②③④⑤';
+let _pdfjsP=null;
+function getPdfjs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(!_pdfjsP)_pdfjsP=new Promise((res,rej)=>{
+    const el=document.createElement('script');
+    el.src='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+    el.onload=()=>{try{window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';}catch(_){}res(window.pdfjsLib);};
+    el.onerror=()=>rej(new Error('PDF 모듈을 불러오지 못했습니다.'));
+    document.head.appendChild(el);
+  });
+  return _pdfjsP;
+}
+function akAllKnownSubjs(){
+  return [...KOR_CHOICE_SUBJS,...MAT_CHOICE_SUBJS,'영어','한국사','국어','수학',
+    ...EXP_SOCIAL_SUBJS,...EXP_SCI1_SUBJS,...EXP_SCI2_SUBJS,...INTEG_EXP_SUBJS,...SOCSCI_EXP_SUBJS,...LANG2_SUBJS];
+}
+function akNormAns(t){const i=AK_CIRCLES.indexOf(t);if(i>=0)return String(i+1);return /^\d{1,4}$/.test(t)?t:'';}
+function akRowsFromItems(items){
+  const rows=[];
+  [...items].sort((a,b)=>b.y-a.y||a.x-b.x).forEach(it=>{
+    const r=rows.find(r=>Math.abs(r.y-it.y)<3.5);
+    if(r)r.items.push(it);else rows.push({y:it.y,items:[it]});
+  });
+  rows.forEach(r=>r.items.sort((a,b)=>a.x-b.x));
+  return rows;
+}
+function akParseKice(items){
+  const rows=akRowsFromItems(items);
+  const known=akAllKnownSubjs();
+  let header=null;
+  for(const r of rows){
+    const hits=r.items.filter(i=>known.includes(i.s.trim()));
+    if(hits.length&&(!header||hits.length>header.length))header=hits.map(i=>({name:i.s.trim(),x:i.x}));
+  }
+  let area='';
+  for(const r of rows){
+    const m=r.items.map(i=>i.s).join(' ').match(/([가-힣·Ⅰ-Ⅴ\s]+?)\s*영역\s*정답표/);
+    if(m){area=m[1].trim();break;}
+  }
+  const byNo=new Map();
+  for(const r of rows){
+    const toks=r.items.map(i=>({t:i.s.trim(),x:i.x})).filter(o=>o.t!=='');
+    if(toks.length<3||toks.length%3!==0)continue;
+    if(!toks.every(o=>/^\d{1,4}$/.test(o.t)||AK_CIRCLES.includes(o.t)))continue;
+    for(let g=0;g<toks.length;g+=3){
+      const no=Number(toks[g].t),ans=akNormAns(toks[g+1].t),pt=Number(toks[g+2].t);
+      if(!no||no>60||!ans||!pt||pt>5)continue;
+      if(!byNo.has(no))byNo.set(no,[]);
+      byNo.get(no).push({a:ans,p:pt,x:toks[g].x});
+    }
+  }
+  if(!byNo.size)return {subjects:[],area,error:'정답표를 찾지 못했습니다.'};
+  byNo.forEach(l=>l.sort((a,b)=>a.x-b.x));
+  const nos=[...byNo.keys()].sort((a,b)=>a-b);
+  const cols=Math.max(...nos.map(n=>byNo.get(n).length));
+  let names=(header||[]).slice().sort((a,b)=>a.x-b.x).map(o=>o.name);
+  if(cols===1&&names.length!==1)names=[area||names[0]||''];
+  if(names.length!==cols)return {subjects:[],area,error:`과목 열 ${cols}개와 과목명 ${names.length}개가 맞지 않습니다.`};
+  return {area,error:'',subjects:names.map((name,k)=>({
+    name,items:nos.map(n=>{const l=byNo.get(n);const it=l.length===1?l[0]:l[k];return it?{a:it.a,p:it.p}:{a:'',p:0};})
+  }))};
+}
+async function akImportFromUrl(){
+  const url=(_('ak-url')?.value||'').trim();
+  if(!/^https?:\/\//.test(url)){toast('정답표 PDF 주소를 입력하세요.','warn');return;}
+  showLoad(true);
+  try{
+    const lib=await getPdfjs();
+    const resp=await fetch(url);
+    if(!resp.ok)throw new Error('PDF를 받지 못했습니다. (HTTP '+resp.status+')');
+    const doc=await lib.getDocument({data:await resp.arrayBuffer()}).promise;
+    let items=[];
+    for(let p=1;p<=doc.numPages;p++){
+      const tc=await (await doc.getPage(p)).getTextContent();
+      items=items.concat(tc.items.filter(i=>i.str.trim()).map(i=>({x:i.transform[4],y:i.transform[5],s:i.str})));
+    }
+    const r=akParseKice(items);
+    if(r.error)throw new Error(r.error);
+    const ex=getExam(S.akExamId);
+    const mine=akSubjectGroups(ex).flatMap(g=>g.items);
+    const applied=[],skipped=[];
+    for(const sub of r.subjects){
+      if(!mine.includes(sub.name)){skipped.push(sub.name);continue;}
+      S.akDraft[sub.name]={items:sub.items.map(it=>({a:it.a,p:it.p}))};
+      applied.push(`${sub.name} ${sub.items.length}문항`);
+    }
+    if(!applied.length)throw new Error(`이 시험 과목 구성과 맞는 과목이 없습니다. (PDF: ${r.subjects.map(x=>x.name).join(', ')})`);
+    S.akSubj=r.subjects.find(x=>mine.includes(x.name)).name;
+    S.akSrcUrl=url;
+    akRenderModal();
+    toast(`${r.area?r.area+' ':''}정답표를 불러왔습니다 — ${applied.join(', ')}${skipped.length?` · 제외: ${skipped.join(', ')}`:''}`,'success',{duration:7000});
+  }catch(e){toast('불러오기 실패: '+e.message,'error',{duration:7000});}
+  showLoad(false);
+}
+
 /* ── 정답표 등록 ── */
 function akItemsFor(subj){
   const d=S.akDraft&&S.akDraft[subj];
@@ -4814,6 +4913,7 @@ function openAnswerKeys(examId){
   const groups=akSubjectGroups(ex);
   const filled=Object.keys(S.akDraft).filter(k=>akItemsFor(k));
   S.akSubj=filled[0]||groups[0].items[0];
+  S.akSrcUrl=ex.answerKeySrc||'';
   akRenderModal();
   openModal();
 }
@@ -4831,6 +4931,12 @@ function akRenderModal(){
   _('mCt').style.maxWidth='760px';
   _('mCt').innerHTML=`<p class="mtitle">${escapeHtml(ex.name)} 정답표</p>
     <p class="msub">정답을 등록하면 학생이 성적 입력에서 답을 찍고 원점수가 자동 계산됩니다. 1~5는 객관식, 그 외 값은 단답형으로 봅니다.</p>
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <p style="font-size:12px;font-weight:700;color:#6d28d9;margin-bottom:6px">평가원 정답표 PDF에서 불러오기</p>
+      <div style="display:flex;gap:6px"><input class="fi" id="ak-url" value="${escapeHtml(S.akSrcUrl||ex.answerKeySrc||'')}" placeholder="https://cdn.kice.re.kr/09mo-27suneung/09mo-27suneung_1a.pdf" style="flex:1;min-width:0">
+      <button class="btn bp bsm" style="flex:0 0 auto" onclick="akImportFromUrl()">불러오기</button></div>
+      <p style="font-size:11px;color:#9ca3af;margin-top:6px">교시별 주소를 넣으면 선택과목까지 한 번에 채워집니다(국어 <code>_1a</code>, 수학 <code>_2a</code>, 영어 <code>_3a</code> …). 저장 전에 값을 확인해 주세요.</p>
+    </div>
     <div class="frow" style="margin-bottom:8px"><div class="fg" style="margin:0"><label class="fl">과목</label>
       <select class="fi fsel" id="ak-subj" onchange="akSwitchSubj(this.value)">${opts}</select></div>
       <div class="fg" style="margin:0"><label class="fl">문항 수</label>
@@ -4895,6 +5001,7 @@ async function akSave(){
     out[subj]={items:items.map(it=>({a:String(it.a==null?'':it.a).trim(),p:Number(it.p)||0}))};
   }
   ex.answerKeys=out;
+  if(S.akSrcUrl)ex.answerKeySrc=S.akSrcUrl;
   showLoad(true);
   try{await db.collection('config').doc('main').set(S.config);closeModal();renderAdminExams();toast('정답표가 저장되었습니다.','success');}
   catch(e){toast('저장 실패: '+e.message,'error');}

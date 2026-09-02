@@ -72,6 +72,13 @@ Optional per exam. When an exam has an answer key for a subject, the student's w
 - Saved as `scores[examId].answers = {kor:[…], mat:[…], …}`, padded to the key's question count, only for subjects that have a key. Raw/grade fields stay exactly as before, so 등급·그래프·성적표 needed no changes.
 - 제2외국어/한문 has no answer-sheet support (still 원점수), and the **admin** score form always edits raw directly — that is the override path.
 
+**KICE PDF import.** `cdn.kice.re.kr` serves the official 정답표 PDFs with `Access-Control-Allow-Origin: *`, so the browser fetches and parses them directly — **no Cloud Function or proxy is needed**; don't add one. `getPdfjs()` lazy-loads pdf.js from jsdelivr (same CDN as the font) and `akParseKice` turns its positioned text items into per-subject keys:
+
+- Rows are clustered by `y`; a data row is one whose tokens are all digits or ①–⑤ and whose count is a multiple of 3 — each triple is (문항번호, 정답, 배점).
+- **공통 문항 appear once, 선택 문항 repeat once per 선택과목.** The repeat count gives the number of subject columns; the subject names come from the header row (matched against `akAllKnownSubjs()`) and are paired to occurrences by `x` order. Single-column PDFs (영어/한국사) fall back to the `… 영역 정답표` title.
+- Verified end-to-end against the live 2027 9월 모평 `_1a`/`_2a`: 국어 화작·언매 45문항, 수학 확통·미적·기하 30문항, 배점합 100 each, 단답형 answers (`190`, `457`, …) intact.
+- URL pattern is `…/{코드}/{코드}_{교시}a.pdf` (1 국어, 2 수학, 3 영어 …), published progressively through exam day. The last-used URL is kept in `exam.answerKeySrc`. Only 국어/수학 PDFs existed when this was written — 영어/한국사/탐구 layouts are handled by the same generic rule but were never seen, so the import fills the grid and the admin confirms before 저장.
+
 ### Notices vs. popups
 
 Two separate things, both admin-managed from the **공지사항** tab:
