@@ -627,7 +627,7 @@ const S = {
   consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0,
   opScoreStuId:null, opScoreTab:0, opGraphTab:0,
   notices:[], noticeEditId:null, noticeComposerOpen:false,
-  popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false,
+  popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false, scoreGradeTab:'',
   qbComposerOpen:null, qbPostEditId:null, qbDraftFiles:{}, qbCommentDraftFiles:{}
 };
 
@@ -4019,9 +4019,25 @@ async function sendScoreReminderBulk(){
 }
 
 /* ── ADMIN: 학생 성적 ── */
+/* 학년 탭 — 학생 목록과 시험 열을 함께 좁힌다. 학년을 고르면 그 학년 시험만 남는다. */
+function scoreGradeNormalize(baseStu){
+  if(S.scoreGradeTab&&!baseStu.some(s=>s.grade===S.scoreGradeTab))S.scoreGradeTab='';
+  return S.scoreGradeTab||'';
+}
+function scoreGradeFilter(list){const g=S.scoreGradeTab||'';return g?list.filter(s=>s.grade===g):list;}
+function scoreGradeExams(){const g=S.scoreGradeTab||'';return g?examsForGrade(g):getExams();}
+function scoreGradeTabsHtml(baseStu){
+  const present=GRADE_LEVELS.filter(g=>baseStu.some(s=>s.grade===g));
+  if(present.length<2)return '';
+  const cur=S.scoreGradeTab||'';
+  const tab=(v,label,n)=>`<button class="dt ${cur===v?'on':''}" onclick="S.scoreGradeTab='${v}';renderAdminScores()">${label}<span style="font-size:11px;font-weight:600;opacity:.65;margin-left:5px">${n}</span></button>`;
+  return `<div class="dtabs">${tab('','전체',baseStu.length)}${present.map(g=>tab(g,g,baseStu.filter(s=>s.grade===g).length)).join('')}</div>`;
+}
 function renderOpScores(){
   const gradeOrder={'고3':0,'고2':1,'고1':2};
-  const baseStu=bookableStu();
+  const allStu=bookableStu();
+  scoreGradeNormalize(allStu);
+  const baseStu=scoreGradeFilter(allStu);
   const sorted=[...baseStu].sort((a,b)=>{
     if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
@@ -4029,7 +4045,7 @@ function renderOpScores(){
     if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
     return 0;
   });
-  const examsForRows=getExams();
+  const examsForRows=scoreGradeExams();
   const rows=sorted.map(s=>{
     const examCells=examsForRows.map(ex=>`<td data-label="${escapeHtml(ex.name)}" style="text-align:center">${examScoreCell(ex,s,_OK_SVG)}</td>`).join('');
     return `<tr style="cursor:pointer" onclick="S.opScoreStuId='${s._docId}';S.opScoreTab=0;S.opGraphTab=0;renderAdminScores()">
@@ -4046,6 +4062,7 @@ function renderOpScores(){
   const colCount=4+examsForRows.length;
   _('adminC').innerHTML=`<style>#adminC .opscore-tbl tbody tr:hover{background:#f9fafb}</style>
   <div class="sh"><span class="shtitle">학생 성적 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
+  ${scoreGradeTabsHtml(allStu)}
   <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">${examTotals.map(({ex,total,target})=>`<div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1;min-width:120px"><span style="font-size:11px;font-weight:600;color:#6b7280">${ex.name}${ex.grade?' · '+ex.grade:''}</span><p style="font-size:18px;font-weight:800;margin-top:2px">${total}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${target}명</span></p></div>`).join('')}</div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table class="opscore-tbl">
@@ -4095,7 +4112,9 @@ function renderAdminScores(){
     return renderOpScores();
   }
   const gradeOrder={'고3':0,'고2':1,'고1':2};
-  const baseStu=bookableStu();
+  const allStu=bookableStu();
+  scoreGradeNormalize(allStu);
+  const baseStu=scoreGradeFilter(allStu);
   const sorted=[...baseStu].sort((a,b)=>{
     if(S.stuSort==='grade') return (gradeOrder[a.grade]??3)-(gradeOrder[b.grade]??3)||a.name.localeCompare(b.name,'ko');
     if(S.stuSort==='name') return a.name.localeCompare(b.name,'ko');
@@ -4103,7 +4122,7 @@ function renderAdminScores(){
     if(S.stuSort==='school') return (a.school||'').localeCompare(b.school||'','ko')||a.name.localeCompare(b.name,'ko');
     return 0;
   });
-  const examsForRows=getExams();
+  const examsForRows=scoreGradeExams();
   const rows=sorted.map(s=>{
     const examCells=examsForRows.map(ex=>`<td data-label="${escapeHtml(ex.name)}" style="text-align:center">${examAppliesTo(ex,s)?`<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${hasStuExamScore(s,ex.id)?'#22c55e':'#d1d5db'}"></span>`:_OFF_GRADE}</td>`).join('');
     return `<tr>
@@ -4114,7 +4133,7 @@ function renderAdminScores(){
       ${examCells}
       <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;justify-content:flex-end"><button class="btn bs bsm" onclick="openScoreDetail('${s._docId}')">상세</button></div></td>
     </tr>`;}).join('');
-  const exams=getExams();
+  const exams=examsForRows;
   const examTotals=exams.map(ex=>({ex,total:baseStu.filter(s=>examAppliesTo(ex,s)&&hasStuExamScore(s,ex.id)).length,target:examTargetCount(ex,baseStu)}));
   const sortOpts=[['grade','학년순'],['name','이름순'],['seat','좌석순'],['school','학교순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${S.stuSort===k?'bp':'bs'} bsm" onclick="S.stuSort='${k}';renderAdminScores()">${l}</button>`).join('');
@@ -4122,6 +4141,7 @@ function renderAdminScores(){
   const colCount=5+exams.length;
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">학생 성적 관리 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span>
     <button class="btn bs bsm" onclick="refreshStudents()">새로고침</button></div>
+  ${scoreGradeTabsHtml(allStu)}
   <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">${examTotals.map(({ex,total,target})=>`<div style="background:#f9fafb;border-radius:10px;padding:10px 16px;flex:1;min-width:120px"><span style="font-size:11px;font-weight:600;color:#6b7280">${ex.name}${ex.grade?' · '+ex.grade:''}</span><p style="font-size:18px;font-weight:800;margin-top:2px">${total}<span style="font-size:12px;font-weight:400;color:#6b7280"> / ${target}명</span></p></div>`).join('')}</div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table>
