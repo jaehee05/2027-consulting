@@ -32,6 +32,27 @@ When the user wants a frontend change live, commit + push and trust Vercel. Don'
 
 `firestore.rules` allows read/write to all collections **except `settings/*`**. The ppurio API key, account, sender profile, and admin phone list live in `settings/ppurio`. Anything touching credentials must go through Cloud Functions (Admin SDK) — never read or write `settings/*` from `index.html`. The admin UI's settings tab calls `ppurioAdmin` over HTTP.
 
+### Per-grade exams (학년별 과목 구성)
+
+Exams are grade-scoped. Each entry in `S.config.exams` carries:
+
+- `grade` — `'고1' | '고2' | '고3'`, or `''`/absent meaning **all grades** (the pre-2026-09 default, so legacy exams keep working untouched).
+- `korMode` / `matMode` — `'choice'` (default, 화법과 작문·언어와 매체 / 확률과 통계·미적분·기하) or `'common'` (선택과목 없는 공통형).
+- `expMode` — `'choice'` (default, 사탐/과탐 2과목 선택) or `'integrated'` (통합사회 + 통합과학).
+- `hasScienceII` only applies when `expMode==='choice'`; it is forced to `false` on save for integrated exams.
+
+Score documents keep the **same field names in every mode** (`korSubj/korRaw`, `exp1Subj/exp1Raw`, …). Modes without a 선택과목 store a fixed subject name so `exam.gradeCuts[subj]` lookups stay uniform: `korSubj='국어'`, `matSubj='수학'`, `exp1Subj='통합사회'`, `exp2Subj='통합과학'`. Grade computation (`getExamGrade`, `getGradeSubjects`, `drawGradeGraph`) therefore needed no mode-awareness — only the input forms and the 선택과목 display row did (`scSubjLabel`, `scSubjRowLabel`).
+
+Central helpers (all near `getExams`/`gcRelGroups` in `index.html`):
+
+- `examsForStu(stu)` / `examsForGrade(g)` — the exam list for one student. **Every per-student view uses this, not `getExams()`**: student home, tablet session, 멘토링 상세, 성적 상세, 예약 상세, 학생 상세, 등급 추이 tabs, and the 멘토링 내용 tab index (`consultNotesEditorHtml`, `_currentConsultExamId`, and the tablet auto-save in `init`) — the note tabs and their auto-save must index the *same* filtered array or notes get written to the wrong exam.
+- `examAppliesTo(exam, stu)` — for admin tables that list **all** students against **all** exams. Those keep every exam column and render `_OFF_GRADE` (`—`) instead of the 미입력 dot for off-grade pairs; per-exam counters divide by `examTargetCount(ex, list)`, not the whole roster. 성적 미입력 알림톡 targets are filtered the same way.
+- `examKorCommon` / `examMatCommon` / `examExpInteg` / `examKorSubjs` / `examMatSubjs` / `examSciSubjs` — mode predicates + subject lists. Subject arrays live in the `*_SUBJS` consts; don't re-inline them.
+
+`gcRelGroups(exam)` derives the 등급컷 table from these, so both cut modals (`openExamGradeCuts`, `openEstGradeCuts`) adapt automatically. Note that saving a cut modal rebuilds `gradeCuts` from only the currently-visible subjects — switching a mode and re-saving cuts discards the old mode's cuts.
+
+`saveExamScore` (the `es-*` ids) is dead code from the pre-wizard student form; the live student path is `startScoreWizard` → `getScoreSteps` → `finishScoreWizard`.
+
 ### Grade-cut model (graph/score rendering)
 
 A student's score per exam is stored with both a `*Raw` (raw score) and a cached `*Grade` (computed grade) for each subject (`kor`, `mat`, `eng`, `his`, `exp1`, `exp2`, `lang2`), plus optional `*GradeOverride` for admin overrides. Exams carry two parallel cut tables:
