@@ -65,6 +65,7 @@ Two separate things, both admin-managed from the **공지사항** tab:
 
 Popup specifics:
 
+- The body is plain text the admin types, but `popupBodyHtml` splits it into 문단 `<p>` blocks and — for consecutive lines starting with `·`/`-`/`※` — a highlighted `.pp-note` list, so a bare textarea still renders as a designed notice. Indented continuation lines fold into the preceding item. Everything goes through `escapeHtml`; never render popup body as raw HTML.
 - `popupActive(p)` gates display; `popupStatus(p)` maps the same state to the 노출중/예정/종료/중지 chip in the admin list.
 - Multiple active popups queue up (`_popupQueue`, newest first) and advance on 닫기.
 - **오늘 하루 보지 않기 is `localStorage` only** — key `popupHide_<docId>` holding a date string. Nothing is written to Firestore, so it is per-browser and resets at midnight. Never "fix" this by storing dismissals per student.
