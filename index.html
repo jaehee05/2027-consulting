@@ -111,14 +111,19 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 #kakaoCh:active{transform:translateY(0)}
 #kakaoCh svg{width:27px;height:27px;display:block;fill:#1C64F2}
 @media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:52px;height:52px}#kakaoCh svg{width:25px;height:25px}}
-/* 학생 답안 입력(가채점) */
-.as-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(208px,1fr));gap:6px;margin-top:12px}
-.as-row{display:flex;align-items:center;gap:4px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:4px 6px}
-.as-no{flex:0 0 22px;font-size:11px;font-weight:700;color:var(--gray-500);text-align:right}
-.as-opt{flex:1;height:30px;min-width:0;border-radius:6px;border:1.5px solid var(--gray-200);background:var(--surface);font-size:12px;font-weight:700;color:var(--gray-500);cursor:pointer;font-family:inherit;padding:0;transition:.1s}
-.as-opt.on{background:var(--primary);border-color:var(--primary);color:#fff}
-.as-num{flex:1;min-width:0;height:30px;border:1.5px solid var(--gray-200);border-radius:6px;text-align:center;font-size:13px;font-weight:700;font-family:inherit;outline:none;background:var(--surface);color:var(--gray-900)}
-.as-num:focus{border-color:var(--primary)}
+/* 학생 답안 입력(가채점표) — 객관식은 5문항 묶음, 주관식은 문항별 칸 */
+.as-sec{margin-top:18px}
+.as-sec-t{font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:2px}
+.as-sec-t b{color:var(--primary);font-weight:800}
+.as-kind{font-size:12px;font-weight:700;color:var(--gray-500);margin:10px 0 6px}
+.as-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.as-box{border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;background:var(--surface)}
+.as-box-h{background:var(--gray-100);font-size:11.5px;font-weight:700;color:var(--gray-700);text-align:center;padding:6px 4px;white-space:nowrap}
+.as-box-b{padding:8px}
+.as-in{width:100%;min-width:0;height:36px;border:1.5px solid var(--gray-200);border-radius:8px;text-align:center;font-size:17px;font-weight:700;letter-spacing:.16em;font-family:inherit;outline:none;background:var(--surface);color:var(--gray-900)}
+.as-in.short{letter-spacing:normal;font-size:15px}
+.as-in:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(28,100,242,.15)}
+.as-in.done{background:var(--primary-soft);border-color:var(--primary-soft-border)}
 .as-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--primary-soft);border:1px solid var(--primary-soft-border);border-radius:10px;padding:10px 14px;margin-top:4px}
 .as-score{font-size:20px;font-weight:800;color:var(--primary-text)}
 .as-meta{font-size:12px;color:var(--gray-500);margin-left:auto}
@@ -885,6 +890,33 @@ function examAnswerKey(exam,subj){
   return (k&&Array.isArray(k.items)&&k.items.length)?k.items:null;
 }
 function akIsChoice(a){return /^[1-5]$/.test(String(a==null?'':a).trim());}
+/* 정답표의 앞쪽 N문항이 공통 과목. 0 이면 공통/선택 구분 없이 한 덩어리로 본다. */
+function akCommonCount(exam,subj){
+  const k=exam&&exam.answerKeys&&exam.answerKeys[subj];
+  const len=(k&&Array.isArray(k.items))?k.items.length:0;
+  return Math.max(0,Math.min(Number(k&&k.common)||0,len));
+}
+/* 가채점표 배치 — 객관식은 5문항씩 한 칸, 주관식은 문항마다 한 칸. */
+function akSheetBlocks(items,from,to){
+  const blocks=[];
+  let i=from;
+  while(i<=to){
+    const ch=akIsChoice(items[i].a);
+    let j=i;
+    while(j+1<=to&&akIsChoice(items[j+1].a)===ch)j++;
+    if(ch)for(let k=i;k<=j;k+=5)blocks.push({kind:'choice',from:k,to:Math.min(k+4,j)});
+    else for(let k=i;k<=j;k++)blocks.push({kind:'short',from:k,to:k});
+    i=j+1;
+  }
+  return blocks;
+}
+function akSheetSections(items,common,subjName){
+  if(common>0&&common<items.length)return [
+    {label:'공통과목',blocks:akSheetBlocks(items,0,common-1)},
+    {label:'선택과목',sub:subjName,blocks:akSheetBlocks(items,common,items.length-1)}
+  ];
+  return [{label:'',blocks:akSheetBlocks(items,0,items.length-1)}];
+}
 function akTotalScore(items){return (items||[]).reduce((n,it)=>n+(Number(it&&it.p)||0),0);}
 function akScore(items,answers){
   let sc=0;
@@ -1858,14 +1890,24 @@ function swAnswers(key){
   if(!Array.isArray(w.answers[key]))w.answers[key]=[];
   return w.answers[key];
 }
-function swPickAnswer(key,i,val){
+/* 객관식 묶음 칸: 1~5 만 받고, 다 채우면 다음 칸으로 넘어간다. */
+function swBlockInput(key,from,n,el){
+  const v=(el.value||'').replace(/[^1-5]/g,'').slice(0,n);
+  el.value=v;
   const arr=swAnswers(key);
-  arr[i]=(arr[i]===val)?'':val;
-  const row=_('as-row-'+i);
-  if(row)row.querySelectorAll('.as-opt').forEach(b=>b.classList.toggle('on',b.dataset.v===arr[i]));
+  for(let i=0;i<n;i++)arr[from+i]=v[i]||'';
+  el.classList.toggle('done',v.length===n);
   swUpdateSheetScore();
+  if(v.length===n&&el.dataset.next){const nx=_(el.dataset.next);if(nx){nx.focus();nx.select&&nx.select();}}
 }
-function swSetAnswer(key,i,val){swAnswers(key)[i]=String(val||'').trim();swUpdateSheetScore();}
+function swShortInput(key,i,el){
+  const v=(el.value||'').replace(/[^0-9]/g,'').slice(0,4);
+  el.value=v;
+  swAnswers(key)[i]=v;
+  el.classList.toggle('done',v!=='');
+  swUpdateSheetScore();
+  if(v.length===4&&el.dataset.next){const nx=_(el.dataset.next);if(nx){nx.focus();nx.select&&nx.select();}}
+}
 /* 화면의 원점수는 보고 있는 단계만 갱신하므로, 저장 직전에 답안 기준으로 전부 다시 계산한다.
    (선택과목을 바꾸면 이전 과목 정답표로 매긴 점수가 남는 문제를 막는다) */
 function swSyncAnswerRaws(exam){
@@ -1885,7 +1927,10 @@ function swUpdateSheetScore(){
   S.scoreWizard[st.rawKey]=String(raw);
   const el=_('sw-sheet-score');if(el)el.textContent=raw+'점';
   const m=_('sw-sheet-meta');
-  if(m){const un=akUnanswered(items,arr);m.textContent=un?`미입력 ${un}문항`:`${items.length}문항 모두 입력`;m.style.color=un?'#b45309':'#15803d';}
+  if(m){
+    const un=akUnanswered(items,arr),right=items.length-akWrongNos(items,arr).length;
+    m.innerHTML=`맞은 문항 <b>${right}</b>/${items.length}`+(un?` · <span style="color:#b45309">미입력 ${un}</span>`:'');
+  }
 }
 
 function startScoreWizard(examId){
@@ -1933,22 +1978,40 @@ function renderScoreWizard(){
   if(st.type==='answerSheet'){
     const items=examAnswerKey(exam,st.subj)||[];
     const arr=swAnswers(st.ansKey);
-    const marks='①②③④⑤';
-    const rows=items.map((it,i)=>{
-      const cur=String(arr[i]==null?'':arr[i]);
-      if(akIsChoice(it.a)){
-        const opts=['1','2','3','4','5'].map(v=>`<button type="button" class="as-opt ${cur===v?'on':''}" data-v="${v}" onclick="swPickAnswer('${st.ansKey}',${i},'${v}')">${marks[Number(v)-1]}</button>`).join('');
-        return `<div class="as-row" id="as-row-${i}"><span class="as-no">${i+1}</span>${opts}</div>`;
-      }
-      return `<div class="as-row" id="as-row-${i}"><span class="as-no">${i+1}</span><input class="as-num" inputmode="numeric" value="${escapeHtml(cur)}" placeholder="단답" oninput="swSetAnswer('${st.ansKey}',${i},this.value)"></div>`;
-    }).join('');
-    const raw=akScore(items,arr),un=akUnanswered(items,arr);
+    const secs=akSheetSections(items,akCommonCount(exam,st.subj),st.subj);
+    const ids=[];
+    secs.forEach((sec,si)=>sec.blocks.forEach((b,bi)=>ids.push(`sw-b-${si}-${bi}`)));
+    let n=0,html='';
+    secs.forEach((sec,si)=>{
+      html+=`<div class="as-sec">${sec.label?`<p class="as-sec-t">▪ ${sec.label}${sec.sub?`(<b>${escapeHtml(sec.sub)}</b>)`:''}</p>`:''}`;
+      let kind=null,open=false;
+      sec.blocks.forEach((b,bi)=>{
+        if(b.kind!==kind){
+          if(open)html+='</div>';
+          kind=b.kind;
+          html+=`<p class="as-kind">– ${kind==='choice'?'객관식':'주관식'}</p><div class="as-grid">`;
+          open=true;
+        }
+        const cnt=b.to-b.from+1;
+        const val=items.slice(b.from,b.to+1).map((_,k)=>String(arr[b.from+k]||'')).join('');
+        const label=cnt>1?`${b.from+1}번~${b.to+1}번`:`${b.from+1}번`;
+        const next=ids[n+1]||'';
+        const done=b.kind==='choice'?(val.length===cnt):(val!=='');
+        html+=`<div class="as-box"><div class="as-box-h">${label}</div><div class="as-box-b">
+          <input class="as-in ${b.kind==='short'?'short':''} ${done?'done':''}" id="${ids[n]}" data-next="${next}" inputmode="numeric" maxlength="${b.kind==='choice'?cnt:4}" value="${escapeHtml(val)}"
+            ${b.kind==='choice'?`oninput="swBlockInput('${st.ansKey}',${b.from},${cnt},this)"`:`oninput="swShortInput('${st.ansKey}',${b.from},this)"`}></div></div>`;
+        n++;
+      });
+      if(open)html+='</div>';
+      html+='</div>';
+    });
+    const raw=akScore(items,arr),un=akUnanswered(items,arr),right=items.length-akWrongNos(items,arr).length;
     c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
       <div><p class="sw-title">${st.title}</p>
         <p style="color:#1C64F2;font-size:14px;font-weight:600;margin-bottom:6px">${escapeHtml(st.subj)}</p>
-        <p style="color:#6b7280;font-size:13px">답을 고르면 원점수가 자동으로 계산됩니다.</p>
-        <div class="as-bar"><span style="font-size:12px;font-weight:700;color:#1d4ed8">원점수</span><span class="as-score" id="sw-sheet-score">${raw}점</span><span class="as-meta" id="sw-sheet-meta" style="color:${un?'#b45309':'#15803d'}">${un?`미입력 ${un}문항`:`${items.length}문항 모두 입력`}</span></div>
-        <div class="as-wrap">${rows}</div></div>
+        <p style="color:#6b7280;font-size:13px">객관식은 번호 순서대로 이어서 입력하세요. (예: <b>12345</b>)</p>
+        <div class="as-bar"><span style="font-size:12px;font-weight:700;color:#1d4ed8">원점수</span><span class="as-score" id="sw-sheet-score">${raw}점</span><span class="as-meta" id="sw-sheet-meta">맞은 문항 <b>${right}</b>/${items.length}${un?` · <span style="color:#b45309">미입력 ${un}</span>`:''}</span></div>
+        ${html}</div>
       <div class="sw-bottom">${prevBtn}<button class="sw-next" onclick="${isLast?`swSaveStep();finishScoreWizard()`:`swSaveStep();S.scoreStep++;renderScoreWizard()`}">${isLast?'저장':'다음'}</button></div>
     </div></div>`;
     return;
@@ -4864,8 +4927,10 @@ function akParseKice(items){
   let names=(header||[]).slice().sort((a,b)=>a.x-b.x).map(o=>o.name);
   if(cols===1&&names.length!==1)names=[area||names[0]||''];
   if(names.length!==cols)return {subjects:[],area,error:`과목 열 ${cols}개와 과목명 ${names.length}개가 맞지 않습니다.`};
+  const common=cols>1?nos.filter(n=>byNo.get(n).length===1).length:0;
   return {area,error:'',subjects:names.map((name,k)=>({
-    name,items:nos.map(n=>{const l=byNo.get(n);const it=l.length===1?l[0]:l[k];return it?{a:it.a,p:it.p}:{a:'',p:0};})
+    name,common,
+    items:nos.map(n=>{const l=byNo.get(n);const it=l.length===1?l[0]:l[k];return it?{a:it.a,p:it.p}:{a:'',p:0};})
   }))};
 }
 async function akImportFromUrl(){
@@ -4889,8 +4954,8 @@ async function akImportFromUrl(){
     const applied=[],skipped=[];
     for(const sub of r.subjects){
       if(!mine.includes(sub.name)){skipped.push(sub.name);continue;}
-      S.akDraft[sub.name]={items:sub.items.map(it=>({a:it.a,p:it.p}))};
-      applied.push(`${sub.name} ${sub.items.length}문항`);
+      S.akDraft[sub.name]={items:sub.items.map(it=>({a:it.a,p:it.p})),common:sub.common||0};
+      applied.push(`${sub.name} ${sub.items.length}문항${sub.common?`(공통 ${sub.common})`:''}`);
     }
     if(!applied.length)throw new Error(`이 시험 과목 구성과 맞는 과목이 없습니다. (PDF: ${r.subjects.map(x=>x.name).join(', ')})`);
     S.akSubj=r.subjects.find(x=>mine.includes(x.name)).name;
@@ -4940,8 +5005,10 @@ function akRenderModal(){
     <div class="frow" style="margin-bottom:8px"><div class="fg" style="margin:0"><label class="fl">과목</label>
       <select class="fi fsel" id="ak-subj" onchange="akSwitchSubj(this.value)">${opts}</select></div>
       <div class="fg" style="margin:0"><label class="fl">문항 수</label>
-      <div style="display:flex;gap:6px"><input class="fi" id="ak-cnt" type="number" min="1" max="60" value="${items.length}" style="flex:1">
-      <button class="btn bs bsm" onclick="akSetCount()">적용</button></div></div></div>
+      <div style="display:flex;gap:6px"><input class="fi" id="ak-cnt" type="number" min="1" max="60" value="${items.length}" style="flex:1;min-width:0">
+      <button class="btn bs bsm" style="flex:0 0 auto" onclick="akSetCount()">적용</button></div></div></div>
+    <div class="fg" style="margin-bottom:8px"><label class="fl">공통 과목 문항 수 <span style="font-weight:400;color:#9ca3af">— 앞에서 몇 번까지가 공통인지. 선택과목이 없으면 0</span></label>
+      <input class="fi" id="ak-common" type="number" min="0" max="60" value="${S.akDraft[subj]&&S.akDraft[subj].common?S.akDraft[subj].common:0}" oninput="akSetCommon(this.value)"></div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <span style="font-size:12px;color:#6b7280">배점 일괄</span>
       ${[2,3].map(v=>`<button class="btn bs bsm" style="font-size:11px;padding:3px 9px" onclick="akFillPoints(${v})">전체 ${v}점</button>`).join('')}
@@ -4952,7 +5019,13 @@ function akRenderModal(){
       <button class="btn bd" style="flex:0 0 auto" onclick="akClearSubj()">이 과목 비우기</button>
       <button class="btn bp" style="flex:1" onclick="akSave()">저장</button></div>`;
 }
+function akSetCommon(v){
+  const d=S.akDraft[S.akSubj];if(!d)return;
+  d.common=Math.max(0,Math.min(60,Number(v)||0));
+}
 function akReadGrid(){
+  const d=S.akDraft&&S.akDraft[S.akSubj];
+  if(d){const cv=_('ak-common');if(cv)d.common=Math.max(0,Math.min(60,Number(cv.value)||0));}
   const items=akItemsFor(S.akSubj);if(!items)return;
   for(let i=0;i<items.length;i++){
     const a=_('ak-a-'+i),p=_('ak-p-'+i);
@@ -4979,7 +5052,7 @@ function akSetCount(){
   const n=Math.max(1,Math.min(60,Number(_('ak-cnt')?.value)||0));
   const items=akItemsFor(S.akSubj)||[];
   const next=Array.from({length:n},(_,i)=>items[i]||{a:'',p:2});
-  S.akDraft[S.akSubj]={items:next};
+  S.akDraft[S.akSubj]={items:next,common:Math.min((S.akDraft[S.akSubj]||{}).common||0,n)};
   akRenderModal();
 }
 function akFillPoints(v){
@@ -4998,7 +5071,7 @@ async function akSave(){
   for(const [subj,d] of Object.entries(S.akDraft||{})){
     const items=(d&&d.items)||[];
     if(!items.some(it=>String(it.a==null?'':it.a).trim()!==''))continue;
-    out[subj]={items:items.map(it=>({a:String(it.a==null?'':it.a).trim(),p:Number(it.p)||0}))};
+    out[subj]={items:items.map(it=>({a:String(it.a==null?'':it.a).trim(),p:Number(it.p)||0})),common:Math.max(0,Math.min(Number(d&&d.common)||0,items.length))};
   }
   ex.answerKeys=out;
   if(S.akSrcUrl)ex.answerKeySrc=S.akSrcUrl;
