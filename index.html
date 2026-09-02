@@ -2512,8 +2512,9 @@ async function noticeTogglePin(id){
    '오늘 하루 보지 않기'는 서버가 아니라 브라우저 localStorage 로만 기억한다. */
 var _popupsLoaded=false,_popupsLoading=null;
 const POPUP_SAMPLE={
-  title:'시험 보느라 정말 고생 많았어요',
-  body:'그동안 준비하느라 애쓴 만큼, 시험장에서 끝까지 집중한 여러분 모두 정말 수고 많았습니다.\n\n성적 입력 기간 안에 성적을 등록해 주시고, 멘토링 예약도 잊지 말고 신청해 주세요.\n\n결과에 너무 일희일비하지 말고 남은 기간 차근차근 준비해 봅시다. 💪'
+  title:'오늘 시험 보느라 고생했습니다',
+  body:'시험 치르느라 고생 많았습니다.\n잘 본 과목도, 아쉬운 과목도 있을 텐데 아쉬운 쪽이 오히려 건질 게 많습니다.\n\n기억이 선명할 때 성적부터 입력해 주세요.\n\n· 성적 입력 마감: 9월 3일 (목)\n· 예약 현황은 홈 화면에서 확인할 수 있습니다.',
+  endDate:'2026-09-03'
 };
 function todayKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function dateKeyAfter(days){const d=new Date();d.setDate(d.getDate()+days);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -2605,7 +2606,7 @@ async function popupSeedSample(){
     S.config.popupSeeded=true;
     await db.collection('config').doc('main').set(S.config);
     const now=Date.now();
-    await db.collection('popups').add({title:POPUP_SAMPLE.title,body:POPUP_SAMPLE.body,startDate:todayKey(),endDate:dateKeyAfter(7),enabled:true,createdAt:now,updatedAt:now,authorId:S.user?.id||'',authorName:S.user?.name||'관리자'});
+    await db.collection('popups').add({title:POPUP_SAMPLE.title,body:POPUP_SAMPLE.body,startDate:todayKey(),endDate:POPUP_SAMPLE.endDate||dateKeyAfter(7),enabled:true,createdAt:now,updatedAt:now,authorId:S.user?.id||'',authorName:S.user?.name||'관리자'});
     await loadPopups();
   }catch(e){console.error('popup seed error',e);}
 }
