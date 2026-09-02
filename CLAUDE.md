@@ -61,6 +61,17 @@ Wide tables (many exam columns) use `class="tw tw-cards tw-wide"`. `.tw-wide` se
 
 The 채널톡 (ChannelIO) launcher was removed on 2026-09-02 and replaced by `#kakaoCh`, a plain anchor to the academy's KakaoTalk channel, styled as a floating launcher in the same corner — deliberately kept in ChannelIO's pastel-blue chat-bubble look rather than Kakao yellow, so it reads as part of the app. `applyChannelIOVisibility` (name kept, call sites unchanged) sets its `href` and toggles `.on`: shown for students and logged-out visitors, hidden for admin/operator/tablet — and hidden whenever no URL is configured. The URL comes from `config.kakaoChannelUrl` in Firestore, falling back to the `KAKAO_CHANNEL_URL` constant (currently the `/chat` deep link for channel `_MtGCX`). `showView` re-applies it on every view change, so paths that skip `enterHome` still get the right state.
 
+### Answer keys (정답표 · 가채점)
+
+Optional per exam. When an exam has an answer key for a subject, the student's wizard replaces the 원점수 field with a 문항별 답안 sheet and scores it automatically.
+
+- `exam.answerKeys[과목명] = {items:[{a:'정답', p:배점}, …]}`. The subject key follows the same rule as `gradeCuts` (공통형 → `'국어'`/`'수학'`, 통합탐구 → the fixed names), so 국어/수학 선택과목마다 별도 정답표를 등록합니다.
+- **`a` decides the input type**: `1`–`5` renders 5지선다 buttons, anything else (a 단답형 number) renders a text field. There is no separate flag — `akIsChoice` is the single check.
+- Scoring lives in `akScore` / `akWrongNos` / `akUnanswered`, all driven by `items` (not by the student's array length), so a short or missing answer array just counts as 미입력.
+- `getScoreSteps` reads `S.scoreWizard` to decide: for 선택과목 subjects the answer sheet step is inserted *after* the subject-picking step and only once a subject with a key is chosen (that step gets `hideRaw`). Changing the 선택과목 changes the step list — that is why `finishScoreWizard` calls **`swSyncAnswerRaws`** to recompute every raw from the answers against the *currently* selected subjects. The live `swUpdateSheetScore` only updates the step being viewed, so it alone is not enough.
+- Saved as `scores[examId].answers = {kor:[…], mat:[…], …}`, padded to the key's question count, only for subjects that have a key. Raw/grade fields stay exactly as before, so 등급·그래프·성적표 needed no changes.
+- 제2외국어/한문 has no answer-sheet support (still 원점수), and the **admin** score form always edits raw directly — that is the override path.
+
 ### Notices vs. popups
 
 Two separate things, both admin-managed from the **공지사항** tab:
