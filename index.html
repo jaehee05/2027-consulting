@@ -121,10 +121,10 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .wa-part b{color:var(--primary)}
 .wa-none{font-size:12px;color:var(--success);font-weight:600}
 .oj-wrap{overflow-x:auto}
-.oj-tbl{border-collapse:collapse;font-size:12px;margin-bottom:6px;width:max-content}
-.oj-tbl th,.oj-tbl td{border:1px solid var(--gray-200);padding:3px 2px;text-align:center;width:30px;min-width:30px;line-height:1.45}
+.oj-tbl{border-collapse:collapse;font-size:12px;margin-bottom:6px;width:100%;table-layout:fixed}
+.oj-tbl th,.oj-tbl td{border:1px solid var(--gray-200);padding:3px 2px;text-align:center;line-height:1.45;overflow:hidden}
 .oj-tbl th{background:var(--gray-100);font-size:10.5px;font-weight:700;color:var(--gray-600)}
-.oj-tbl .oj-h{background:var(--gray-50);font-size:10.5px;font-weight:700;color:var(--gray-500);width:42px;min-width:42px;white-space:nowrap;padding:3px 7px}
+.oj-tbl .oj-h{background:var(--gray-50);font-size:10.5px;font-weight:700;color:var(--gray-500);width:44px;white-space:nowrap;padding:3px 6px}
 .oj-tbl .oj-key{color:var(--gray-500);font-size:11.5px}
 .oj-tbl .oj-my{font-weight:700;color:var(--gray-900);font-size:11.5px}
 .oj-tbl .oj-my.bad{color:var(--danger)}
@@ -2209,7 +2209,7 @@ function ojTablesHtml(items,arr,from,to,maxPer){
       cells.my+=`<td class="oj-my${blank?' blank':(ok?'':' bad')}">${waMark(arr[i])}</td>`;
       cells.mk+=`<td class="${!keyed?'oj-skip':(blank?'oj-skip':(ok?'oj-o':'oj-x'))}">${!keyed||blank?'·':(ok?'O':'X')}</td>`;
     }
-    out+=`<table class="oj-tbl"><tbody>
+    out+=`<table class="oj-tbl" style="min-width:${44+(e0-s0+1)*30}px"><tbody>
       <tr><td class="oj-h">번호</td>${cells.no}</tr>
       <tr><td class="oj-h">정답</td>${cells.key}</tr>
       <tr><td class="oj-h">내 답</td>${cells.my}</tr>
