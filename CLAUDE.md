@@ -59,7 +59,7 @@ Wide tables (many exam columns) use `class="tw tw-cards tw-wide"`. `.tw-wide` se
 
 ### Contact button
 
-The 채널톡 (ChannelIO) launcher was removed on 2026-09-02 and replaced by `#kakaoCh`, a plain anchor to the academy's KakaoTalk channel, styled as a floating launcher in the same corner. `applyChannelIOVisibility` (name kept, call sites unchanged) sets its `href` and toggles `.on`: shown for students and logged-out visitors, hidden for admin/operator/tablet — and hidden whenever no URL is configured. The URL comes from `config.kakaoChannelUrl` in Firestore, falling back to the `KAKAO_CHANNEL_URL` constant.
+The 채널톡 (ChannelIO) launcher was removed on 2026-09-02 and replaced by `#kakaoCh`, a plain anchor to the academy's KakaoTalk channel, styled as a floating launcher in the same corner — deliberately kept in ChannelIO's pastel-blue chat-bubble look rather than Kakao yellow, so it reads as part of the app. `applyChannelIOVisibility` (name kept, call sites unchanged) sets its `href` and toggles `.on`: shown for students and logged-out visitors, hidden for admin/operator/tablet — and hidden whenever no URL is configured. The URL comes from `config.kakaoChannelUrl` in Firestore, falling back to the `KAKAO_CHANNEL_URL` constant.
 
 ### Notices vs. popups
 

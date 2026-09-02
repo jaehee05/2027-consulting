@@ -104,13 +104,13 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .tab{padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray-500);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;flex-shrink:0;white-space:nowrap}
 .tab.on{color:var(--primary);border-bottom-color:var(--primary)}.tab:hover{color:var(--gray-900)}
 .tw{overflow-x:auto}
-/* 카카오톡 채널 문의 버튼 — 채널톡 런처를 대체한다. */
-#kakaoCh{position:fixed;right:20px;bottom:20px;z-index:900;width:54px;height:54px;border-radius:50%;background:#FEE500;display:none;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.18);transition:transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
+/* 카카오톡 채널 문의 버튼 — 채널톡 런처 자리를 그대로 이어받는다(파스텔 블루). */
+#kakaoCh{position:fixed;right:20px;bottom:20px;z-index:900;width:56px;height:56px;border-radius:50%;background:linear-gradient(140deg,#e3edff,#c3d9ff);border:1px solid rgba(28,100,242,.16);display:none;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(28,100,242,.22);transition:transform .15s,box-shadow .15s,background .15s;-webkit-tap-highlight-color:transparent}
 #kakaoCh.on{display:flex}
-#kakaoCh:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.22)}
+#kakaoCh:hover{transform:translateY(-2px);background:linear-gradient(140deg,#eef4ff,#b9d3ff);box-shadow:0 10px 24px rgba(28,100,242,.3)}
 #kakaoCh:active{transform:translateY(0)}
-#kakaoCh svg{width:28px;height:28px;display:block}
-@media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:50px;height:50px}#kakaoCh svg{width:26px;height:26px}}
+#kakaoCh svg{width:27px;height:27px;display:block;fill:#1C64F2}
+@media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:52px;height:52px}#kakaoCh svg{width:25px;height:25px}}
 /* 팝업 공지 */
 #pOv .modal{padding:0;overflow:hidden;max-width:400px}
 #pOv:not(.hidden) .modal{animation:ppIn .24s cubic-bezier(.2,.8,.3,1)}
@@ -645,7 +645,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 
 <!-- 카카오톡 채널 문의 버튼 (학생·비로그인 화면에서만 노출) -->
 <a id="kakaoCh" class="np" href="#" target="_blank" rel="noopener noreferrer" aria-label="카카오톡 채널로 문의하기" title="카카오톡 채널로 문의하기">
-  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="#3C1E1E" d="M12 3C6.9 3 2.75 6.23 2.75 10.21c0 2.55 1.7 4.79 4.26 6.06-.19.69-.68 2.47-.78 2.86-.12.48.18.47.37.34.15-.1 2.4-1.63 3.37-2.29.66.1 1.34.15 2.03.15 5.1 0 9.25-3.23 9.25-7.12C21.25 6.23 17.1 3 12 3z"/></svg>
+  <svg viewBox="0 0 28 28" aria-hidden="true" focusable="false"><path d="M7.4 4h13.2A4.4 4.4 0 0 1 25 8.4v6.9a4.4 4.4 0 0 1-4.4 4.4h-7.4l-4.9 3.72a.8.8 0 0 1-1.28-.64V19.7h-.02A4.4 4.4 0 0 1 3 15.3V8.4A4.4 4.4 0 0 1 7.4 4z"/></svg>
 </a>
 
 <!-- 인쇄 영역 (인쇄 시에만 노출) -->
