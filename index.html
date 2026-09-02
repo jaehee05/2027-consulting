@@ -5447,6 +5447,36 @@ function gcPasteInto(idPrefix,subjects,textId){
   else toast('과목명을 찾지 못했습니다. 줄 앞에 과목명을 적어 주세요.','warn',{duration:6000});
   return filled;
 }
+/* 예상 등급컷 붙여넣기 — '과목명 87-85 81-79 …' 처럼 등급마다 범위를 받는다.
+   단일 숫자면 상·하한을 같게 둔다. */
+function gcEstApplyPaste(examId){
+  const ex=getExam(examId);if(!ex)return;
+  const allRel=gcAllRel(ex);
+  const norm=t=>String(t==null?'':t).replace(/\s+/g,'');
+  const txt=String(_('ec-paste')?.value||'');
+  let filled=0;const missed=[];
+  for(const line of txt.split(/\n/)){
+    const t=line.trim();if(!t)continue;
+    const head=t.split(/[0-9]/)[0];
+    const hn=norm(head);
+    let hit=-1,len=0;
+    allRel.forEach((sub,si)=>{const k=norm(sub);if(k&&hn.indexOf(k)>=0&&k.length>len){hit=si;len=k.length;}});
+    if(hit<0){missed.push(t.slice(0,14));continue;}
+    const toks=[...t.slice(head.length).matchAll(/(\d+(?:\.\d+)?)\s*[-~]\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)/g)];
+    if(!toks.length){missed.push(t.slice(0,14));continue;}
+    for(let i=0;i<8;i++){
+      const hiEl=_('ec-'+hit+'-'+i+'-hi'),loEl=_('ec-'+hit+'-'+i+'-lo');
+      if(!hiEl||!loEl)continue;
+      const m=toks[i];
+      if(!m){hiEl.value='';loEl.value='';continue;}
+      const a=Number(m[1]!=null?m[1]:m[3]),b=Number(m[2]!=null?m[2]:m[3]);
+      hiEl.value=String(Math.max(a,b));loEl.value=String(Math.min(a,b));
+    }
+    filled++;
+  }
+  if(filled)toast(`${filled}개 과목 예상 등급컷을 채웠습니다.${missed.length?` · 못 읽은 줄 ${missed.length}개`:''}`,'success',{duration:5000});
+  else toast('과목명을 찾지 못했습니다. 줄 앞에 과목명을 적어 주세요.','warn',{duration:6000});
+}
 function gcApplyPaste(examId){
   const ex=getExam(examId);if(!ex)return;
   const allRel=gcAllRel(ex);
@@ -5460,7 +5490,7 @@ function gcPasteBoxHtml(id,onclick,ph){
     <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">등급컷 붙여넣기</p>
     <textarea class="fi ta" id="${id}" rows="3" style="height:auto" placeholder="${escapeHtml(ph)}"></textarea>
     <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-      <p style="font-size:11px;color:#9ca3af;line-height:1.5;flex:1">한 줄에 과목 하나. 과목명 뒤에 <b>1등급부터 순서대로</b> 적으면 됩니다. 소수(42.5)도 됩니다.</p>
+      <p style="font-size:11px;color:#9ca3af;line-height:1.5;flex:1">한 줄에 과목 하나. 과목명 뒤에 <b>1등급부터 순서대로</b> 적으면 됩니다. 소수(42.5)와 범위(<code>87-85</code>) 모두 됩니다.</p>
       <button class="btn bp bsm" style="flex:0 0 auto" onclick="${onclick}">등급컷 채우기</button></div>
   </div>`;
 }
@@ -5501,7 +5531,8 @@ function openEstGradeCuts(examId){
   }
   _('mCt').style.maxWidth='900px';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">${ex.name} 예상 등급컷</p>
-    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">각 등급의 예상 최저 원점수 범위를 입력하세요. (위: 상한, 아래: 하한)</p>
+    <p style="font-size:12px;color:#6b7280;margin-bottom:12px">각 등급의 예상 최저 원점수 범위를 입력하세요. (위: 상한, 아래: 하한)</p>
+    ${gcPasteBoxHtml('ec-paste',`gcEstApplyPaste('${examId}')`,'언어와 매체 87-85 81-79 73-71 63-61\n미적분 88-86 80-78 72-70')}
     <table class="gc-tbl" style="table-layout:fixed;width:100%">${gcTblHeader()}${rows}</table>
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn bs" style="flex:1" onclick="closeModal();renderAdminExams()">취소</button><button class="btn bp" style="flex:1" onclick="saveEstGradeCutsFromModal('${examId}')">저장</button></div>`;openModal();}
 
