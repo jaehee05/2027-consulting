@@ -1374,6 +1374,7 @@ function showView(id){
     const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
     if(['vSetup','vLogin','vPin'].includes(v))el.style.display=v===id?'flex':'none';
   });
+  applyChannelIOVisibility();
 }
 
 /* ── DATA ── */
@@ -6636,7 +6637,7 @@ let _confirmResolver=null;
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
 function closeModal(){if(_modalLocked)return;const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;r(false);}}
 /* 카카오톡 채널 주소. 비워 두면 버튼이 뜨지 않는다. */
-const KAKAO_CHANNEL_URL='';
+const KAKAO_CHANNEL_URL='https://pf.kakao.com/_MtGCX/chat';
 function kakaoChannelUrl(){return (S.config&&S.config.kakaoChannelUrl)||KAKAO_CHANNEL_URL||'';}
 /* 관리자·OP·태블릿 화면에서는 숨긴다(채널톡과 같은 규칙). */
 function applyChannelIOVisibility(){

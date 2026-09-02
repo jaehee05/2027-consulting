@@ -22,7 +22,7 @@ The three deploy targets are **independent** — pick the right one for the chan
 - **Web frontend (`index.html`, `privacy.html`, `favicon.png`)** — Vercel auto-deploys from GitHub `main` on every push. Live site: `https://www.kjhedu.kr/`. No `vercel.json` in repo; config is on the Vercel side. **A `git push` is sufficient** — do not run `firebase deploy --only hosting`. The `consulting-dd53f.web.app` Firebase Hosting site exists but is unused (404).
 - **Cloud Functions** — `firebase deploy --only functions --project consulting-dd53f` (from repo root, after `cd functions && npm install`).
 - **Firestore rules** — `firebase deploy --only firestore:rules --project consulting-dd53f`.
-- **Storage rules** — `firebase deploy --only storage --project consulting-dd53f`. **Firebase Storage was never set up on this project**, so this deploy fails with "Firebase Storage has not been set up" and 질문 게시판 사진 첨부 cannot work at all. Someone has to click *Get Started* once at `console.firebase.google.com/project/consulting-dd53f/storage` (needs the Blaze plan) — the code, the bucket name in the web config, and `storage.rules` are all already correct and waiting on that.
+- **Storage rules** — `firebase deploy --only storage --project consulting-dd53f`. Storage was finally provisioned on 2026-09-02 (bucket `consulting-dd53f.firebasestorage.app`, `asia-northeast3`, production rules) and the repo's `storage.rules` released then; before that 질문 게시판 사진 첨부 could not work at all. If an upload ever fails again, check the error code the toast now prints (`storage/unauthorized` → rules, `storage/unauthenticated` → the Firebase Auth session died even though the app session survived).
 - **Mobile app** — `cd mobile && npm run ios` (or `android`). Only needed for App/Play Store releases; not part of the web deploy flow.
 
 Firebase project: **`consulting-dd53f`** (set as `default` in `.firebaserc`).
@@ -59,7 +59,7 @@ Wide tables (many exam columns) use `class="tw tw-cards tw-wide"`. `.tw-wide` se
 
 ### Contact button
 
-The 채널톡 (ChannelIO) launcher was removed on 2026-09-02 and replaced by `#kakaoCh`, a plain anchor to the academy's KakaoTalk channel, styled as a floating launcher in the same corner — deliberately kept in ChannelIO's pastel-blue chat-bubble look rather than Kakao yellow, so it reads as part of the app. `applyChannelIOVisibility` (name kept, call sites unchanged) sets its `href` and toggles `.on`: shown for students and logged-out visitors, hidden for admin/operator/tablet — and hidden whenever no URL is configured. The URL comes from `config.kakaoChannelUrl` in Firestore, falling back to the `KAKAO_CHANNEL_URL` constant.
+The 채널톡 (ChannelIO) launcher was removed on 2026-09-02 and replaced by `#kakaoCh`, a plain anchor to the academy's KakaoTalk channel, styled as a floating launcher in the same corner — deliberately kept in ChannelIO's pastel-blue chat-bubble look rather than Kakao yellow, so it reads as part of the app. `applyChannelIOVisibility` (name kept, call sites unchanged) sets its `href` and toggles `.on`: shown for students and logged-out visitors, hidden for admin/operator/tablet — and hidden whenever no URL is configured. The URL comes from `config.kakaoChannelUrl` in Firestore, falling back to the `KAKAO_CHANNEL_URL` constant (currently the `/chat` deep link for channel `_MtGCX`). `showView` re-applies it on every view change, so paths that skip `enterHome` still get the right state.
 
 ### Notices vs. popups
 
