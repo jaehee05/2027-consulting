@@ -942,8 +942,9 @@ function examAnswerKey(exam,subj){const k=examKeyObj(exam,subj);return k?k.items
 function akIsChoice(a){return /^[1-5]$/.test(String(a==null?'':a).trim());}
 /* 정답이 비어 있으면 s(주관식) 표시로 유형을 판단한다. 정답이 있으면 정답이 우선. */
 function akItemChoice(it){
+  if(it&&it.s)return false;
   const a=String(it&&it.a!=null?it.a:'').trim();
-  return a!==''?akIsChoice(a):!(it&&it.s);
+  return a===''||akIsChoice(a);
 }
 /* 정답 일괄 입력 — '①④⑤', '1③ 2④ 3⑤', '3 4 5 1 3' 등을 순서대로 받는다.
    원문자가 하나라도 있으면 원문자만 정답으로 본다(앞의 문항 번호를 걸러내기 위함). */
@@ -5116,10 +5117,14 @@ function akParseKice(items){
   if(cols===1)names=single?[single]:(names.length===1?names:[area||names[0]||'']);
   if(names.length!==cols)return {subjects:[],area,error:`과목 열 ${cols}개와 과목명 ${names.length}개가 맞지 않습니다.`};
   const common=cols>1?nos.filter(n=>byNo.get(n).length===1).length:0;
-  return {area,error:'',subjects:names.map((name,k)=>({
-    name,common,
-    items:nos.map(n=>{const l=byNo.get(n);const it=l.length===1?l[0]:l[k];return it?{a:it.a,p:it.p}:{a:'',p:0};})
-  }))};
+  return {area,error:'',subjects:names.map((name,k)=>{
+    const items=nos.map(n=>{const l=byNo.get(n);const it=l.length===1?l[0]:l[k];return it?{a:it.a,p:it.p}:{a:'',p:0};});
+    /* 정답이 1~5 가 아니면 주관식. 수학은 답이 우연히 1~5 일 수 있어 표준 위치도 함께 표시한다. */
+    items.forEach(it=>{if(!akIsChoice(it.a))it.s=1;});
+    const isMath=area==='수학'||name==='수학'||MAT_CHOICE_SUBJS.includes(name);
+    if(isMath&&items.length===30)AK_SHORT_NOS['수학'].forEach(no=>{if(items[no-1])items[no-1].s=1;});
+    return {name,common,items};
+  })};
 }
 async function akFetchParse(lib,url){
   const resp=await fetch(url);
@@ -5137,8 +5142,8 @@ function akApplyParsed(ex,r){
   const applied=[],skipped=[];
   for(const sub of r.subjects||[]){
     if(!mine.includes(sub.name)){skipped.push(sub.name);continue;}
-    S.akDraft[sub.name]={items:sub.items.map(it=>({a:it.a,p:it.p})),common:sub.common||0,
-      open:!!(S.akDraft[sub.name]&&S.akDraft[sub.name].open)};
+    S.akDraft[sub.name]={items:sub.items.map(it=>{const o={a:it.a,p:it.p};if(it.s)o.s=1;return o;}),
+      common:sub.common||0,open:!!(S.akDraft[sub.name]&&S.akDraft[sub.name].open)};
     applied.push(sub.name);
   }
   return {applied,skipped};
@@ -5331,6 +5336,8 @@ function akRecalcTotal(){
 /* 정답을 한 글자 넣으면 다음 문항으로 넘겨 연속 입력이 끊기지 않게 한다. */
 function akAdvance(input,i){
   akRecalcTotal();
+  const items=akItemsFor(S.akSubj)||[];
+  if(items[i]&&items[i].s)return;
   if(akIsChoice(input.value)){const nx=_('ak-a-'+(i+1));if(nx){nx.focus();nx.select&&nx.select();}}
 }
 function akSwitchSubj(v){akReadGrid();S.akSubj=v;akRenderModal();}
