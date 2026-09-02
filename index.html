@@ -111,20 +111,27 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 #kakaoCh:active{transform:translateY(0)}
 #kakaoCh svg{width:27px;height:27px;display:block;fill:#1C64F2}
 @media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:52px;height:52px}#kakaoCh svg{width:25px;height:25px}}
-/* 오답 문항 목록(멘토링) */
-.wa-sec{padding:10px 0;border-top:1px solid var(--gray-100)}
+/* 정오표(멘토링) */
+.wa-sec{padding:12px 0;border-top:1px solid var(--gray-100)}
 .wa-sec.first{border-top:none;padding-top:0}
 .wa-h{display:flex;align-items:baseline;gap:7px;font-size:13px;font-weight:800;color:var(--gray-900);margin-bottom:8px;flex-wrap:wrap}
 .wa-subj{font-size:11.5px;font-weight:600;color:var(--primary)}
 .wa-n{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--gray-500)}
-.wa-chips{display:flex;flex-wrap:wrap;gap:5px}
-.wa-chip{display:inline-flex;align-items:center;gap:4px;background:var(--danger-soft);border:1px solid #fecaca;border-radius:8px;padding:3px 8px;font-size:12px;color:#991b1b;white-space:nowrap}
-.wa-chip b{font-weight:800;font-size:11.5px}
-.wa-chip i{font-style:normal;font-size:9.5px;font-weight:700;color:var(--warning-text);background:var(--warning-soft);border-radius:4px;padding:1px 4px}
-.wa-chip em{font-style:normal;color:var(--gray-400);font-size:10px}
-.wa-chip .ok{font-weight:800;color:var(--success)}
-.wa-chip.blank{background:var(--gray-100);border-color:var(--gray-200);color:var(--gray-500)}
+.wa-part{font-size:11.5px;font-weight:700;color:var(--gray-500);margin:8px 0 5px}
+.wa-part b{color:var(--primary)}
 .wa-none{font-size:12px;color:var(--success);font-weight:600}
+.oj-wrap{overflow-x:auto}
+.oj-tbl{border-collapse:collapse;font-size:12px;margin-bottom:6px;width:max-content;table-layout:fixed}
+.oj-tbl th,.oj-tbl td{border:1px solid var(--gray-200);padding:3px 2px;text-align:center;width:30px;min-width:30px;line-height:1.45}
+.oj-tbl th{background:var(--gray-100);font-size:10.5px;font-weight:700;color:var(--gray-600)}
+.oj-tbl .oj-h{background:var(--gray-50);font-size:10.5px;font-weight:700;color:var(--gray-500);width:42px;min-width:42px;white-space:nowrap;padding:3px 7px}
+.oj-tbl .oj-key{color:var(--gray-500);font-size:11.5px}
+.oj-tbl .oj-my{font-weight:700;color:var(--gray-900);font-size:11.5px}
+.oj-tbl .oj-my.bad{color:var(--danger)}
+.oj-tbl .oj-my.blank{color:var(--gray-400);font-weight:400}
+.oj-tbl .oj-o{color:var(--success);font-weight:800}
+.oj-tbl .oj-x{background:var(--danger-soft);color:var(--danger);font-weight:800}
+.oj-tbl .oj-skip{color:var(--gray-400)}
 /* 학생 답안 입력(가채점표) — 객관식은 5문항 묶음, 주관식은 문항별 칸 */
 .as-sec{margin-top:18px}
 .as-sec-t{font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:2px}
@@ -2184,6 +2191,30 @@ function waSlotSubj(sc,k){
   return (sc&&sc[k+'Subj'])||'';
 }
 function waMark(v){const t=String(v==null?'':v).trim();return t===''?'—':(/^[1-5]$/.test(t)?'①②③④⑤'[Number(t)-1]:t);}
+/* 정오표 — 번호/정답/내 답/채점 4줄, 10문항씩 끊어서 표를 이어 붙인다. */
+function ojTablesHtml(items,arr,from,to,per){
+  per=per||10;
+  let out='';
+  for(let s0=from;s0<=to;s0+=per){
+    const e0=Math.min(s0+per-1,to);
+    const cells={no:'',key:'',my:'',mk:''};
+    for(let i=s0;i<=e0;i++){
+      const keyed=String(items[i]&&items[i].a!=null?items[i].a:'').trim()!=='';
+      const blank=String(arr[i]==null?'':arr[i]).trim()==='';
+      const ok=keyed&&akSame(arr[i],items[i].a);
+      cells.no+=`<th>${i+1}</th>`;
+      cells.key+=`<td class="oj-key">${keyed?waMark(items[i].a):'—'}</td>`;
+      cells.my+=`<td class="oj-my${blank?' blank':(ok?'':' bad')}">${waMark(arr[i])}</td>`;
+      cells.mk+=`<td class="${!keyed?'oj-skip':(blank?'oj-skip':(ok?'oj-o':'oj-x'))}">${!keyed||blank?'·':(ok?'O':'X')}</td>`;
+    }
+    out+=`<table class="oj-tbl"><tbody>
+      <tr><td class="oj-h">번호</td>${cells.no}</tr>
+      <tr><td class="oj-h">정답</td>${cells.key}</tr>
+      <tr><td class="oj-h">내 답</td>${cells.my}</tr>
+      <tr><td class="oj-h">채점</td>${cells.mk}</tr></tbody></table>`;
+  }
+  return `<div class="oj-wrap">${out}</div>`;
+}
 function wrongListHtml(exam,sc){
   if(!exam||!sc||!sc.answers)return '';
   const blocks=[];
@@ -2194,18 +2225,19 @@ function wrongListHtml(exam,sc){
     if(!items||!Array.isArray(arr)||!arr.length)continue;
     const wrong=akWrongNos(items,arr);
     const common=akCommonCount(exam,subj);
-    const chips=wrong.map(no=>{
-      const i=no-1;const mine=String(arr[i]==null?'':arr[i]).trim();
-      return `<span class="wa-chip${mine===''?' blank':''}"><b>${no}</b>${common>0&&i>=common?'<i>선택</i>':''}<span>${waMark(mine)}</span><em>→</em><span class="ok">${waMark(items[i].a)}</span></span>`;
-    }).join('');
+    const parts=(common>0&&common<items.length)
+      ?[['공통과목',0,common-1],[`선택과목(<b>${escapeHtml(subj)}</b>)`,common,items.length-1]]
+      :[['',0,items.length-1]];
+    const body=parts.map(([plabel,from,to])=>
+      (plabel?`<p class="wa-part">▪ ${plabel}</p>`:'')+ojTablesHtml(items,arr,from,to)).join('');
     blocks.push(`<div class="wa-sec${blocks.length?'':' first'}">
       <p class="wa-h">${label}<span class="wa-subj">${escapeHtml(subj)}</span><span class="wa-n">${wrong.length?`오답 ${wrong.length}문항`:'전부 정답'} · ${akScore(items,arr)}점</span></p>
-      ${chips?`<div class="wa-chips">${chips}</div>`:'<p class="wa-none">틀린 문항이 없습니다.</p>'}</div>`);
+      ${body}</div>`);
   }
   if(!blocks.length)return '';
   return `<div class="card" style="margin-bottom:12px">
-    <p style="font-size:13px;font-weight:700;margin-bottom:3px">오답 문항</p>
-    <p style="font-size:11px;color:#9ca3af;margin-bottom:10px">학생이 쓴 답 → 정답. 미입력 문항은 회색입니다.</p>
+    <p style="font-size:13px;font-weight:700;margin-bottom:3px">정오표</p>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:10px">문항별 정답과 학생 답을 대조한 표입니다. 미입력 문항은 · 로 표시됩니다.</p>
     ${blocks.join('')}</div>`;
 }
 function scSubjRowLabel(exam){return examKorCommon(exam)&&examMatCommon(exam)?'과목':'선택과목';}
