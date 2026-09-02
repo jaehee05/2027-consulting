@@ -945,6 +945,19 @@ function akItemChoice(it){
   const a=String(it&&it.a!=null?it.a:'').trim();
   return a!==''?akIsChoice(a):!(it&&it.s);
 }
+/* 정답 일괄 입력 — '①④⑤', '1③ 2④ 3⑤', '3 4 5 1 3' 등을 순서대로 받는다.
+   원문자가 하나라도 있으면 원문자만 정답으로 본다(앞의 문항 번호를 걸러내기 위함). */
+function akParseAnswers(t){
+  const src=String(t||'');
+  const hasCircle=/[①②③④⑤]/.test(src);
+  const out=[];
+  for(const m of src.matchAll(/[①②③④⑤]|\d+/g)){
+    const tok=m[0];const ci=AK_CIRCLES.indexOf(tok);
+    if(hasCircle){if(ci>=0)out.push(String(ci+1));}
+    else out.push(tok);
+  }
+  return out;
+}
 /* '16-22,29-30' 같은 표기를 문항 번호 배열로. */
 function akParseNos(t){
   const out=new Set();
@@ -5132,7 +5145,14 @@ function akApplyParsed(ex,r){
 }
 async function akImportFromUrl(){
   const url=(_('ak-url')?.value||'').trim();
-  if(!/^https?:\/\//.test(url)){toast('정답표 PDF 주소를 입력하세요.','warn');return;}
+  if(!/^https?:\/\//.test(url)){toast('정답표 PDF 또는 이미지 주소를 입력하세요.','warn');return;}
+  if(/\.(png|jpe?g|gif|webp)(\?|$)/i.test(url)||/imageSrc=/.test(url)){
+    const m=url.match(/imageSrc=([^&]+)/);
+    akShowImage(m?decodeURIComponent(m[1]):url);
+    S.akSrcUrl=url;
+    toast('이미지는 자동으로 읽을 수 없습니다. 아래 이미지를 보고 정답을 붙여넣어 주세요.','warn',{duration:7000});
+    return;
+  }
   showLoad(true);
   try{
     const lib=await getPdfjs();
@@ -5213,7 +5233,20 @@ function akRenderModal(){
       <div style="display:flex;gap:6px;flex-wrap:wrap"><input class="fi" id="ak-url" value="${escapeHtml(S.akSrcUrl||ex.answerKeySrc||'')}" placeholder="https://cdn.kice.re.kr/09mo-27suneung/09mo-27suneung_1a.pdf" style="flex:1;min-width:180px">
       <button class="btn bp bsm" style="flex:0 0 auto" onclick="akImportFromUrl()">불러오기</button>
       <button class="btn bs bsm" style="flex:0 0 auto;color:#6d28d9;border-color:#ddd6fe" onclick="akImportExplorations()">탐구 전체</button></div>
-      <p style="font-size:11px;color:#9ca3af;margin-top:6px">국어 <code>_1a</code>, 수학 <code>_2a</code>, 영어 <code>_3a</code> — 선택과목까지 한 번에 채워집니다.<br>탐구는 과목마다 파일이 나뉘어 있어(<code>_42_1a</code>, <code>_43_1a</code> …) <b>탐구 전체</b>를 누르면 응시 과목을 모두 훑어 받아옵니다. 저장 전에 값을 확인해 주세요.</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:6px">국어 <code>_1a</code>, 수학 <code>_2a</code>, 영어 <code>_3a</code> — 선택과목까지 한 번에 채워집니다.<br>탐구는 과목마다 파일이 나뉘어 있어(<code>_42_1a</code>, <code>_43_1a</code> …) <b>탐구 전체</b>를 누르면 응시 과목을 모두 훑어 받아옵니다.<br><b>이미지(교육청 학평)</b> 주소를 넣으면 아래에 띄워 드립니다 — 보면서 정답을 붙여넣으세요.</p>
+      <div id="ak-img" style="display:none;margin-top:8px;max-height:340px;overflow:auto;border:1px solid #ddd6fe;border-radius:8px;background:#fff"></div>
+    </div>
+    <div style="background:#f9fafb;border:1px solid var(--gray-200);border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <p style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">정답 일괄 입력</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <input class="fi" id="ak-paste" placeholder="③④⑤①③ 또는 3 4 5 1 3 또는 1③ 2④ 3⑤ …" style="flex:1;min-width:180px">
+        <button class="btn bp bsm" style="flex:0 0 auto" onclick="akApplyPaste()">정답 채우기</button></div>
+      <div class="frow" style="margin-top:8px;margin-bottom:0">
+        <div class="fg" style="margin:0"><label class="fl">3점 문항 <span style="font-weight:400;color:#9ca3af">— 나머지는 2점</span></label>
+          <input class="fi" id="ak-p3" placeholder="예: 8,13,21,34" onchange="akApplyP3(this.value)"></div>
+        <div class="fg" style="margin:0"><label class="fl">&nbsp;</label>
+          <p style="font-size:11px;color:#9ca3af;line-height:1.5">번호 순서대로 채웁니다. 원문자(①~⑤)가 섞여 있으면 원문자만 정답으로 읽습니다.</p></div>
+      </div>
     </div>
     <div class="frow" style="margin-bottom:8px"><div class="fg" style="margin:0"><label class="fl">과목</label>
       <select class="fi fsel" id="ak-subj" onchange="akSwitchSubj(this.value)">${opts}</select></div>
@@ -5250,6 +5283,30 @@ function akSetShort(v){
   akRenderModal();
 }
 function akSetOpen(v){const d=S.akDraft[S.akSubj];if(d)d.open=!!v;}
+function akApplyPaste(){
+  akReadGrid();
+  const items=akItemsFor(S.akSubj);if(!items)return;
+  const vals=akParseAnswers(_('ak-paste')?.value||'');
+  if(!vals.length){toast('정답을 붙여넣어 주세요.','warn');return;}
+  items.forEach((it,i)=>{it.a=vals[i]!=null?vals[i]:'';});
+  akRenderModal();
+  const msg=vals.length===items.length?`${vals.length}문항 채웠습니다.`
+    :`${Math.min(vals.length,items.length)}문항 채웠습니다. (붙여넣은 값 ${vals.length}개 / 문항 ${items.length}개 — 개수를 확인해 주세요)`;
+  toast(msg,vals.length===items.length?'success':'warn',{duration:6000});
+}
+function akApplyP3(v){
+  akReadGrid();
+  const items=akItemsFor(S.akSubj);if(!items)return;
+  const nos=new Set(akParseNos(v));
+  items.forEach((it,i)=>{it.p=nos.has(i+1)?3:2;});
+  akRenderModal();
+}
+/* 이미지로 제공되는 정답표(교육청 학평)는 파싱할 수 없으니 옆에 띄워만 준다. */
+function akShowImage(url){
+  const box=_('ak-img');if(!box)return;
+  box.style.display='block';
+  box.innerHTML=`<img src="${escapeHtml(url)}" referrerpolicy="no-referrer" style="display:block;width:100%;height:auto" alt="정답표 이미지">`;
+}
 function akReadGrid(){
   const d=S.akDraft&&S.akDraft[S.akSubj];
   if(d){
