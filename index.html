@@ -341,7 +341,50 @@ tr:last-child td{border-bottom:none}
   .mtitle{font-size:16px}
   .mactions{position:sticky;bottom:-18px;background:var(--surface);margin:8px -18px -18px;padding:14px 18px;border-top:1px solid var(--gray-200);z-index:5}
 }
-@media print{.np{display:none!important}.po{display:block!important}.topbar,.tabs{display:none!important}body{background:white}.po,.po *{-webkit-print-color-adjust:exact;print-color-adjust:exact}.po .adm-slot{height:56px}}
+/* 인쇄 문서 — 모달 미리보기와 실제 인쇄가 같은 마크업을 쓴다. */
+.pr-doc{color:#111827;font-size:13px;line-height:1.5}
+.pr-title{font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:3px}
+.pr-sub{font-size:11.5px;color:#4b5563;padding-bottom:8px;border-bottom:2px solid #111827;margin-bottom:16px}
+.pr-sec{margin-bottom:18px;page-break-inside:avoid;break-inside:avoid}
+.pr-sec:last-child{margin-bottom:0}
+.pr-h{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:800;padding-bottom:5px;margin-bottom:9px;border-bottom:1.5px solid #111827}
+.pr-h-sub{font-size:11px;font-weight:600;color:#4b5563;margin-left:auto}
+.pr-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.pr-slot{border:1px solid #9ca3af;border-radius:5px;padding:6px 4px;min-height:42px;display:flex;flex-direction:column;justify-content:center;gap:3px;text-align:center}
+.pr-slot b{display:block;font-size:11px;font-weight:700;color:#374151;letter-spacing:-.2px}
+.pr-slot span{display:block;font-size:12.5px;font-weight:700;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-slot.filled{background:#e8f0fe;border-color:#374151}
+.pr-slot.vacant span{color:#9ca3af;font-weight:500}
+.pr-slot.off{border-style:dashed;background:#f3f4f6}
+.pr-slot.off span{color:#6b7280;font-weight:500}
+.pr-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.pr-tbl th{background:#f3f4f6;border:1px solid #9ca3af;padding:5px 7px;font-size:11px;font-weight:700;color:#111827;text-align:center;white-space:nowrap}
+.pr-tbl td{border:1px solid #d1d5db;padding:5px 7px;text-align:center}
+.pr-tbl td.l{text-align:left}
+.pr-tbl td.nm{font-weight:700;text-align:left}
+.pr-tbl tr{page-break-inside:avoid;break-inside:avoid}
+.pr-empty{color:#9ca3af;font-size:12px}
+@media print{
+  @page{size:A4 portrait;margin:14mm 12mm}
+  html,body{background:#fff!important}
+  .topbar,.tabs,.np{display:none!important}
+  /* 인쇄 버튼으로 들어온 경우엔 인쇄 영역만 남긴다. */
+  body.printing>*{display:none!important}
+  body.printing>#printRoot{display:block!important}
+  .po,.po *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pr-doc{font-size:10pt}
+  .pr-title{font-size:15pt}
+  .pr-sub{font-size:8.5pt;margin-bottom:7mm}
+  .pr-sec{margin-bottom:7mm}
+  .pr-h{font-size:11pt}
+  .pr-h-sub{font-size:8.5pt}
+  .pr-grid{gap:1.2mm}
+  .pr-slot{min-height:11mm;border-radius:1mm}
+  .pr-slot b{font-size:8pt}
+  .pr-slot span{font-size:9.5pt}
+  .pr-tbl{font-size:9pt}
+  .pr-tbl th{font-size:8.5pt}
+}
 .po{display:none}
 code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;font-family:monospace}
 .empty{text-align:center;padding:36px 20px;color:var(--gray-400);font-size:13px}
@@ -592,6 +635,9 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <div id="mOv" class="overlay hidden" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="mCt"></div>
 </div>
+
+<!-- 인쇄 영역 (인쇄 시에만 노출) -->
+<div id="printRoot" class="po" style="display:none"></div>
 
 <!-- 팝업 공지 -->
 <div id="pOv" class="overlay hidden" style="z-index:1100" onclick="if(event.target===this)popupNext()">
@@ -2406,6 +2452,7 @@ function noticeStudentCardHtml(){
 // 관리자 공지사항 보드 — 공지사항 탭에서 작성/수정/삭제/고정 토글.
 function noticeBoardHtml(){
   const list=noticeSorted();
+  const pinnedN=list.filter(n=>n.pinned).length;
   const open=S.noticeComposerOpen;
   const composer=open?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:12px">
       <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 공지 작성</p>
@@ -2453,8 +2500,9 @@ function noticeBoardHtml(){
   }
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <span class="bx bb">공지</span><p style="font-size:15px;font-weight:700">공지사항</p>${list.length?`<span style="font-size:11px;color:#6b7280">${list.length}건</span>`:''}
+      <span class="bx bb">공지</span><p style="font-size:15px;font-weight:700">공지사항</p>${list.length?`<span style="font-size:11px;color:#6b7280">${list.length}건${pinnedN?` · 고정 ${pinnedN}건`:''}</span>`:''}
     </div>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:12px">학생 멘토링 화면 상단에 항상 보이는 목록입니다.</p>
     ${composer}
     ${itemsHtml}
   </div>`;
@@ -2468,19 +2516,8 @@ function noticeRerender(){
   else if(S.tab==='notices')renderAdminNotices();
 }
 function renderAdminNotices(){
-  const list=noticeSorted();
-  const summary=`<div class="np" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
-    <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe">
-      <p style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px;letter-spacing:-.2px">전체 공지</p>
-      <p style="font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.1">${list.length}<span style="font-size:13px;font-weight:600;color:#3b82f6;margin-left:3px">건</span></p>
-    </div>
-    <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a">
-      <p style="font-size:11px;font-weight:700;color:#b45309;margin-bottom:4px;letter-spacing:-.2px">고정 공지</p>
-      <p style="font-size:22px;font-weight:800;color:#78350f;line-height:1.1">${list.filter(n=>n.pinned).length}<span style="font-size:13px;font-weight:600;color:#d97706;margin-left:3px">건</span></p>
-    </div>
-  </div>`;
   if(!_popupsLoaded&&!_popupsLoading)popupAdminInit();
-  _('adminC').innerHTML=summary+popupBoardHtml()+noticeBoardHtml();
+  _('adminC').innerHTML=popupBoardHtml()+noticeBoardHtml();
 }
 // 액션 핸들러는 Firestore에만 쓰고, S.notices 갱신과 rerender는 onSnapshot 리스너에 일임한다.
 // 로컬에서 직접 push/update/filter 하면 리스너의 즉시 발화와 겹쳐 중복 항목이 생긴다.
@@ -4894,78 +4931,53 @@ function buildBookingPrintHtml(opts){
     .sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.slot||'').localeCompare(b.slot||''));
   const noshowIds=new Set(S.bookings.filter(isNoShow).map(b=>b.studentId));
   const unbooked=bookableStu().filter(s=>!bookedIds.has(s._docId)&&!noshowIds.has(s._docId)).sort((a,b)=>(a.seat||999)-(b.seat||999));
+  const phoneOf=stu=>stu?((stu.noStudentPhone?stu.guardianPhone:stu.studentPhone)||'—'):'—';
 
   const gridHtml=!o.grid?'':printDates.map(d=>{
     const sortedSlots=[...(d.slots||[])].sort((a,b)=>a.localeCompare(b));
     const bookedCnt=live.filter(b=>b.date===d.date).length;
     const cells=sortedSlots.map(slot=>{
       const b=live.find(x=>x.date===d.date&&x.slot===slot);
-      if(b){
-        const att=b.attendance==='attended'?' \u2713':'';
-        return `<div class="adm-slot filled" style="cursor:default"><span class="adm-slot-time">${escapeHtml(slot)}${att}</span><span class="adm-slot-name">${escapeHtml(b.studentName||'')}</span></div>`;
-      }
-      const slotActive=isSlotActive(d.id,slot);
-      const inactiveStyle=slotActive?'':'background:repeating-linear-gradient(135deg,#d1d5db 0,#d1d5db 8px,#9ca3af 8px,#9ca3af 16px);color:#1f2937;border-color:#6b7280;border-style:dashed';
-      const lbl=slotActive?'비어있음':'비활성';
-      return `<div class="adm-slot vacant" style="cursor:default;${inactiveStyle}"><span class="adm-slot-time">${escapeHtml(slot)}</span><span class="adm-slot-name">${lbl}</span></div>`;
+      if(b)return `<div class="pr-slot filled"><b>${escapeHtml(slot)}${b.attendance==='attended'?' ✓':''}</b><span>${escapeHtml(b.studentName||'')}</span></div>`;
+      if(!isSlotActive(d.id,slot))return `<div class="pr-slot off"><b>${escapeHtml(slot)}</b><span>비활성</span></div>`;
+      return `<div class="pr-slot vacant"><b>${escapeHtml(slot)}</b><span>—</span></div>`;
     }).join('');
-    return `<div style="margin-bottom:24px;page-break-inside:avoid">
-      <p style="font-size:14px;font-weight:700;border-bottom:2px solid #1C64F2;padding-bottom:6px;margin-bottom:10px">${escapeHtml(d.label||'')} <span style="font-size:11px;font-weight:500;color:#6b7280;margin-left:6px">예약 ${bookedCnt}/${sortedSlots.length}</span></p>
-      <div class="sg">${cells}</div>
-    </div>`;
+    return `<section class="pr-sec"><h3 class="pr-h">${escapeHtml(d.label||'')}<span class="pr-h-sub">예약 ${bookedCnt} / ${sortedSlots.length}</span></h3>
+      <div class="pr-grid">${cells}</div></section>`;
   }).join('');
 
-  const noshowHtml=(!o.noshow||!noshowList.length)?'':`<div style="margin-top:24px;page-break-inside:avoid">
-    <p style="font-size:14px;font-weight:700;border-bottom:2px solid #991b1b;padding-bottom:6px;margin-bottom:10px;color:#991b1b">결석 처리된 학생 <span style="font-size:11px;font-weight:500;color:#b91c1c;margin-left:6px">총 ${noshowList.length}명</span></p>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="background:#fee2e2;color:#991b1b">
-        <th style="padding:6px 8px;text-align:center;width:48px">좌석</th>
-        <th style="padding:6px 8px;text-align:center">이름</th>
-        <th style="padding:6px 8px;text-align:center">원래 예약</th>
-        <th style="padding:6px 8px;text-align:center">학교</th>
-        <th style="padding:6px 8px;text-align:center">연락처</th>
-      </tr></thead>
+  const noshowHtml=(!o.noshow||!noshowList.length)?'':`<section class="pr-sec">
+    <h3 class="pr-h">결석 처리된 학생<span class="pr-h-sub">총 ${noshowList.length}명</span></h3>
+    <table class="pr-tbl">
+      <thead><tr><th style="width:12mm">좌석</th><th>이름</th><th>원래 예약</th><th>학교</th><th>연락처</th></tr></thead>
       <tbody>${noshowList.map(b=>{const stu=S.students.find(x=>x._docId===b.studentId);
-        return `<tr style="border-bottom:1px solid #f0f0f0">
-        <td style="padding:6px 8px;text-align:center;font-weight:700;color:#1C64F2">${stu?.seat||'—'}</td>
-        <td style="padding:6px 8px;font-weight:700">${escapeHtml(b.studentName||'')}</td>
-        <td style="padding:6px 8px;text-align:center;color:#991b1b">${escapeHtml(b.dateLabel||'')} ${escapeHtml(b.slot||'')}</td>
-        <td style="padding:6px 8px">${escapeHtml(stu?.school||'—')}</td>
-        <td style="padding:6px 8px;color:#374151">${escapeHtml(stu?(stu.noStudentPhone?stu.guardianPhone:stu.studentPhone)||'—':'—')}</td>
-      </tr>`;}).join('')}</tbody>
-    </table>
-  </div>`;
+        return `<tr><td>${stu?.seat||'—'}</td><td class="nm">${escapeHtml(b.studentName||'')}</td>
+        <td>${escapeHtml(b.dateLabel||'')} ${escapeHtml(b.slot||'')}</td>
+        <td class="l">${escapeHtml(stu?.school||'—')}</td>
+        <td>${escapeHtml(phoneOf(stu))}</td></tr>`;}).join('')}</tbody>
+    </table></section>`;
 
-  const unbookedHtml=(!o.unbooked||!unbooked.length)?'':`<div style="margin-top:24px;page-break-inside:avoid">
-    <p style="font-size:14px;font-weight:700;border-bottom:2px solid #b45309;padding-bottom:6px;margin-bottom:10px;color:#78350f">미예약 학생 <span style="font-size:11px;font-weight:500;color:#9a3412;margin-left:6px">총 ${unbooked.length}명</span></p>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="background:#fef3c7;color:#78350f">
-        <th style="padding:6px 8px;text-align:center;width:48px">좌석</th>
-        <th style="padding:6px 8px;text-align:center">이름</th>
-        <th style="padding:6px 8px;text-align:center">학교</th>
-        <th style="padding:6px 8px;text-align:center;width:56px">학년</th>
-        <th style="padding:6px 8px;text-align:center">학생 연락처</th>
-        <th style="padding:6px 8px;text-align:center">보호자 연락처</th>
-      </tr></thead>
-      <tbody>${unbooked.map(s=>`<tr style="border-bottom:1px solid #f0f0f0">
-        <td style="padding:6px 8px;text-align:center;font-weight:700;color:#1C64F2;width:48px">${s.seat||'—'}</td>
-        <td style="padding:6px 8px;font-weight:700">${escapeHtml(s.name||'')}</td>
-        <td style="padding:6px 8px">${escapeHtml(s.school||'')}</td>
-        <td style="padding:6px 8px;color:#6b7280;width:56px">${escapeHtml(s.grade||'')}</td>
-        <td style="padding:6px 8px;color:#374151">${escapeHtml(s.noStudentPhone?'(없음)':(s.studentPhone||''))}</td>
-        <td style="padding:6px 8px;color:#6b7280">${escapeHtml(s.guardianPhone||'')}</td>
-      </tr>`).join('')}</tbody>
-    </table>
-  </div>`;
+  const unbookedHtml=(!o.unbooked||!unbooked.length)?'':`<section class="pr-sec">
+    <h3 class="pr-h">미예약 학생<span class="pr-h-sub">총 ${unbooked.length}명</span></h3>
+    <table class="pr-tbl">
+      <thead><tr><th style="width:12mm">좌석</th><th>이름</th><th style="width:14mm">학년</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th></tr></thead>
+      <tbody>${unbooked.map(s=>`<tr><td>${s.seat||'—'}</td><td class="nm">${escapeHtml(s.name||'')}</td>
+        <td>${escapeHtml(s.grade||'—')}</td><td class="l">${escapeHtml(s.school||'—')}</td>
+        <td>${escapeHtml(s.noStudentPhone?'(없음)':(s.studentPhone||'—'))}</td>
+        <td>${escapeHtml(s.guardianPhone||'—')}</td></tr>`).join('')}</tbody>
+    </table></section>`;
 
+  const allDates=(S.schedule.dates||[]).filter(d=>(d.slots||[]).length>0);
   const dateLbl=printDates.length===0?'선택된 날짜 없음'
-    :printDates.length===(S.schedule.dates||[]).filter(d=>(d.slots||[]).length>0).length?'전체 일정'
+    :printDates.length===allDates.length?'전체 일정'
     :printDates.map(d=>d.label).join(', ');
   const body=gridHtml+noshowHtml+unbookedHtml;
   return {
-    html:`<p style="font-size:18px;font-weight:800;margin-bottom:4px">2027학년도 9월 모의평가 멘토링 예약 현황</p>
-      <p style="font-size:12px;color:#6b7280;margin-bottom:20px">${escapeHtml(dateLbl)} · 예약 ${inRange.length}건 · 출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
-      ${body||'<p style="color:#9ca3af">인쇄할 내용이 없습니다. 포함 항목을 선택해 주세요.</p>'}`,
+    html:`<div class="pr-doc">
+      <p class="pr-title">2027학년도 9월 모의평가 멘토링 예약 현황</p>
+      <p class="pr-sub">${escapeHtml(dateLbl)} · 예약 ${inRange.length}건 · 출력일 ${new Date().toLocaleDateString('ko-KR')}</p>
+      ${body||'<p class="pr-empty">인쇄할 내용이 없습니다. 포함 항목을 선택해 주세요.</p>'}
+    </div>`,
     counts:{dates:printDates.length, booked:inRange.length, noshow:noshowList.length, unbooked:unbooked.length}
   };
 }
@@ -5024,12 +5036,21 @@ function setAllPrintDates(on){
   openBookPrintModal();
 }
 function doBookPrint(){
-  const area=_('bookPrintArea');
+  const area=_('printRoot');
   if(!area){toast('인쇄 영역을 찾지 못했습니다.','error');return;}
   area.innerHTML=buildBookingPrintHtml(bookPrintOpts()).html;
   closeModal();
+  document.body.classList.add('printing');
   setTimeout(()=>window.print(),80);
 }
+/* 인쇄가 끝나면 화면을 원래대로 돌린다. afterprint 를 못 받는 브라우저 대비로 타이머도 둔다. */
+function endBookPrint(){
+  if(!document.body.classList.contains('printing'))return;
+  document.body.classList.remove('printing');
+  const r=_('printRoot');if(r)r.innerHTML='';
+}
+window.addEventListener('afterprint',endBookPrint);
+window.addEventListener('focus',()=>setTimeout(endBookPrint,300));
 function renderAdminBookings(){
   const bookedIds=new Set(S.bookings.filter(b=>!isNoShow(b)).map(b=>b.studentId));
   const noshowList=S.bookings.filter(isNoShow).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.slot||'').localeCompare(b.slot||''));
@@ -5160,7 +5181,6 @@ function renderAdminBookings(){
     ${statsCard}
     ${dupCard}
     ${disableCard}
-    <div class="po" id="bookPrintArea" style="display:none;margin-bottom:24px"></div>
     ${slotGridHtml}
     ${renderRequestsSection()}
     ${noshowSection}

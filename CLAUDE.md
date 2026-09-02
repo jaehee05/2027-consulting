@@ -72,6 +72,14 @@ Popup specifics:
 - `S.popupShown` makes the popup fire once per session; `doLogout` resets it (and `_popupsLoaded`) so the next login shows it again.
 - The sample 팝업 is seeded once by `popupSeedSample()` when an admin first opens the 공지사항 tab, guarded by `config.popupSeeded`. Deleting the sample must not bring it back — that flag is the guard, so don't seed off an empty-collection check.
 
+### Printing (예약 현황)
+
+`window.print()` is only ever called from `doBookPrint`. Printing is **opt-in isolation**, not opt-out:
+
+- The print document is rendered into `#printRoot`, a **direct child of `<body>`** — not into the booking view. `doBookPrint` adds `body.printing`, and `@media print` then hides every body child except `#printRoot` (`body.printing>*{display:none!important}` + an ID-specificity override). The earlier approach only hid `.np`-tagged blocks, so the slot grid, requests section and no-show section printed underneath the print area.
+- `endBookPrint` (bound to `afterprint`, plus a `focus` fallback for browsers that skip it) drops the class and empties `#printRoot`.
+- `buildBookingPrintHtml` emits `.pr-*` classes only — no inline styling. Those classes are defined for screen (the modal preview at `#printPrev` uses the same markup) and re-sized inside `@media print`, so preview and paper stay in sync. Add print styling there, never as inline styles in the builder.
+
 ### Grade-cut model (graph/score rendering)
 
 A student's score per exam is stored with both a `*Raw` (raw score) and a cached `*Grade` (computed grade) for each subject (`kor`, `mat`, `eng`, `his`, `exp1`, `exp2`, `lang2`), plus optional `*GradeOverride` for admin overrides. Exams carry two parallel cut tables:
