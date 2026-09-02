@@ -104,6 +104,13 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .tab{padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray-500);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;flex-shrink:0;white-space:nowrap}
 .tab.on{color:var(--primary);border-bottom-color:var(--primary)}.tab:hover{color:var(--gray-900)}
 .tw{overflow-x:auto}
+/* 카카오톡 채널 문의 버튼 — 채널톡 런처를 대체한다. */
+#kakaoCh{position:fixed;right:20px;bottom:20px;z-index:900;width:54px;height:54px;border-radius:50%;background:#FEE500;display:none;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.18);transition:transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
+#kakaoCh.on{display:flex}
+#kakaoCh:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.22)}
+#kakaoCh:active{transform:translateY(0)}
+#kakaoCh svg{width:28px;height:28px;display:block}
+@media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:50px;height:50px}#kakaoCh svg{width:26px;height:26px}}
 /* 팝업 공지 */
 #pOv .modal{padding:0;overflow:hidden;max-width:400px}
 #pOv:not(.hidden) .modal{animation:ppIn .24s cubic-bezier(.2,.8,.3,1)}
@@ -635,6 +642,11 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <div id="mOv" class="overlay hidden" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="mCt"></div>
 </div>
+
+<!-- 카카오톡 채널 문의 버튼 (학생·비로그인 화면에서만 노출) -->
+<a id="kakaoCh" class="np" href="#" target="_blank" rel="noopener noreferrer" aria-label="카카오톡 채널로 문의하기" title="카카오톡 채널로 문의하기">
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="#3C1E1E" d="M12 3C6.9 3 2.75 6.23 2.75 10.21c0 2.55 1.7 4.79 4.26 6.06-.19.69-.68 2.47-.78 2.86-.12.48.18.47.37.34.15-.1 2.4-1.63 3.37-2.29.66.1 1.34.15 2.03.15 5.1 0 9.25-3.23 9.25-7.12C21.25 6.23 17.1 3 12 3z"/></svg>
+</a>
 
 <!-- 인쇄 영역 (인쇄 시에만 노출) -->
 <div id="printRoot" class="po" style="display:none"></div>
@@ -1568,7 +1580,7 @@ function showWithdrawnNotice(){
     title:'로그인할 수 없습니다',
     body:`<div style="line-height:1.65;color:#374151;font-size:13.5px">
       <p style="margin-bottom:10px">퇴원 처리된 계정으로, 더 이상 로그인할 수 없습니다.</p>
-      <p>문의 사항이 있으시면 화면 <b>우측 하단의 채널톡</b>으로 문의해 주세요.</p>
+      <p>문의 사항이 있으시면 화면 <b>우측 하단의 카카오톡 채널</b>로 문의해 주세요.</p>
     </div>`,
     actions:[{label:'확인',kind:'primary',onclick:'closeModal()'}]
   });
@@ -2081,10 +2093,20 @@ async function qbUploadPhoto(file,bid,scopeId){
   const blob=await qbCompressImage(file);
   const fname=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
   const path=`qboard/${bid}/${scopeId}/${fname}`;
-  const ref=(await getStorage()).ref(path);
-  await ref.put(blob,{contentType:'image/jpeg'});
-  const url=await ref.getDownloadURL();
-  return {url,path,name:file.name||fname};
+  try{
+    const ref=(await getStorage()).ref(path);
+    await ref.put(blob,{contentType:'image/jpeg'});
+    const url=await ref.getDownloadURL();
+    return {url,path,name:file.name||fname};
+  }catch(e){
+    /* Firebase Storage 미설정/권한 오류를 원인 코드까지 보여줘야 진단이 된다. */
+    console.error('qbUploadPhoto failed',e);
+    const code=e&&e.code?String(e.code):'';
+    if(code==='storage/unauthorized')throw new Error('사진 업로드 권한이 없습니다. 관리자에게 문의해 주세요. ('+code+')');
+    if(code==='storage/unauthenticated')throw new Error('로그인이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요. ('+code+')');
+    if(code==='storage/quota-exceeded')throw new Error('사진 저장 공간이 가득 찼습니다. 관리자에게 문의해 주세요. ('+code+')');
+    throw new Error('사진 업로드에 실패했습니다. 관리자에게 문의해 주세요.'+(code?' ('+code+')':(e&&e.message?' ('+e.message+')':'')));
+  }
 }
 async function qbDeletePhotos(photos){
   if(!Array.isArray(photos)||!photos.length)return;
@@ -6613,12 +6635,18 @@ function toast(msg,kind='info',opts={}){
 let _confirmResolver=null;
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
 function closeModal(){if(_modalLocked)return;const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;r(false);}}
+/* 카카오톡 채널 주소. 비워 두면 버튼이 뜨지 않는다. */
+const KAKAO_CHANNEL_URL='';
+function kakaoChannelUrl(){return (S.config&&S.config.kakaoChannelUrl)||KAKAO_CHANNEL_URL||'';}
+/* 관리자·OP·태블릿 화면에서는 숨긴다(채널톡과 같은 규칙). */
 function applyChannelIOVisibility(){
   try{
-    if(typeof ChannelIO!=='function')return;
+    const el=document.getElementById('kakaoCh');if(!el)return;
+    const url=kakaoChannelUrl();
     const t=S.user?.type;
-    if(t==='admin'||t==='operator'||t==='tablet')ChannelIO('hideChannelButton');
-    else ChannelIO('showChannelButton');
+    const show=!!url&&t!=='admin'&&t!=='operator'&&t!=='tablet';
+    if(show)el.href=url;
+    el.classList.toggle('on',show);
   }catch(_){}
 }
 /**
@@ -7388,12 +7416,6 @@ window.addEventListener('popstate',function(e){
   if(document.readyState==='complete')start();
   else window.addEventListener('load',start);
 })();
-</script>
-<script>
-  (function(){var w=window;if(w.ChannelIO){return w.console.error("ChannelIO script included twice.");}var ch=function(){ch.c(arguments);};ch.q=[];ch.c=function(args){ch.q.push(args);};w.ChannelIO=ch;function l(){if(w.ChannelIOInitialized){return;}w.ChannelIOInitialized=true;var s=document.createElement("script");s.type="text/javascript";s.async=true;s.src="https://cdn.channel.io/plugin/ch-plugin-web.js";var x=document.getElementsByTagName("script")[0];if(x.parentNode){x.parentNode.insertBefore(s,x);}}function defer(){var ric=w.requestIdleCallback||function(f){setTimeout(f,1200);};ric(l,{timeout:5000});}if(document.readyState==="complete"){defer();}else{w.addEventListener("load",defer);}})();
-  ChannelIO('boot', {
-    "pluginKey": "c28c40e4-3516-4d29-956b-a34e5637f293"
-  });
 </script>
 <script>
 (function(){
