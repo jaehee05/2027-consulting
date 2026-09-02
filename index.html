@@ -5062,10 +5062,21 @@ function akRowsFromItems(items){
 function akParseKice(items){
   const rows=akRowsFromItems(items);
   const known=akAllKnownSubjs();
+  const norm=t=>String(t==null?'':t).replace(/\s+/g,'');
+  const knownNorm=new Map(known.map(k=>[norm(k),k]));
+  /* 과목명 줄 — 띄어쓰기 차이를 무시하고 맞춘다(국어·수학처럼 여러 과목이 한 표에 있는 경우). */
   let header=null;
   for(const r of rows){
-    const hits=r.items.filter(i=>known.includes(i.s.trim()));
-    if(hits.length&&(!header||hits.length>header.length))header=hits.map(i=>({name:i.s.trim(),x:i.x}));
+    const hits=r.items.map(i=>({name:knownNorm.get(norm(i.s)),x:i.x})).filter(o=>o.name);
+    if(hits.length&&(!header||hits.length>header.length))header=hits;
+  }
+  /* 탐구처럼 과목마다 파일이 나뉘면 '( 생활과 윤리 ) 과목' 으로 한 과목만 적혀 있다. */
+  let single='';
+  for(const r of rows){
+    const m=r.items.map(i=>i.s).join('').match(/\(([^()]+)\)\s*과목/);
+    if(!m)continue;
+    const hit=knownNorm.get(norm(m[1]));
+    if(hit){single=hit;break;}
   }
   let area='';
   for(const r of rows){
@@ -5089,7 +5100,7 @@ function akParseKice(items){
   const nos=[...byNo.keys()].sort((a,b)=>a-b);
   const cols=Math.max(...nos.map(n=>byNo.get(n).length));
   let names=(header||[]).slice().sort((a,b)=>a.x-b.x).map(o=>o.name);
-  if(cols===1&&names.length!==1)names=[area||names[0]||''];
+  if(cols===1)names=single?[single]:(names.length===1?names:[area||names[0]||'']);
   if(names.length!==cols)return {subjects:[],area,error:`과목 열 ${cols}개와 과목명 ${names.length}개가 맞지 않습니다.`};
   const common=cols>1?nos.filter(n=>byNo.get(n).length===1).length:0;
   return {area,error:'',subjects:names.map((name,k)=>({
@@ -5097,35 +5108,68 @@ function akParseKice(items){
     items:nos.map(n=>{const l=byNo.get(n);const it=l.length===1?l[0]:l[k];return it?{a:it.a,p:it.p}:{a:'',p:0};})
   }))};
 }
+async function akFetchParse(lib,url){
+  const resp=await fetch(url);
+  if(!resp.ok)return {subjects:[],error:'HTTP '+resp.status,status:resp.status};
+  const doc=await lib.getDocument({data:await resp.arrayBuffer()}).promise;
+  let items=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const tc=await (await doc.getPage(p)).getTextContent();
+    items=items.concat(tc.items.filter(i=>i.str.trim()).map(i=>({x:i.transform[4],y:i.transform[5],s:i.str})));
+  }
+  return akParseKice(items);
+}
+function akApplyParsed(ex,r){
+  const mine=akSubjectGroups(ex).flatMap(g=>g.items);
+  const applied=[],skipped=[];
+  for(const sub of r.subjects||[]){
+    if(!mine.includes(sub.name)){skipped.push(sub.name);continue;}
+    S.akDraft[sub.name]={items:sub.items.map(it=>({a:it.a,p:it.p})),common:sub.common||0,
+      open:!!(S.akDraft[sub.name]&&S.akDraft[sub.name].open)};
+    applied.push(sub.name);
+  }
+  return {applied,skipped};
+}
 async function akImportFromUrl(){
   const url=(_('ak-url')?.value||'').trim();
   if(!/^https?:\/\//.test(url)){toast('정답표 PDF 주소를 입력하세요.','warn');return;}
   showLoad(true);
   try{
     const lib=await getPdfjs();
-    const resp=await fetch(url);
-    if(!resp.ok)throw new Error('PDF를 받지 못했습니다. (HTTP '+resp.status+')');
-    const doc=await lib.getDocument({data:await resp.arrayBuffer()}).promise;
-    let items=[];
-    for(let p=1;p<=doc.numPages;p++){
-      const tc=await (await doc.getPage(p)).getTextContent();
-      items=items.concat(tc.items.filter(i=>i.str.trim()).map(i=>({x:i.transform[4],y:i.transform[5],s:i.str})));
-    }
-    const r=akParseKice(items);
+    const r=await akFetchParse(lib,url);
     if(r.error)throw new Error(r.error);
     const ex=getExam(S.akExamId);
-    const mine=akSubjectGroups(ex).flatMap(g=>g.items);
-    const applied=[],skipped=[];
-    for(const sub of r.subjects){
-      if(!mine.includes(sub.name)){skipped.push(sub.name);continue;}
-      S.akDraft[sub.name]={items:sub.items.map(it=>({a:it.a,p:it.p})),common:sub.common||0,open:!!(S.akDraft[sub.name]&&S.akDraft[sub.name].open)};
-      applied.push(`${sub.name} ${sub.items.length}문항${sub.common?`(공통 ${sub.common})`:''}`);
-    }
-    if(!applied.length)throw new Error(`이 시험 과목 구성과 맞는 과목이 없습니다. (PDF: ${r.subjects.map(x=>x.name).join(', ')})`);
-    S.akSubj=r.subjects.find(x=>mine.includes(x.name)).name;
-    S.akSrcUrl=url;
+    const {applied,skipped}=akApplyParsed(ex,r);
+    if(!applied.length)throw new Error(`PDF 과목(${r.subjects.map(x=>x.name).join(', ')})이 이 시험 과목 구성에 없습니다.${r.area?` [${r.area}]`:''}`);
+    S.akSubj=applied[0];S.akSrcUrl=url;
     akRenderModal();
     toast(`${r.area?r.area+' ':''}정답표를 불러왔습니다 — ${applied.join(', ')}${skipped.length?` · 제외: ${skipped.join(', ')}`:''}`,'success',{duration:7000});
+  }catch(e){toast('불러오기 실패: '+e.message,'error',{duration:7000});}
+  showLoad(false);
+}
+/* 탐구는 과목마다 파일이 따로다(..._42_1a.pdf, _42_2a.pdf …). 번호를 훑어 한 번에 받는다. */
+async function akImportExplorations(){
+  const url=(_('ak-url')?.value||'').trim();
+  const m=url.match(/^(https?:\/\/.*\/)([^\/]+?)_\d+(?:_\d+)?a\.pdf$/i);
+  if(!m){toast('먼저 이 시험의 정답표 PDF 주소를 한 번 넣어주세요.','warn');return;}
+  const dir=m[1],stem=m[2];
+  showLoad(true);
+  const applied=[],skipped=[];
+  try{
+    const lib=await getPdfjs();
+    for(const grp of ['41','42','43']){
+      for(let i=1;i<=12;i++){
+        const r=await akFetchParse(lib,`${dir}${stem}_${grp}_${i}a.pdf`);
+        if(r.status===404||r.status===403)break;
+        if(r.error)continue;
+        const out=akApplyParsed(getExam(S.akExamId),r);
+        applied.push(...out.applied);skipped.push(...out.skipped);
+      }
+    }
+    if(!applied.length)throw new Error(`받아온 과목이 없습니다.${skipped.length?` (이 시험 구성에 없는 과목: ${[...new Set(skipped)].join(', ')})`:''}`);
+    S.akSubj=applied[0];S.akSrcUrl=url;
+    akRenderModal();
+    toast(`탐구 ${applied.length}개 과목을 불러왔습니다 — ${applied.join(', ')}${skipped.length?` · 제외: ${[...new Set(skipped)].join(', ')}`:''}`,'success',{duration:9000});
   }catch(e){toast('불러오기 실패: '+e.message,'error',{duration:7000});}
   showLoad(false);
 }
@@ -5166,9 +5210,10 @@ function akRenderModal(){
     <p class="msub">정답을 등록하면 학생이 성적 입력에서 답을 찍고 원점수가 자동 계산됩니다. 1~5는 객관식, 그 외 값은 단답형으로 봅니다.</p>
     <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;margin-bottom:12px">
       <p style="font-size:12px;font-weight:700;color:#6d28d9;margin-bottom:6px">평가원 정답표 PDF에서 불러오기</p>
-      <div style="display:flex;gap:6px"><input class="fi" id="ak-url" value="${escapeHtml(S.akSrcUrl||ex.answerKeySrc||'')}" placeholder="https://cdn.kice.re.kr/09mo-27suneung/09mo-27suneung_1a.pdf" style="flex:1;min-width:0">
-      <button class="btn bp bsm" style="flex:0 0 auto" onclick="akImportFromUrl()">불러오기</button></div>
-      <p style="font-size:11px;color:#9ca3af;margin-top:6px">교시별 주소를 넣으면 선택과목까지 한 번에 채워집니다(국어 <code>_1a</code>, 수학 <code>_2a</code>, 영어 <code>_3a</code> …). 저장 전에 값을 확인해 주세요.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><input class="fi" id="ak-url" value="${escapeHtml(S.akSrcUrl||ex.answerKeySrc||'')}" placeholder="https://cdn.kice.re.kr/09mo-27suneung/09mo-27suneung_1a.pdf" style="flex:1;min-width:180px">
+      <button class="btn bp bsm" style="flex:0 0 auto" onclick="akImportFromUrl()">불러오기</button>
+      <button class="btn bs bsm" style="flex:0 0 auto;color:#6d28d9;border-color:#ddd6fe" onclick="akImportExplorations()">탐구 전체</button></div>
+      <p style="font-size:11px;color:#9ca3af;margin-top:6px">국어 <code>_1a</code>, 수학 <code>_2a</code>, 영어 <code>_3a</code> — 선택과목까지 한 번에 채워집니다.<br>탐구는 과목마다 파일이 나뉘어 있어(<code>_42_1a</code>, <code>_43_1a</code> …) <b>탐구 전체</b>를 누르면 응시 과목을 모두 훑어 받아옵니다. 저장 전에 값을 확인해 주세요.</p>
     </div>
     <div class="frow" style="margin-bottom:8px"><div class="fg" style="margin:0"><label class="fl">과목</label>
       <select class="fi fsel" id="ak-subj" onchange="akSwitchSubj(this.value)">${opts}</select></div>
