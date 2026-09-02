@@ -111,6 +111,20 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 #kakaoCh:active{transform:translateY(0)}
 #kakaoCh svg{width:27px;height:27px;display:block;fill:#1C64F2}
 @media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:52px;height:52px}#kakaoCh svg{width:25px;height:25px}}
+/* 오답 문항 목록(멘토링) */
+.wa-sec{padding:10px 0;border-top:1px solid var(--gray-100)}
+.wa-sec.first{border-top:none;padding-top:0}
+.wa-h{display:flex;align-items:baseline;gap:7px;font-size:13px;font-weight:800;color:var(--gray-900);margin-bottom:8px;flex-wrap:wrap}
+.wa-subj{font-size:11.5px;font-weight:600;color:var(--primary)}
+.wa-n{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--gray-500)}
+.wa-chips{display:flex;flex-wrap:wrap;gap:5px}
+.wa-chip{display:inline-flex;align-items:center;gap:4px;background:var(--danger-soft);border:1px solid #fecaca;border-radius:8px;padding:3px 8px;font-size:12px;color:#991b1b;white-space:nowrap}
+.wa-chip b{font-weight:800;font-size:11.5px}
+.wa-chip i{font-style:normal;font-size:9.5px;font-weight:700;color:var(--warning-text);background:var(--warning-soft);border-radius:4px;padding:1px 4px}
+.wa-chip em{font-style:normal;color:var(--gray-400);font-size:10px}
+.wa-chip .ok{font-weight:800;color:var(--success)}
+.wa-chip.blank{background:var(--gray-100);border-color:var(--gray-200);color:var(--gray-500)}
+.wa-none{font-size:12px;color:var(--success);font-weight:600}
 /* 학생 답안 입력(가채점표) — 객관식은 5문항 묶음, 주관식은 문항별 칸 */
 .as-sec{margin-top:18px}
 .as-sec-t{font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:2px}
@@ -890,6 +904,14 @@ function examAnswerKey(exam,subj){
   return (k&&Array.isArray(k.items)&&k.items.length)?k.items:null;
 }
 function akIsChoice(a){return /^[1-5]$/.test(String(a==null?'':a).trim());}
+/* 단답형은 앞의 0 때문에 오답 처리되지 않도록 숫자로 비교한다. */
+function akSame(a,b){
+  const x=String(a==null?'':a).trim(),y=String(b==null?'':b).trim();
+  if(x===''||y==='')return false;
+  if(/^\d+$/.test(x)&&/^\d+$/.test(y))return Number(x)===Number(y);
+  return x===y;
+}
+function swNormNum(v){const t=String(v==null?'':v).trim();return /^\d+$/.test(t)?String(Number(t)):t;}
 /* 정답표의 앞쪽 N문항이 공통 과목. 0 이면 공통/선택 구분 없이 한 덩어리로 본다. */
 function akCommonCount(exam,subj){
   const k=exam&&exam.answerKeys&&exam.answerKeys[subj];
@@ -923,8 +945,7 @@ function akScore(items,answers){
   for(let i=0;i<items.length;i++){
     const it=items[i];if(!it)continue;
     const key=String(it.a==null?'':it.a).trim();if(key==='')continue;
-    const got=String(answers&&answers[i]!=null?answers[i]:'').trim();
-    if(got!==''&&got===key)sc+=Number(it.p)||0;
+    if(akSame(answers&&answers[i],key))sc+=Number(it.p)||0;
   }
   return sc;
 }
@@ -933,11 +954,11 @@ function akWrongNos(items,answers){
   for(let i=0;i<items.length;i++){
     const it=items[i];if(!it)continue;
     const key=String(it.a==null?'':it.a).trim();if(key==='')continue;
-    const got=String(answers&&answers[i]!=null?answers[i]:'').trim();
-    if(got!==key)out.push(i+1);
+    if(!akSame(answers&&answers[i],key))out.push(i+1);
   }
   return out;
 }
+function akKeyed(items){return (items||[]).filter(it=>it&&String(it.a==null?'':it.a).trim()!=='').length;}
 function akUnanswered(items,answers){
   let n=0;
   for(let i=0;i<items.length;i++){
@@ -1393,11 +1414,12 @@ function renderTabletConsult(stu){
   const exams=examsForStu(stu);
   const examsWithScore=exams.filter(ex=>hasStuExamScore(stu,ex.id));
   const scoreTabIdx=Math.min(S.tabletScoreTab||0,Math.max(0,examsWithScore.length-1));
-  let scoreTabs='',scoreBody='';
+  let scoreTabs='',scoreBody='',wrongHtml='';
   if(examsWithScore.length){
     scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.tabletScoreTab=${i};renderTablet()">${escapeHtml(ex.name)}</button>`).join('');
     const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
     scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
+    wrongHtml=wrongListHtml(selEx,getStuExamScore(stu,selEx.id));
   }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
   const subjects=getGradeSubjects(stu);
   const graphTabIdx=Math.min(S.tabletGraphTab||0,Math.max(0,subjects.length-1));
@@ -1432,6 +1454,7 @@ function renderTabletConsult(stu){
       ${examsWithScore.length>1?'<div class="dtabs" style="margin-bottom:10px">'+scoreTabs+'</div>':''}
       ${scoreBody}
     </div>
+    ${wrongHtml}
     <div class="card" style="margin-bottom:12px">
       <p style="font-size:13px;font-weight:700;margin-bottom:10px">등급 추이</p>
       ${subjectChangesHtml(stu,exams)}
@@ -1901,12 +1924,20 @@ function swBlockInput(key,from,n,el){
   if(v.length===n&&el.dataset.next){const nx=_(el.dataset.next);if(nx){nx.focus();nx.select&&nx.select();}}
 }
 function swShortInput(key,i,el){
-  const v=(el.value||'').replace(/[^0-9]/g,'').slice(0,4);
+  const v=(el.value||'').replace(/[^0-9]/g,'').slice(0,3);
   el.value=v;
   swAnswers(key)[i]=v;
   el.classList.toggle('done',v!=='');
   swUpdateSheetScore();
-  if(v.length===4&&el.dataset.next){const nx=_(el.dataset.next);if(nx){nx.focus();nx.select&&nx.select();}}
+  if(v.length===3&&el.dataset.next){const nx=_(el.dataset.next);if(nx){nx.focus();nx.select&&nx.select();}}
+}
+/* 한 문항도 입력하지 않았으면 0점 대신 아무 점수도 보여주지 않고, 원점수도 비워 둔다. */
+function swSheetStatus(items,arr){
+  const keyed=akKeyed(items),un=akUnanswered(items,arr),entered=keyed-un;
+  if(!entered)return {score:'—',meta:'답을 입력하면 원점수가 계산됩니다',raw:''};
+  const raw=akScore(items,arr),right=keyed-akWrongNos(items,arr).length;
+  return {score:raw+'점',raw:String(raw),
+    meta:`맞은 문항 <b>${right}</b>/${keyed}`+(un?` · <span style="color:#b45309">미입력 ${un}</span>`:'')};
 }
 /* 화면의 원점수는 보고 있는 단계만 갱신하므로, 저장 직전에 답안 기준으로 전부 다시 계산한다.
    (선택과목을 바꾸면 이전 과목 정답표로 매긴 점수가 남는 문제를 막는다) */
@@ -1915,7 +1946,7 @@ function swSyncAnswerRaws(exam){
   for(const [k,subj,rawKey] of [['kor',w.korSubj,'korRaw'],['mat',w.matSubj,'matRaw'],['eng','영어','engRaw'],['his','한국사','hisRaw'],['exp1',w.exp1Subj,'exp1Raw'],['exp2',w.exp2Subj,'exp2Raw']]){
     if(!subj)continue;
     const items=examAnswerKey(exam,subj);if(!items)continue;
-    w[rawKey]=String(akScore(items,(w.answers&&w.answers[k])||[]));
+    w[rawKey]=swSheetStatus(items,(w.answers&&w.answers[k])||[]).raw;
   }
 }
 function swUpdateSheetScore(){
@@ -1923,14 +1954,10 @@ function swUpdateSheetScore(){
   const st=getScoreSteps(exam)[S.scoreStep];if(!st||st.type!=='answerSheet')return;
   const items=examAnswerKey(exam,st.subj)||[];
   const arr=swAnswers(st.ansKey);
-  const raw=akScore(items,arr);
-  S.scoreWizard[st.rawKey]=String(raw);
-  const el=_('sw-sheet-score');if(el)el.textContent=raw+'점';
-  const m=_('sw-sheet-meta');
-  if(m){
-    const un=akUnanswered(items,arr),right=items.length-akWrongNos(items,arr).length;
-    m.innerHTML=`맞은 문항 <b>${right}</b>/${items.length}`+(un?` · <span style="color:#b45309">미입력 ${un}</span>`:'');
-  }
+  const stt=swSheetStatus(items,arr);
+  S.scoreWizard[st.rawKey]=stt.raw;
+  const el=_('sw-sheet-score');if(el){el.textContent=stt.score;el.style.color=stt.raw===''?'#9ca3af':'';}
+  const m=_('sw-sheet-meta');if(m)m.innerHTML=stt.meta;
 }
 
 function startScoreWizard(examId){
@@ -1998,19 +2025,19 @@ function renderScoreWizard(){
         const next=ids[n+1]||'';
         const done=b.kind==='choice'?(val.length===cnt):(val!=='');
         html+=`<div class="as-box"><div class="as-box-h">${label}</div><div class="as-box-b">
-          <input class="as-in ${b.kind==='short'?'short':''} ${done?'done':''}" id="${ids[n]}" data-next="${next}" inputmode="numeric" maxlength="${b.kind==='choice'?cnt:4}" value="${escapeHtml(val)}"
+          <input class="as-in ${b.kind==='short'?'short':''} ${done?'done':''}" id="${ids[n]}" data-next="${next}" inputmode="numeric" maxlength="${b.kind==='choice'?cnt:3}" value="${escapeHtml(val)}"
             ${b.kind==='choice'?`oninput="swBlockInput('${st.ansKey}',${b.from},${cnt},this)"`:`oninput="swShortInput('${st.ansKey}',${b.from},this)"`}></div></div>`;
         n++;
       });
       if(open)html+='</div>';
       html+='</div>';
     });
-    const raw=akScore(items,arr),un=akUnanswered(items,arr),right=items.length-akWrongNos(items,arr).length;
+    const stt=swSheetStatus(items,arr);
     c.innerHTML=`<div class="card" style="padding:20px"><div class="sw-wrap">
       <div><p class="sw-title">${st.title}</p>
         <p style="color:#1C64F2;font-size:14px;font-weight:600;margin-bottom:6px">${escapeHtml(st.subj)}</p>
         <p style="color:#6b7280;font-size:13px">객관식은 번호 순서대로 이어서 입력하세요. (예: <b>12345</b>)</p>
-        <div class="as-bar"><span style="font-size:12px;font-weight:700;color:#1d4ed8">원점수</span><span class="as-score" id="sw-sheet-score">${raw}점</span><span class="as-meta" id="sw-sheet-meta">맞은 문항 <b>${right}</b>/${items.length}${un?` · <span style="color:#b45309">미입력 ${un}</span>`:''}</span></div>
+        <div class="as-bar"><span style="font-size:12px;font-weight:700;color:#1d4ed8">원점수</span><span class="as-score" id="sw-sheet-score"${stt.raw===''?' style="color:#9ca3af"':''}>${stt.score}</span><span class="as-meta" id="sw-sheet-meta">${stt.meta}</span></div>
         ${html}</div>
       <div class="sw-bottom">${prevBtn}<button class="sw-next" onclick="${isLast?`swSaveStep();finishScoreWizard()`:`swSaveStep();S.scoreStep++;renderScoreWizard()`}">${isLast?'저장':'다음'}</button></div>
     </div></div>`;
@@ -2076,6 +2103,7 @@ function renderScoreWizard(){
 
 function swValidateRaw(el,max){
   if(el.value==='')return;
+  if(/^0\d/.test(el.value))el.value=swNormNum(el.value);
   const v=Number(el.value);
   if(v<0){toast('원점수는 0 이상이어야 합니다.','warn');el.value='';return;}
   if(v>max){toast('원점수는 '+max+' 이하여야 합니다.','warn');el.value='';return;}
@@ -2085,9 +2113,9 @@ function swSaveStep(){
   const steps=getScoreSteps(exam);const st=steps[S.scoreStep];if(!st)return;
   if(st.type==='expGrid')return;
   if(st.type==='answerSheet'){swUpdateSheetScore();return;}
-  if(st.type==='lang2Page'){if(S.scoreWizard.lang2Take)S.scoreWizard.lang2Raw=_('sw-raw')?.value||'';return;}
+  if(st.type==='lang2Page'){if(S.scoreWizard.lang2Take)S.scoreWizard.lang2Raw=swNormNum(_('sw-raw')?.value||'');return;}
   if(st.hideRaw)return;
-  if(st.rawKey){S.scoreWizard[st.rawKey]=_('sw-raw')?.value||'';}
+  if(st.rawKey){S.scoreWizard[st.rawKey]=swNormNum(_('sw-raw')?.value||'');}
 }
 
 async function finishScoreWizard(){
@@ -2147,6 +2175,38 @@ function rawWithDiff(raw,cuts){
   const {cur,upper}=cutDiffChips(raw,cuts);
   if(!cur&&!upper)return raw;
   return `<span style="position:relative;display:inline-block">${upper?`<span style="position:absolute;right:100%;top:50%;transform:translateY(-50%);margin-right:3px">${upper}</span>`:''}<span>${raw}</span>${cur?`<span style="position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:3px">${cur}</span>`:''}</span>`;
+}
+/* 저장된 답안과 정답표를 대조해 오답을 보여준다. 답안이 없는 과목은 건너뛴다. */
+const WA_SLOTS=[['kor','국어'],['mat','수학'],['eng','영어'],['his','한국사'],['exp1','탐구 1'],['exp2','탐구 2']];
+function waSlotSubj(sc,k){
+  if(k==='eng')return '영어';
+  if(k==='his')return '한국사';
+  return (sc&&sc[k+'Subj'])||'';
+}
+function waMark(v){const t=String(v==null?'':v).trim();return t===''?'—':(/^[1-5]$/.test(t)?'①②③④⑤'[Number(t)-1]:t);}
+function wrongListHtml(exam,sc){
+  if(!exam||!sc||!sc.answers)return '';
+  const blocks=[];
+  for(const [k,label] of WA_SLOTS){
+    const subj=waSlotSubj(sc,k);
+    const items=subj?examAnswerKey(exam,subj):null;
+    const arr=sc.answers[k];
+    if(!items||!Array.isArray(arr)||!arr.length)continue;
+    const wrong=akWrongNos(items,arr);
+    const common=akCommonCount(exam,subj);
+    const chips=wrong.map(no=>{
+      const i=no-1;const mine=String(arr[i]==null?'':arr[i]).trim();
+      return `<span class="wa-chip${mine===''?' blank':''}"><b>${no}</b>${common>0&&i>=common?'<i>선택</i>':''}<span>${waMark(mine)}</span><em>→</em><span class="ok">${waMark(items[i].a)}</span></span>`;
+    }).join('');
+    blocks.push(`<div class="wa-sec${blocks.length?'':' first'}">
+      <p class="wa-h">${label}<span class="wa-subj">${escapeHtml(subj)}</span><span class="wa-n">${wrong.length?`오답 ${wrong.length}문항`:'전부 정답'} · ${akScore(items,arr)}점</span></p>
+      ${chips?`<div class="wa-chips">${chips}</div>`:'<p class="wa-none">틀린 문항이 없습니다.</p>'}</div>`);
+  }
+  if(!blocks.length)return '';
+  return `<div class="card" style="margin-bottom:12px">
+    <p style="font-size:13px;font-weight:700;margin-bottom:3px">오답 문항</p>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:10px">학생이 쓴 답 → 정답. 미입력 문항은 회색입니다.</p>
+    ${blocks.join('')}</div>`;
 }
 function scSubjRowLabel(exam){return examKorCommon(exam)&&examMatCommon(exam)?'과목':'선택과목';}
 function scSubjLabel(exam,slot,sc){
@@ -3595,11 +3655,12 @@ function renderConsultDetail(){
   const exams=examsForStu(stu);
   const examsWithScore=exams.filter(ex=>hasStuExamScore(stu,ex.id));
   const scoreTabIdx=S.consultScoreTab||0;
-  let scoreTabs='',scoreBody='';
+  let scoreTabs='',scoreBody='',wrongHtml='';
   if(examsWithScore.length){
     scoreTabs=examsWithScore.map((ex,i)=>`<button class="dt ${i===scoreTabIdx?'on':''}" onclick="S.consultScoreTab=${i};renderConsultDetail()">${ex.name}</button>`).join('');
     const selEx=examsWithScore[scoreTabIdx]||examsWithScore[0];
     scoreBody=examScoreTblFull(selEx,getStuExamScore(stu,selEx.id));
+    wrongHtml=wrongListHtml(selEx,getStuExamScore(stu,selEx.id));
   }else{scoreBody='<p style="font-size:13px;color:#9ca3af;text-align:center;padding:14px">입력된 성적이 없습니다.</p>';}
   const subjects=getGradeSubjects(stu);
   const graphTabIdx=S.consultGraphTab||0;
@@ -3626,6 +3687,7 @@ function renderConsultDetail(){
       ${examsWithScore.length>1?'<div class="dtabs" style="margin-bottom:10px">'+scoreTabs+'</div>':''}
       ${scoreBody}
     </div>
+    ${wrongHtml}
     <div class="card" style="margin-bottom:12px">
       <p style="font-size:13px;font-weight:700;margin-bottom:10px">등급 추이</p>
       ${subjectChangesHtml(stu,exams)}
