@@ -2535,8 +2535,8 @@ async function noticeTogglePin(id){
    '오늘 하루 보지 않기'는 서버가 아니라 브라우저 localStorage 로만 기억한다. */
 var _popupsLoaded=false,_popupsLoading=null;
 const POPUP_SAMPLE={
-  title:'오늘 시험 보느라 고생했습니다',
-  body:'시험 치르느라 고생 많았습니다.\n잘 본 과목도, 아쉬운 과목도 있을 텐데 아쉬운 쪽이 오히려 건질 게 많습니다.\n\n기억이 선명할 때 성적부터 입력해 주세요.\n\n· 성적 입력 마감: 9월 3일 (목)\n· 예약 현황은 홈 화면에서 확인할 수 있습니다.',
+  title:'긴 하루, 고생 많았습니다',
+  body:'긴 하루였습니다. 시험 치르느라 고생 많았습니다.\n\n잘 본 과목도, 아쉬운 과목도 있을 겁니다.\n아쉬운 쪽은 버리는 게 아니라, 아직 꺼내지 못한 점수입니다.\n\n기억이 선명할 때 성적을 남겨 주세요.\n오늘의 기록이 다음 시험의 출발점이 됩니다.\n\n· 성적 입력 마감: 9월 3일 (목)',
   endDate:'2026-09-03'
 };
 function todayKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
