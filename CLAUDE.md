@@ -53,6 +53,21 @@ Central helpers (all near `getExams`/`gcRelGroups` in `index.html`):
 
 `saveExamScore` (the `es-*` ids) is dead code from the pre-wizard student form; the live student path is `startScoreWizard` → `getScoreSteps` → `finishScoreWizard`.
 
+### Notices vs. popups
+
+Two separate things, both admin-managed from the **공지사항** tab:
+
+- **`notices`** — the always-visible 공지사항 card on the student 멘토링 page. `{body, pinned, createdAt, …}`; kept in sync by an `onSnapshot` listener, so the CRUD handlers write to Firestore only and let the listener update `S.notices` and re-render (writing locally too produces duplicates).
+- **`popups`** — a modal that appears once per visit to the **home hub** (`enterHome`), for everyone including admins. `{title, body, startDate, endDate, enabled, createdAt, …}`; dates are `YYYY-MM-DD` and either end may be empty (open-ended). Loaded on demand via `loadPopups()` (a plain `get()`, no listener) and re-fetched after every write, so popup CRUD *does* update `S.popups` locally.
+
+Popup specifics:
+
+- `popupActive(p)` gates display; `popupStatus(p)` maps the same state to the 노출중/예정/종료/중지 chip in the admin list.
+- Multiple active popups queue up (`_popupQueue`, newest first) and advance on 닫기.
+- **오늘 하루 보지 않기 is `localStorage` only** — key `popupHide_<docId>` holding a date string. Nothing is written to Firestore, so it is per-browser and resets at midnight. Never "fix" this by storing dismissals per student.
+- `S.popupShown` makes the popup fire once per session; `doLogout` resets it (and `_popupsLoaded`) so the next login shows it again.
+- The sample 팝업 is seeded once by `popupSeedSample()` when an admin first opens the 공지사항 tab, guarded by `config.popupSeeded`. Deleting the sample must not bring it back — that flag is the guard, so don't seed off an empty-collection check.
+
 ### Grade-cut model (graph/score rendering)
 
 A student's score per exam is stored with both a `*Raw` (raw score) and a cached `*Grade` (computed grade) for each subject (`kor`, `mat`, `eng`, `his`, `exp1`, `exp2`, `lang2`), plus optional `*GradeOverride` for admin overrides. Exams carry two parallel cut tables:

@@ -547,6 +547,11 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   <div class="modal" id="mCt"></div>
 </div>
 
+<!-- 팝업 공지 -->
+<div id="pOv" class="overlay hidden" style="z-index:1100" onclick="if(event.target===this)popupNext()">
+  <div class="modal" id="pCt" style="max-width:400px;padding:0;overflow:hidden"></div>
+</div>
+
 <!-- 토스트 -->
 <div id="toastWrap" aria-live="polite" aria-atomic="true"></div>
 
@@ -622,6 +627,7 @@ const S = {
   consultStuId:null, consultScoreTab:0, consultGraphTab:0, stuGraphTab:0,
   opScoreStuId:null, opScoreTab:0, opGraphTab:0,
   notices:[], noticeEditId:null, noticeComposerOpen:false,
+  popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false,
   qbComposerOpen:null, qbPostEditId:null, qbDraftFiles:{}, qbCommentDraftFiles:{}
 };
 
@@ -1485,6 +1491,7 @@ function doLogout(){
   stopTabletSessionListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];
+  S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
   S.qbComposerOpen=null;S.qbPostEditId=null;S.qbDraftFiles={};S.qbCommentDraftFiles={};
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
@@ -2426,7 +2433,8 @@ function renderAdminNotices(){
       <p style="font-size:22px;font-weight:800;color:#78350f;line-height:1.1">${list.filter(n=>n.pinned).length}<span style="font-size:13px;font-weight:600;color:#d97706;margin-left:3px">건</span></p>
     </div>
   </div>`;
-  _('adminC').innerHTML=summary+noticeBoardHtml();
+  if(!_popupsLoaded&&!_popupsLoading)popupAdminInit();
+  _('adminC').innerHTML=summary+popupBoardHtml()+noticeBoardHtml();
 }
 // 액션 핸들러는 Firestore에만 쓰고, S.notices 갱신과 rerender는 onSnapshot 리스너에 일임한다.
 // 로컬에서 직접 push/update/filter 하면 리스너의 즉시 발화와 겹쳐 중복 항목이 생긴다.
@@ -2472,6 +2480,237 @@ async function noticeTogglePin(id){
   showLoad(true);
   try{
     await db.collection('notices').doc(id).update({pinned:!n.pinned,updatedAt:Date.now()});
+  }catch(e){toast('변경 실패: '+e.message,'error');}
+  showLoad(false);
+}
+
+/* ── 팝업 공지 ──
+   notices 는 홈 화면 카드로 늘 보이는 목록, popups 는 기간 동안 접속 시 한 번 뜨는 모달.
+   '오늘 하루 보지 않기'는 서버가 아니라 브라우저 localStorage 로만 기억한다. */
+var _popupsLoaded=false,_popupsLoading=null;
+const POPUP_SAMPLE={
+  title:'시험 보느라 정말 고생 많았어요',
+  body:'그동안 준비하느라 애쓴 만큼, 시험장에서 끝까지 집중한 여러분 모두 정말 수고 많았습니다.\n\n성적 입력 기간 안에 성적을 등록해 주시고, 멘토링 예약도 잊지 말고 신청해 주세요.\n\n결과에 너무 일희일비하지 말고 남은 기간 차근차근 준비해 봅시다. 💪'
+};
+function todayKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function dateKeyAfter(days){const d=new Date();d.setDate(d.getDate()+days);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function popupPeriodLabel(p){
+  if(!p.startDate&&!p.endDate)return '기간 제한 없음';
+  if(!p.endDate)return p.startDate+' ~ 무기한';
+  if(!p.startDate)return '~ '+p.endDate;
+  return p.startDate+' ~ '+p.endDate;
+}
+function popupActive(p,today){
+  if(!p||p.enabled===false)return false;
+  today=today||todayKey();
+  if(p.startDate&&today<p.startDate)return false;
+  if(p.endDate&&today>p.endDate)return false;
+  return true;
+}
+function popupStatus(p){
+  const t=todayKey();
+  if(p.enabled===false)return {label:'중지',color:'#6b7280',bg:'#f3f4f6'};
+  if(p.startDate&&t<p.startDate)return {label:'예정',color:'#b45309',bg:'#fef3c7'};
+  if(p.endDate&&t>p.endDate)return {label:'종료',color:'#6b7280',bg:'#f3f4f6'};
+  return {label:'노출중',color:'#15803d',bg:'#dcfce7'};
+}
+function popupHiddenToday(id){try{return localStorage.getItem('popupHide_'+id)===todayKey();}catch(e){return false;}}
+function popupHideToday(id){try{localStorage.setItem('popupHide_'+id,todayKey());}catch(e){}}
+function popupSorted(){return [...S.popups].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));}
+
+async function loadPopups(){
+  if(_popupsLoading)return _popupsLoading;
+  _popupsLoading=(async()=>{
+    try{
+      const snap=await db.collection('popups').get();
+      S.popups=snap.docs.map(d=>({_docId:d.id,...d.data()}));
+      _popupsLoaded=true;
+    }catch(e){console.error('popups load error',e);}
+    _popupsLoading=null;
+  })();
+  return _popupsLoading;
+}
+
+/* 홈 진입 시 노출 대상 팝업을 큐에 넣고 순서대로 띄운다. */
+var _popupQueue=[];
+async function popupShowOnHome(){
+  if(S.popupShown)return;
+  S.popupShown=true;
+  await loadPopups();
+  const list=popupSorted().filter(p=>popupActive(p)&&!popupHiddenToday(p._docId));
+  if(!list.length)return;
+  _popupQueue=list.slice();
+  popupNext();
+}
+function popupNext(){
+  const p=_popupQueue.shift();
+  if(!p){popupCloseOverlay();return;}
+  popupRender(p,_popupQueue.length);
+}
+function popupCloseOverlay(){const ov=_('pOv');if(!ov)return;ov.classList.add('hidden');ov.style.display='none';}
+function popupDismiss(id,hideToday){if(hideToday)popupHideToday(id);popupNext();}
+function popupRender(p,remaining,preview){
+  const ov=_('pOv');if(!ov)return;
+  const footer=preview
+    ? `<button style="flex:1;padding:14px;background:#fff;border:none;font-size:13px;color:#1C64F2;font-weight:700;cursor:pointer;font-family:inherit" onclick="popupCloseOverlay()">닫기</button>`
+    : `<button style="flex:1;padding:14px;background:#fff;border:none;border-right:1px solid #e5e7eb;font-size:13px;color:#6b7280;font-weight:600;cursor:pointer;font-family:inherit" onclick="popupDismiss('${p._docId}',true)">오늘 하루 보지 않기</button>
+       <button style="flex:1;padding:14px;background:#fff;border:none;font-size:13px;color:#1C64F2;font-weight:700;cursor:pointer;font-family:inherit" onclick="popupDismiss('${p._docId}',false)">닫기</button>`;
+  _('pCt').innerHTML=`
+    <div style="padding:22px 22px 18px">
+      <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:12px">
+        <span style="font-size:19px;line-height:1.3">📢</span>
+        <p style="font-size:17px;font-weight:800;color:#111827;line-height:1.4;flex:1">${escapeHtml(p.title||'공지')}</p>
+        ${preview?'<span class="bx bb" style="font-size:10px;flex-shrink:0">미리보기</span>':''}
+      </div>
+      <p style="font-size:14px;line-height:1.75;color:#374151;white-space:pre-wrap;word-break:keep-all">${escapeHtml(p.body||'')}</p>
+      ${!preview&&remaining>0?`<p style="font-size:11px;color:#9ca3af;margin-top:14px;text-align:right">공지 ${remaining}건 더 있음</p>`:''}
+    </div>
+    <div style="display:flex;border-top:1px solid #e5e7eb">${footer}</div>`;
+  ov.classList.remove('hidden');ov.style.display='flex';
+}
+function popupPreview(id){const p=S.popups.find(x=>x._docId===id);if(!p)return;_popupQueue=[];popupRender(p,0,true);}
+
+/* 관리자 공지사항 탭 진입 시 1회: 목록 로드 + 예시 팝업 시드. */
+async function popupAdminInit(){
+  await loadPopups();
+  await popupSeedSample();
+  if(S.tab==='notices')renderAdminNotices();
+}
+async function popupSeedSample(){
+  if(!S.config||S.config.popupSeeded)return;
+  try{
+    S.config.popupSeeded=true;
+    await db.collection('config').doc('main').set(S.config);
+    const now=Date.now();
+    await db.collection('popups').add({title:POPUP_SAMPLE.title,body:POPUP_SAMPLE.body,startDate:todayKey(),endDate:dateKeyAfter(7),enabled:true,createdAt:now,updatedAt:now,authorId:S.user?.id||'',authorName:S.user?.name||'관리자'});
+    await loadPopups();
+  }catch(e){console.error('popup seed error',e);}
+}
+
+function popupOpenComposer(){S.popupComposerOpen=true;S.popupEditId=null;popupRerender();}
+function popupCloseComposer(){S.popupComposerOpen=false;popupRerender();}
+function popupStartEdit(id){S.popupEditId=id;S.popupComposerOpen=false;popupRerender();}
+function popupCancelEdit(){S.popupEditId=null;popupRerender();}
+function popupRerender(){if(S.tab==='notices')renderAdminNotices();}
+
+function popupFormHtml(p,idp){
+  p=p||{};
+  return `<div class="fg" style="margin-bottom:8px"><label class="fl">제목</label><input class="fi" id="${idp}-title" value="${escapeHtml(p.title||'')}" placeholder="예: 9월 모의평가 수고했습니다"></div>
+    <div class="fg" style="margin-bottom:8px"><label class="fl">내용</label><textarea class="fi ta" id="${idp}-body" rows="5" placeholder="팝업에 표시할 내용을 입력하세요">${escapeHtml(p.body||'')}</textarea></div>
+    <div class="frow" style="margin-bottom:6px"><div class="fg"><label class="fl">노출 시작일 (선택)</label><input class="fi" id="${idp}-start" type="date" value="${p.startDate||''}"></div>
+    <div class="fg"><label class="fl">노출 종료일 (선택)</label><input class="fi" id="${idp}-end" type="date" value="${p.endDate||''}"></div></div>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:8px">비워두면 기간 제한 없이 노출됩니다. 학생이 '오늘 하루 보지 않기'를 누르면 그날은 다시 뜨지 않습니다.</p>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;cursor:pointer"><input type="checkbox" id="${idp}-enabled" ${p.enabled===false?'':'checked'}> <span>사용</span></label>`;
+}
+
+function popupBoardHtml(){
+  const list=popupSorted();
+  const open=S.popupComposerOpen;
+  const composer=open?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:12px">
+      <p style="font-size:11px;color:#6b7280;margin-bottom:8px">새 팝업 공지</p>
+      ${popupFormHtml(null,'pp-new')}
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn bs bsm" style="flex:1" onclick="popupCloseComposer()">취소</button>
+        <button class="btn bp bsm" style="flex:1" onclick="popupCreate()">등록</button>
+      </div>
+    </div>`:`<button class="btn bp bsm" style="width:100%;margin-bottom:12px" onclick="popupOpenComposer()">+ 팝업 공지 작성</button>`;
+  let itemsHtml='';
+  if(list.length){
+    itemsHtml=list.map(p=>{
+      if(S.popupEditId===p._docId){
+        return `<div style="border:1px solid #93c5fd;background:#eff6ff;border-radius:10px;padding:12px;margin-bottom:8px">
+          <p style="font-size:11px;color:#6b7280;margin-bottom:8px">팝업 공지 수정</p>
+          ${popupFormHtml(p,'pp-edit-'+p._docId)}
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <button class="btn bs bsm" style="flex:1" onclick="popupCancelEdit()">취소</button>
+            <button class="btn bp bsm" style="flex:1" onclick="popupSaveEdit('${p._docId}')">저장</button>
+          </div>
+        </div>`;
+      }
+      const st=popupStatus(p);
+      return `<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+          <span class="bx" style="background:${st.bg};color:${st.color};font-size:10px;font-weight:700">${st.label}</span>
+          <b style="font-size:13px;color:#111827">${escapeHtml(p.title||'(제목 없음)')}</b>
+          <span style="font-size:11px;color:#9ca3af">· ${popupPeriodLabel(p)}</span>
+          <div style="display:flex;gap:4px;margin-left:auto">
+            <button class="btn bs bsm" style="font-size:11px;padding:3px 8px" onclick="popupPreview('${p._docId}')">미리보기</button>
+            <button class="btn bs bsm" style="font-size:11px;padding:3px 8px" onclick="popupToggleEnabled('${p._docId}')">${p.enabled===false?'사용':'중지'}</button>
+            <button class="btn bs bsm" style="font-size:11px;padding:3px 8px" onclick="popupStartEdit('${p._docId}')">수정</button>
+            <button class="btn bd bsm" style="font-size:11px;padding:3px 8px" onclick="popupDelete('${p._docId}')">삭제</button>
+          </div>
+        </div>
+        <p style="font-size:13px;color:#4b5563;white-space:pre-wrap;line-height:1.6">${escapeHtml(p.body||'')}</p>
+      </div>`;
+    }).join('');
+  }else{
+    itemsHtml=`<p style="font-size:12px;color:#9ca3af;text-align:center;padding:14px 0;background:#f9fafb;border-radius:8px">${_popupsLoaded?'등록된 팝업 공지가 없습니다.':'불러오는 중...'}</p>`;
+  }
+  const activeN=list.filter(p=>popupActive(p)).length;
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+      <span class="bx bb">팝업</span><p style="font-size:15px;font-weight:700">팝업 공지</p>${list.length?`<span style="font-size:11px;color:#6b7280">${list.length}건 · 노출중 ${activeN}건</span>`:''}
+    </div>
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:12px">홈 화면에 접속하면 노출 기간 중인 팝업이 한 번 뜹니다.</p>
+    ${composer}
+    ${itemsHtml}
+  </div>`;
+}
+
+function _popupReadForm(idp){
+  const title=(_(idp+'-title')?.value||'').trim();
+  const body=(_(idp+'-body')?.value||'').trim();
+  const startDate=_(idp+'-start')?.value||'';
+  const endDate=_(idp+'-end')?.value||'';
+  const enabled=!!_(idp+'-enabled')?.checked;
+  if(!title){toast('제목을 입력하세요.','warn');return null;}
+  if(!body){toast('내용을 입력하세요.','warn');return null;}
+  if(startDate&&endDate&&endDate<startDate){toast('종료일이 시작일보다 빠릅니다.','warn');return null;}
+  return {title,body,startDate,endDate,enabled};
+}
+async function popupCreate(){
+  const d=_popupReadForm('pp-new');if(!d)return;
+  const now=Date.now();
+  showLoad(true);
+  try{
+    await db.collection('popups').add({...d,createdAt:now,updatedAt:now,authorId:S.user?.id||'',authorName:S.user?.name||'관리자'});
+    await loadPopups();
+    S.popupComposerOpen=false;
+    toast('팝업 공지가 등록되었습니다.','success');
+    popupRerender();
+  }catch(e){toast('등록 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function popupSaveEdit(id){
+  const d=_popupReadForm('pp-edit-'+id);if(!d)return;
+  showLoad(true);
+  try{
+    await db.collection('popups').doc(id).update({...d,updatedAt:Date.now()});
+    await loadPopups();
+    S.popupEditId=null;
+    popupRerender();
+  }catch(e){toast('저장 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function popupDelete(id){
+  const p=S.popups.find(x=>x._docId===id);
+  if(!(await confirmDialog({title:'팝업 공지 삭제',message:`'${p?.title||''}' 팝업 공지를 삭제하시겠습니까?`,confirmLabel:'삭제',kind:'danger'})))return;
+  showLoad(true);
+  try{
+    await db.collection('popups').doc(id).delete();
+    await loadPopups();
+    if(S.popupEditId===id)S.popupEditId=null;
+    popupRerender();
+  }catch(e){toast('삭제 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function popupToggleEnabled(id){
+  const p=S.popups.find(x=>x._docId===id);if(!p)return;
+  showLoad(true);
+  try{
+    await db.collection('popups').doc(id).update({enabled:p.enabled===false,updatedAt:Date.now()});
+    await loadPopups();
+    popupRerender();
   }catch(e){toast('변경 실패: '+e.message,'error');}
   showLoad(false);
 }
@@ -6385,6 +6624,7 @@ function enterHome(){
   applyChips();
   if(!_skipPush)navPush({v:'vHome'});
   applyChannelIOVisibility();
+  setTimeout(popupShowOnHome,250);
 }
 function goHome(){enterHome();}
 
