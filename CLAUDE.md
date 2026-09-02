@@ -38,10 +38,10 @@ Exams are grade-scoped. Each entry in `S.config.exams` carries:
 
 - `grade` — `'고1' | '고2' | '고3'`, or `''`/absent meaning **all grades** (the pre-2026-09 default, so legacy exams keep working untouched).
 - `korMode` / `matMode` — `'choice'` (default, 화법과 작문·언어와 매체 / 확률과 통계·미적분·기하) or `'common'` (선택과목 없는 공통형).
-- `expMode` — `'choice'` (default, 사탐/과탐 2과목 선택) or `'integrated'` (통합사회 + 통합과학).
-- `hasScienceII` only applies when `expMode==='choice'`; it is forced to `false` on save for integrated exams.
+- `expMode` — `'choice'` (default, 사탐/과탐 2과목 선택), `'socsci'` (사회 + 과학 — 고1 학력평가), or `'integrated'` (통합사회 + 통합과학). The two fixed-subject modes differ only in the stored subject names; `examFixedExpSubjs(exam)` returns that pair (or `null` for `'choice'`) and is the single place the names live.
+- `hasScienceII` only applies when `expMode==='choice'`; it is forced to `false` on save otherwise.
 
-Score documents keep the **same field names in every mode** (`korSubj/korRaw`, `exp1Subj/exp1Raw`, …). Modes without a 선택과목 store a fixed subject name so `exam.gradeCuts[subj]` lookups stay uniform: `korSubj='국어'`, `matSubj='수학'`, `exp1Subj='통합사회'`, `exp2Subj='통합과학'`. Grade computation (`getExamGrade`, `getGradeSubjects`, `drawGradeGraph`) therefore needed no mode-awareness — only the input forms and the 선택과목 display row did (`scSubjLabel`, `scSubjRowLabel`).
+Score documents keep the **same field names in every mode** (`korSubj/korRaw`, `exp1Subj/exp1Raw`, …). Modes without a 선택과목 store a fixed subject name so `exam.gradeCuts[subj]` lookups stay uniform: `korSubj='국어'`, `matSubj='수학'`, and `exp1Subj`/`exp2Subj` from `examFixedExpSubjs`. Grade computation (`getExamGrade`, `getGradeSubjects`, `drawGradeGraph`) therefore needed no mode-awareness — only the input forms and the 선택과목 display row did (`scSubjLabel`, `scSubjRowLabel`).
 
 Central helpers (all near `getExams`/`gcRelGroups` in `index.html`):
 

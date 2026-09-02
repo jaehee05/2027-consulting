@@ -724,17 +724,20 @@ const EXP_SOCIAL_SUBJS=['생활과 윤리','윤리와 사상','한국지리','�
 const EXP_SCI1_SUBJS=['물리학Ⅰ','화학Ⅰ','생명과학Ⅰ','지구과학Ⅰ'];
 const EXP_SCI2_SUBJS=['물리학Ⅱ','화학Ⅱ','생명과학Ⅱ','지구과학Ⅱ'];
 const INTEG_EXP_SUBJS=['통합사회','통합과학'];
+const SOCSCI_EXP_SUBJS=['사회','과학'];
 const LANG2_SUBJS=['독일어Ⅰ','프랑스어Ⅰ','스페인어Ⅰ','중국어Ⅰ','일본어Ⅰ','러시아어Ⅰ','아랍어Ⅰ','베트남어Ⅰ','한문Ⅰ'];
 /* 공통형 국어·수학은 선택과목이 없으므로 과목명을 '국어'/'수학'으로 저장해 등급컷 키를 맞춘다. */
 function examKorCommon(exam){return exam?.korMode==='common';}
 function examMatCommon(exam){return exam?.matMode==='common';}
-function examExpInteg(exam){return exam?.expMode==='integrated';}
+function examFixedExpSubjs(exam){return exam?.expMode==='integrated'?INTEG_EXP_SUBJS:exam?.expMode==='socsci'?SOCSCI_EXP_SUBJS:null;}
+function examExpFixed(exam){return !!examFixedExpSubjs(exam);}
 function examKorSubjs(exam){return examKorCommon(exam)?['국어']:KOR_CHOICE_SUBJS;}
 function examMatSubjs(exam){return examMatCommon(exam)?['수학']:MAT_CHOICE_SUBJS;}
 function examSciSubjs(exam){return exam&&exam.hasScienceII?EXP_SCI1_SUBJS.concat(EXP_SCI2_SUBJS):EXP_SCI1_SUBJS;}
 function gcRelGroups(exam){
   const g=[['국어',examKorSubjs(exam),100],['수학',examMatSubjs(exam),100]];
-  if(examExpInteg(exam))g.push(['탐구',INTEG_EXP_SUBJS,50]);
+  const fixedExp=examFixedExpSubjs(exam);
+  if(fixedExp)g.push(['탐구',fixedExp,50]);
   else{g.push(['사회탐구',EXP_SOCIAL_SUBJS,50]);g.push(['과학탐구',examSciSubjs(exam),50]);}
   return g;
 }
@@ -1617,7 +1620,8 @@ function gradeOpts(sel){return [1,2,3,4,5,6,7,8,9].map(g=>`<option ${String(g)==
 function gradeOverrideOpts(sel){const v=sel?String(sel):'';return `<option value="" ${!v?'selected':''}>자동</option>`+[1,2,3,4,5,6,7,8,9].map(g=>`<option value="${g}" ${String(g)===v?'selected':''}>${g}등급</option>`).join('');}
 
 function getExpSubjects(exam){
-  if(examExpInteg(exam))return [{group:'탐구',items:INTEG_EXP_SUBJS}];
+  const fixedExp=examFixedExpSubjs(exam);
+  if(fixedExp)return [{group:'탐구',items:fixedExp}];
   return [{group:'사회탐구',items:EXP_SOCIAL_SUBJS},{group:'과학탐구',items:examSciSubjs(exam)}];
 }
 function expSubjIndex(exam,subj){
@@ -1635,9 +1639,10 @@ function getScoreSteps(exam){
     :{id:'mat',title:'수학',type:'gridRaw',subjKey:'matSubj',rawKey:'matRaw',rawMax:100,items:MAT_CHOICE_SUBJS});
   steps.push({id:'eng',title:'영어',type:'rawOnly',rawMax:100,rawKey:'engRaw'});
   steps.push({id:'his',title:'한국사',type:'rawOnly',rawMax:50,rawKey:'hisRaw'});
-  if(examExpInteg(exam))steps.push(
-    {id:'exp1r',title:INTEG_EXP_SUBJS[0],type:'rawOnly',rawMax:50,rawKey:'exp1Raw'},
-    {id:'exp2r',title:INTEG_EXP_SUBJS[1],type:'rawOnly',rawMax:50,rawKey:'exp2Raw'}
+  const fixedExp=examFixedExpSubjs(exam);
+  if(fixedExp)steps.push(
+    {id:'exp1r',title:fixedExp[0],type:'rawOnly',rawMax:50,rawKey:'exp1Raw'},
+    {id:'exp2r',title:fixedExp[1],type:'rawOnly',rawMax:50,rawKey:'exp2Raw'}
   );
   else steps.push(
     {id:'exp1s',title:'탐구 1',type:'expGrid',subjKey:'exp1Subj',excludeKey:null},
@@ -1656,7 +1661,8 @@ function startScoreWizard(examId){
   const stu=S.students.find(x=>x._docId===S.studentDocId);
   const sc=getStuExamScore(stu,examId)||{};
   S.scoreWizardExamId=examId;S.scoreStep=0;
-  S.scoreWizard={korSubj:examKorCommon(exam)?'국어':(sc.korSubj||''),korRaw:sc.korRaw||'',matSubj:examMatCommon(exam)?'수학':(sc.matSubj||''),matRaw:sc.matRaw||'',engRaw:sc.engRaw||'',hisRaw:sc.hisRaw||'',exp1Subj:examExpInteg(exam)?INTEG_EXP_SUBJS[0]:(sc.exp1Subj||''),exp1Raw:sc.exp1Raw||'',exp2Subj:examExpInteg(exam)?INTEG_EXP_SUBJS[1]:(sc.exp2Subj||''),exp2Raw:sc.exp2Raw||'',lang2Subj:sc.lang2Subj||'',lang2Raw:sc.lang2Raw||'',lang2Take:!!(sc.lang2Subj||sc.lang2Raw)};
+  const _fx=examFixedExpSubjs(exam);
+  S.scoreWizard={korSubj:examKorCommon(exam)?'국어':(sc.korSubj||''),korRaw:sc.korRaw||'',matSubj:examMatCommon(exam)?'수학':(sc.matSubj||''),matRaw:sc.matRaw||'',engRaw:sc.engRaw||'',hisRaw:sc.hisRaw||'',exp1Subj:_fx?_fx[0]:(sc.exp1Subj||''),exp1Raw:sc.exp1Raw||'',exp2Subj:_fx?_fx[1]:(sc.exp2Subj||''),exp2Raw:sc.exp2Raw||'',lang2Subj:sc.lang2Subj||'',lang2Raw:sc.lang2Raw||'',lang2Take:!!(sc.lang2Subj||sc.lang2Raw)};
   renderScoreWizard();
 }
 
@@ -4182,7 +4188,8 @@ function openAbsGradeCutsModal(){
 
 function examGradeChip(ex){return ex.grade?`<span class="bx ${ex.grade==='고3'?'br':ex.grade==='고2'?'bb':'bg'}">${ex.grade}</span>`:'<span class="bx" style="background:#f3f4f6;color:#6b7280">전체 학년</span>';}
 function examSubjSummary(ex){
-  const exp=examExpInteg(ex)?'통합사회·통합과학':(ex.hasScienceII?'선택(II 포함)':'선택');
+  const _fx=examFixedExpSubjs(ex);
+  const exp=_fx?_fx.join('·'):(ex.hasScienceII?'선택(II 포함)':'선택');
   return `국어 ${examKorCommon(ex)?'공통':'선택'} · 수학 ${examMatCommon(ex)?'공통':'선택'} · 탐구 ${exp}`;
 }
 function examGradeOpts(sel){return `<option value="" ${!sel?'selected':''}>전체 학년</option>`+GRADE_LEVELS.map(g=>`<option value="${g}" ${g===sel?'selected':''}>${g}</option>`).join('');}
@@ -4192,7 +4199,7 @@ function _exModeRow(label,name,cur,opts){
 }
 /* 탐구가 통합사회·통합과학이면 과탐II 선택은 의미가 없다. */
 function examFormSync(){
-  const integ=document.querySelector('input[name="exExpMode"]:checked')?.value==='integrated';
+  const integ=(document.querySelector('input[name="exExpMode"]:checked')?.value||'choice')!=='choice';
   const wrap=_('exSci2Wrap');if(wrap){wrap.style.opacity=integ?'.4':'';}
   const cb=_('exSci2');if(cb)cb.disabled=integ;
   document.querySelectorAll('input[name="exKorMode"],input[name="exMatMode"],input[name="exExpMode"]').forEach(r=>{r.parentElement.style.background=r.checked?'#eff6ff':'#fff';});
@@ -4209,7 +4216,7 @@ function examFormHtml(ex){
     <div style="border:1.5px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px;display:flex;flex-direction:column;gap:10px">
       ${_exModeRow('국어','exKorMode',examKorCommon(ex)?'common':'choice',[['choice','선택 (화법과 작문/언어와 매체)'],['common','공통']])}
       ${_exModeRow('수학','exMatMode',examMatCommon(ex)?'common':'choice',[['choice','선택 (확률과 통계/미적분/기하)'],['common','공통']])}
-      ${_exModeRow('탐구','exExpMode',examExpInteg(ex)?'integrated':'choice',[['choice','선택 2과목'],['integrated','통합사회 + 통합과학']])}
+      ${_exModeRow('탐구','exExpMode',ex.expMode||'choice',[['choice','선택 2과목'],['socsci','사회 + 과학'],['integrated','통합사회 + 통합과학']])}
     </div>
     <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exLang2" ${ex.hasLang2?'checked':''}> 제2외국어/한문 포함</label>
@@ -4234,7 +4241,7 @@ async function saveExamForm(){
   const examId=_('exId')?.value||('exam_'+uid());
   const _mode=(n,d)=>document.querySelector(`input[name="${n}"]:checked`)?.value||d;
   const expMode=_mode('exExpMode','choice');
-  const examData={id:examId,name,grade:_('exGrade')?.value||'',scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',korMode:_mode('exKorMode','choice'),matMode:_mode('exMatMode','choice'),expMode,hasLang2:_('exLang2')?.checked||false,hasScienceII:expMode==='integrated'?false:(_('exSci2')?.checked||false),provisional:_('exProvisional')?.checked||false};
+  const examData={id:examId,name,grade:_('exGrade')?.value||'',scoreStart:_('exStart')?.value||'',scoreEnd:_('exEnd')?.value||'',korMode:_mode('exKorMode','choice'),matMode:_mode('exMatMode','choice'),expMode,hasLang2:_('exLang2')?.checked||false,hasScienceII:expMode!=='choice'?false:(_('exSci2')?.checked||false),provisional:_('exProvisional')?.checked||false};
   if(!S.config.exams)S.config.exams=[];
   const idx=S.config.exams.findIndex(e=>e.id===examId);
   if(idx>=0){examData.gradeCuts=S.config.exams[idx].gradeCuts||{};examData.estGradeCuts=S.config.exams[idx].estGradeCuts||{};S.config.exams[idx]=examData;}
@@ -5036,8 +5043,9 @@ function openAdminScoreEdit(stuDocId, examId, from, bookDocId){
   const _fixedSubj=txt=>`<input class="fi" value="${txt}" disabled style="background:#f9fafb;color:#6b7280">`;
   const ksField=examKorCommon(exam)?_fixedSubj('공통'):`<select class="fi fsel" id="as-ks">${subjOpts(KOR_CHOICE_SUBJS,sc.korSubj||'')}</select>`;
   const msField=examMatCommon(exam)?_fixedSubj('공통'):`<select class="fi fsel" id="as-ms">${subjOpts(MAT_CHOICE_SUBJS,sc.matSubj||'')}</select>`;
-  const e1Field=examExpInteg(exam)?_fixedSubj(INTEG_EXP_SUBJS[0]):`<select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'',exam)}</select>`;
-  const e2Field=examExpInteg(exam)?_fixedSubj(INTEG_EXP_SUBJS[1]):`<select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'',exam)}</select>`;
+  const fixedExp=examFixedExpSubjs(exam);
+  const e1Field=fixedExp?_fixedSubj(fixedExp[0]):`<select class="fi fsel" id="as-e1s">${expOpts(sc.exp1Subj||'',exam)}</select>`;
+  const e2Field=fixedExp?_fixedSubj(fixedExp[1]):`<select class="fi fsel" id="as-e2s">${expOpts(sc.exp2Subj||'',exam)}</select>`;
   let formHtml=`
     <div class="frow"><div class="fg"><label class="fl">국어 선택과목</label>${ksField}</div>
     <div class="fg"><label class="fl">국어 원점수</label><input class="fi" id="as-kr" type="number" min="0" max="100" value="${sc.korRaw||''}" placeholder="0–100"></div></div>
@@ -5076,8 +5084,9 @@ async function saveAdminScore(stuDocId, examId, from, bookDocId){
   const exam=getExam(examId);if(!exam)return;
   const korSubj=examKorCommon(exam)?'국어':(_('as-ks')?.value||''),korRaw=_('as-kr')?.value||'';
   const matSubj=examMatCommon(exam)?'수학':(_('as-ms')?.value||''),matRaw=_('as-mr')?.value||'';
-  const exp1Subj=examExpInteg(exam)?INTEG_EXP_SUBJS[0]:(_('as-e1s')?.value||''),exp1Raw=_('as-e1r')?.value||'';
-  const exp2Subj=examExpInteg(exam)?INTEG_EXP_SUBJS[1]:(_('as-e2s')?.value||''),exp2Raw=_('as-e2r')?.value||'';
+  const fixedExp=examFixedExpSubjs(exam);
+  const exp1Subj=fixedExp?fixedExp[0]:(_('as-e1s')?.value||''),exp1Raw=_('as-e1r')?.value||'';
+  const exp2Subj=fixedExp?fixedExp[1]:(_('as-e2s')?.value||''),exp2Raw=_('as-e2r')?.value||'';
   const engRaw=_('as-er')?.value||'',hisRaw=_('as-hr')?.value||'';
   const scoreData={korSubj,korRaw,korGrade:getExamGrade(exam,korSubj,korRaw),matSubj,matRaw,matGrade:getExamGrade(exam,matSubj,matRaw),engRaw,engGrade:getAbsGrade('eng',engRaw),hisRaw,hisGrade:getAbsGrade('his',hisRaw),exp1Subj,exp1Raw,exp1Grade:getExamGrade(exam,exp1Subj,exp1Raw),exp2Subj,exp2Raw,exp2Grade:getExamGrade(exam,exp2Subj,exp2Raw)};
   if(exam.hasLang2){scoreData.lang2Subj=_('as-l2s')?.value||'';scoreData.lang2Raw=_('as-l2r')?.value||'';scoreData.lang2Grade=getAbsGrade('lang2',scoreData.lang2Raw);}
