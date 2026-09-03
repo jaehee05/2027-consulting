@@ -308,7 +308,11 @@ tr:last-child td{border-bottom:none}
 .gc-tbl .gc-subj{font-size:11px;font-weight:600;white-space:nowrap;text-align:left;padding:4px 8px;min-width:80px}
 .sc-tbl .vl{font-size:13px;font-weight:700}
 .sc-tbl .ec{background:#fafafa}
-.sc-tbl .dl{background:linear-gradient(to top right,transparent calc(50% - 0.5px),var(--gray-300) calc(50% - 0.5px),var(--gray-300) calc(50% + 0.5px),transparent calc(50% + 0.5px))}
+/* 해당 없음 표시. 배경 그라디언트로 그리면 인쇄에서 배경이 빠지거나
+   1px 띠가 래스터라이즈되며 끊겨 나오므로, 실제 벡터 선으로 그린다. */
+.sc-tbl .dl{position:relative;padding:0}
+.sc-tbl .dl .dl-l{position:absolute;inset:0;width:100%;height:100%;display:block}
+.sc-tbl .dl .dl-l line{stroke:var(--gray-300);stroke-width:1}
 .ta{height:auto;padding:10px;resize:vertical;min-height:90px}
 .spin{width:30px;height:30px;border:3px solid var(--gray-200);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -1167,11 +1171,13 @@ function getAbsGrade(type,raw){
   const gc=S.config.gradeCuts;if(!gc||!gc.abs||raw===''||raw===undefined)return '';
   const cuts=gc.abs[type];return cuts?calcGrade(raw,cuts):'';
 }
+/* 표의 '해당 없음' 대각선. viewBox 를 늘려 칸 크기에 맞추되 선 굵기는 고정한다. */
+const _DL_SVG='<svg class="dl-l" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line x1="0" y1="0" x2="100" y2="100" vector-effect="non-scaling-stroke"/></svg>';
 function examGradeCell(exam,subj,raw,override){
   const ov=override?String(override).trim():'';
   if(ov)return `<td class="vl">${ov}</td>`;
   const g=getExamGrade(exam,subj,raw);
-  if(!g)return '<td class="dl"></td>';
+  if(!g)return `<td class="dl">${_DL_SVG}</td>`;
   const est=isEstGrade(exam,subj);
   if(est)return `<td class="vl" style="color:#f59e0b;font-weight:700">${g}</td>`;
   return `<td class="vl">${g}</td>`;
@@ -2421,7 +2427,7 @@ function examScoreTblFull(exam,sc){if(!sc)return '';
   return `<div style="overflow-x:auto"><table class="sc-tbl">
   ${scTblColgroup(hasL2)}
   <tr><td class="rh" style="font-size:10px">영역</td><td class="hd">한국사</td><td class="hd">국어</td><td class="hd">수학</td><td class="hd">영어</td><td class="hd" colspan="2">탐구</td>${hasL2?'<td class="hd">제2외국어/한문</td>':''}</tr>
-  <tr><td class="rh" style="font-size:10px">${scSubjRowLabel(exam)}</td><td class="dl"></td><td style="font-size:11px">${scSubjLabel(exam,'kor',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'mat',sc)}</td><td class="dl"></td><td style="font-size:11px">${scSubjLabel(exam,'exp1',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'exp2',sc)}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
+  <tr><td class="rh" style="font-size:10px">${scSubjRowLabel(exam)}</td><td class="dl">${_DL_SVG}</td><td style="font-size:11px">${scSubjLabel(exam,'kor',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'mat',sc)}</td><td class="dl">${_DL_SVG}</td><td style="font-size:11px">${scSubjLabel(exam,'exp1',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'exp2',sc)}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${krD}</td><td class="vl">${mrD}</td><td class="vl">${erD}</td><td class="vl">${e1rD}</td><td class="vl">${e2rD}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>
   <tr><td class="rh" style="font-size:10px;${hasAnyEstGrade(exam)?'color:#f59e0b;font-weight:700':''}">${gradeLabel}</td>${hg}${kg}${mg}${eg}${e1g}${e2g}${l2g}</tr>
 </table></div>`;}
@@ -2434,8 +2440,8 @@ function examScoreTblHtml(exam,sc){if(!sc)return '';
   const l2g=hasL2?absGradeCell('lang2',sc.lang2Raw,sc.lang2GradeOverride):'';
   const noCuts=!Object.keys(exam.gradeCuts||{}).length&&!Object.keys(exam.estGradeCuts||{}).length;
   const subjRow=noCuts
-    ?`<tr><td class="rh" style="font-size:10px">${scSubjRowLabel(exam)}</td><td class="dl"></td><td style="font-size:11px">${scSubjLabel(exam,'kor',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'mat',sc)}</td><td class="dl"></td><td style="font-size:11px">${scSubjLabel(exam,'exp1',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'exp2',sc)}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>`
-    :`<tr><td class="rh" style="font-size:10px">${scSubjRowLabel(exam)}</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${scSubjLabel(exam,'kor',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'mat',sc)}</td><td class="dl" rowspan="2"></td><td style="font-size:11px">${scSubjLabel(exam,'exp1',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'exp2',sc)}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>`;
+    ?`<tr><td class="rh" style="font-size:10px">${scSubjRowLabel(exam)}</td><td class="dl">${_DL_SVG}</td><td style="font-size:11px">${scSubjLabel(exam,'kor',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'mat',sc)}</td><td class="dl">${_DL_SVG}</td><td style="font-size:11px">${scSubjLabel(exam,'exp1',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'exp2',sc)}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>`
+    :`<tr><td class="rh" style="font-size:10px">${scSubjRowLabel(exam)}</td><td class="dl" rowspan="2">${_DL_SVG}</td><td style="font-size:11px">${scSubjLabel(exam,'kor',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'mat',sc)}</td><td class="dl" rowspan="2">${_DL_SVG}</td><td style="font-size:11px">${scSubjLabel(exam,'exp1',sc)}</td><td style="font-size:11px">${scSubjLabel(exam,'exp2',sc)}</td>${hasL2?`<td style="font-size:11px">${sc.lang2Subj||'—'}</td>`:''}</tr>`;
   const rawRow=noCuts
     ?`<tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.hisRaw||'—'}</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.engRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>`
     :`<tr><td class="rh" style="font-size:10px">원점수</td><td class="vl">${sc.korRaw||'—'}</td><td class="vl">${sc.matRaw||'—'}</td><td class="vl">${sc.exp1Raw||'—'}</td><td class="vl">${sc.exp2Raw||'—'}</td>${hasL2?`<td class="vl">${sc.lang2Raw||'—'}</td>`:''}</tr>`;
