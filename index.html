@@ -113,7 +113,8 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 @media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:52px;height:52px}#kakaoCh svg{width:25px;height:25px}}
 /* 정오표(멘토링) */
 .wa-sec{padding:12px 0;border-top:1px solid var(--gray-100)}
-.wa-sec .wa-h{page-break-after:avoid;break-after:avoid}
+.wa-sec .wa-h,.wa-sec .wa-part{page-break-after:avoid;break-after:avoid}
+.wa-sec .wa-part+.oj-wrap{page-break-before:avoid;break-before:avoid}
 .wa-sec.first{border-top:none;padding-top:0}
 .wa-h{display:flex;align-items:baseline;gap:7px;font-size:13px;font-weight:800;color:var(--gray-900);margin-bottom:8px;flex-wrap:wrap}
 .wa-subj{font-size:11.5px;font-weight:600;color:var(--primary)}
@@ -426,6 +427,8 @@ tr:last-child td{border-bottom:none}
 .pr-sub{font-size:11.5px;color:#4b5563;padding-bottom:8px;border-bottom:2px solid #111827;margin-bottom:16px}
 .pr-sec{margin-bottom:18px;page-break-inside:avoid;break-inside:avoid}
 .pr-sec.pr-flow{page-break-inside:auto;break-inside:auto}
+/* 제목이 앞 페이지에 홀로 남지 않도록 첫 내용과 한 덩어리로 묶는다. */
+.pr-keep{page-break-inside:avoid;break-inside:avoid}
 .pr-flow .pr-h{page-break-after:avoid;break-after:avoid}
 .pr-sec:last-child{margin-bottom:0}
 .pr-h{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:800;padding-bottom:5px;margin-bottom:9px;border-bottom:1.5px solid #111827}
@@ -2341,8 +2344,8 @@ function ojTablesHtml(items,arr,from,to,maxPer){
   }
   return `<div class="oj-wrap">${out}</div>`;
 }
-function wrongListHtml(exam,sc,bare){
-  if(!exam||!sc||!sc.answers)return '';
+function wrongListBlocks(exam,sc){
+  if(!exam||!sc||!sc.answers)return [];
   const blocks=[];
   for(const [k,label] of WA_SLOTS){
     const subj=waSlotSubj(sc,k);
@@ -2360,6 +2363,10 @@ function wrongListHtml(exam,sc,bare){
       <p class="wa-h">${label}<span class="wa-subj">${escapeHtml(subj)}</span><span class="wa-n">${akKeyed(items)?`${wrong.length?`오답 ${wrong.length}문항`:'전부 정답'} · ${akScore(items,arr)}점`:'정답 등록 전'}</span></p>
       ${body}</div>`);
   }
+  return blocks;
+}
+function wrongListHtml(exam,sc,bare){
+  const blocks=wrongListBlocks(exam,sc);
   if(!blocks.length)return '';
   if(bare)return blocks.join('');
   return `<div class="card" style="margin-bottom:12px">
@@ -5870,20 +5877,27 @@ function buildConsultPrintHtml(stu,o){
   if(o.graph){
     const subs=getGradeSubjects(stu).filter(si=>exams.some(ex=>{const s2=getStuExamScore(stu,ex.id);return s2&&si.getGrade(ex,s2);}));
     if(subs.length){
-      const gs=subs.map(si=>`<div><p class="pr-gt">${escapeHtml(si.label)}</p>${drawGradeGraph(exams,stu,si)}</div>`).join('');
-      body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">${num()}등급 추이<span class="pr-h-sub">${subs.length}개 과목</span></h3>${subjectChangesHtml(stu,exams)}<div class="pr-graph">${gs}</div></section>`;
+      const g=si=>`<div><p class="pr-gt">${escapeHtml(si.label)}</p>${drawGradeGraph(exams,stu,si)}</div>`;
+      const head=subs.slice(0,2).map(g).join(''),rest=subs.slice(2).map(g).join('');
+      body+=`<section class="pr-sec pr-flow">
+        <div class="pr-keep"><h3 class="pr-h">${num()}등급 추이<span class="pr-h-sub">${subs.length}개 과목</span></h3>${subjectChangesHtml(stu,exams)}<div class="pr-graph">${head}</div></div>
+        ${rest?`<div class="pr-graph">${rest}</div>`:''}</section>`;
     }
   }
   if(o.wrong&&sc){
-    const w=wrongListHtml(selEx,sc,true);
-    if(w)body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">${num()}정오표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${w}</section>`;
+    const wb=wrongListBlocks(selEx,sc);
+    if(wb.length)body+=`<section class="pr-sec pr-flow">
+      <div class="pr-keep"><h3 class="pr-h">${num()}정오표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${wb[0]}</div>
+      ${wb.slice(1).join('')}</section>`;
   }
   if(o.note){
     const notes=exams.map(ex=>{
       const n=stu.consultNotes&&stu.consultNotes[ex.id];
       return (n&&n.note&&n.note.trim())?`<div class="pr-note"><p class="pr-note-h">${escapeHtml(ex.name)}</p><p class="pr-note-b">${escapeHtml(n.note)}</p></div>`:'';
-    }).join('');
-    if(notes)body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">${num()}멘토링 기록</h3>${notes}</section>`;
+    }).filter(Boolean);
+    if(notes.length)body+=`<section class="pr-sec pr-flow">
+      <div class="pr-keep"><h3 class="pr-h">${num()}멘토링 기록</h3>${notes[0]}</div>
+      ${notes.slice(1).join('')}</section>`;
   }
   const meta=[stu.school,stu.grade,stu.seat?`좌석 ${stu.seat}`:''].filter(Boolean).join(' · ');
   return {
