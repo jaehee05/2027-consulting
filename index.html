@@ -113,6 +113,7 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 @media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:52px;height:52px}#kakaoCh svg{width:25px;height:25px}}
 /* 정오표(멘토링) */
 .wa-sec{padding:12px 0;border-top:1px solid var(--gray-100)}
+.wa-sec .wa-h{page-break-after:avoid;break-after:avoid}
 .wa-sec.first{border-top:none;padding-top:0}
 .wa-h{display:flex;align-items:baseline;gap:7px;font-size:13px;font-weight:800;color:var(--gray-900);margin-bottom:8px;flex-wrap:wrap}
 .wa-subj{font-size:11.5px;font-weight:600;color:var(--primary)}
@@ -121,7 +122,7 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .wa-part b{color:var(--primary)}
 .wa-none{font-size:12px;color:var(--success);font-weight:600}
 .oj-wrap{overflow-x:auto}
-.oj-tbl{border-collapse:collapse;font-size:12px;margin-bottom:6px;width:100%;table-layout:fixed}
+.oj-tbl{border-collapse:collapse;font-size:12px;margin-bottom:6px;width:100%;table-layout:fixed;page-break-inside:avoid;break-inside:avoid}
 .oj-tbl th,.oj-tbl td{border:1px solid var(--gray-200);padding:3px 2px;text-align:center;line-height:1.45;overflow:hidden}
 .oj-tbl th{background:var(--gray-100);font-size:10.5px;font-weight:700;color:var(--gray-600)}
 .oj-tbl .oj-h{background:var(--gray-50);font-size:10.5px;font-weight:700;color:var(--gray-500);width:44px;white-space:nowrap;padding:3px 6px}
@@ -392,11 +393,21 @@ tr:last-child td{border-bottom:none}
   .mtitle{font-size:16px}
   .mactions{position:sticky;bottom:-18px;background:var(--surface);margin:8px -18px -18px;padding:14px 18px;border-top:1px solid var(--gray-200);z-index:5}
 }
+/* 멘토링 자료 인쇄 */
+.pr-graph{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pr-graph>div{page-break-inside:avoid;break-inside:avoid}
+.pr-graph svg{width:100%;height:auto;display:block}
+.pr-gt{font-size:11.5px;font-weight:700;color:var(--gray-700);margin-bottom:2px}
+.pr-note{border:1px solid var(--gray-200);border-radius:8px;padding:9px 12px;margin-bottom:7px;page-break-inside:avoid;break-inside:avoid}
+.pr-note-h{font-size:11.5px;font-weight:700;color:var(--primary-text);margin-bottom:4px}
+.pr-note-b{font-size:12px;line-height:1.65;color:var(--gray-700);white-space:pre-wrap;word-break:keep-all}
 /* 인쇄 문서 — 모달 미리보기와 실제 인쇄가 같은 마크업을 쓴다. */
 .pr-doc{color:#111827;font-size:13px;line-height:1.5}
 .pr-title{font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:3px}
 .pr-sub{font-size:11.5px;color:#4b5563;padding-bottom:8px;border-bottom:2px solid #111827;margin-bottom:16px}
 .pr-sec{margin-bottom:18px;page-break-inside:avoid;break-inside:avoid}
+.pr-sec.pr-flow{page-break-inside:auto;break-inside:auto}
+.pr-flow .pr-h{page-break-after:avoid;break-after:avoid}
 .pr-sec:last-child{margin-bottom:0}
 .pr-h{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:800;padding-bottom:5px;margin-bottom:9px;border-bottom:1.5px solid #111827}
 .pr-h-sub{font-size:11px;font-weight:600;color:#4b5563;margin-left:auto}
@@ -435,6 +446,12 @@ tr:last-child td{border-bottom:none}
   .pr-slot span{font-size:9.5pt}
   .pr-tbl{font-size:9pt}
   .pr-tbl th{font-size:8.5pt}
+  /* 그래프는 애니메이션 최종 상태로 고정해야 종이에 나온다. */
+  .gg-ln{stroke-dasharray:none!important;stroke-dashoffset:0!important;animation:none!important}
+  .gg-lne,.gg-dt{opacity:var(--op,1)!important;animation:none!important}
+  .pr-graph{gap:4mm}
+  .pr-gt{font-size:9pt}
+  .pr-note-b{font-size:9.5pt}
 }
 .po{display:none}
 code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;font-family:monospace}
@@ -776,7 +793,7 @@ const S = {
   opScoreStuId:null, opScoreTab:0, opGraphTab:0,
   notices:[], noticeEditId:null, noticeComposerOpen:false,
   popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false, scoreGradeTab:'',
-  akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'',
+  akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
   qbComposerOpen:null, qbPostEditId:null, qbDraftFiles:{}, qbCommentDraftFiles:{}
 };
 
@@ -2296,7 +2313,7 @@ function ojTablesHtml(items,arr,from,to,maxPer){
   }
   return `<div class="oj-wrap">${out}</div>`;
 }
-function wrongListHtml(exam,sc){
+function wrongListHtml(exam,sc,bare){
   if(!exam||!sc||!sc.answers)return '';
   const blocks=[];
   for(const [k,label] of WA_SLOTS){
@@ -2316,6 +2333,7 @@ function wrongListHtml(exam,sc){
       ${body}</div>`);
   }
   if(!blocks.length)return '';
+  if(bare)return blocks.join('');
   return `<div class="card" style="margin-bottom:12px">
     <p style="font-size:13px;font-weight:700;margin-bottom:3px">정오표</p>
     <p style="font-size:11px;color:#9ca3af;margin-bottom:10px">문항별 정답과 학생 답을 대조한 표입니다. 미입력 문항은 · 로 표시됩니다.</p>
@@ -3792,6 +3810,7 @@ function renderConsultDetail(){
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn bs bsm" onclick="autoSaveConsultNote()">← 목록</button>
       <div style="flex:1;min-width:120px"><p style="font-size:16px;font-weight:700">${escapeHtml(stu.name)}${_isActive?' <span class="bx bb" style="font-size:10px">📺 태블릿 표시 중</span>':''}</p><p style="font-size:12px;color:#6b7280">${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}${booking?' · '+escapeHtml(booking.dateLabel||'')+' '+escapeHtml(booking.slot||''):''}</p></div>
+      <button class="btn bs bsm" onclick="openConsultPrintModal()">🖨 인쇄</button>
       ${_sessBtn}
     </div>
     ${qInfo}
@@ -5784,6 +5803,99 @@ async function doBulk(){
   d.slots.sort();showLoad(true);try{await saveScheduleToDb();closeModal();renderAdminSchedule();toast(`${added}개 추가됨`,'success');} catch(e){showErr('mErr','저장 실패: '+e.message);}showLoad(false);}
 
 /* ── ADMIN: 예약 현황 ── */
+/* ── 멘토링 자료 인쇄 ──
+   성적표·등급 추이 그래프·정오표·멘토링 기록을 골라 한 장으로 뽑는다.
+   예약 현황 인쇄와 같은 틀(#printRoot + body.printing + .pr-*)을 쓴다. */
+const CPRINT_DEFAULTS={score:true,graph:true,wrong:true,note:true};
+function consultPrintOpts(stu,examId){
+  const o=Object.assign({},CPRINT_DEFAULTS,S.cprintOpts||{});
+  const withScore=examsForStu(stu).filter(ex=>hasStuExamScore(stu,ex.id));
+  if(examId)o.examId=examId;
+  if(!o.examId||!withScore.some(e=>e.id===o.examId))o.examId=withScore.length?withScore[withScore.length-1].id:null;
+  return o;
+}
+function buildConsultPrintHtml(stu,o){
+  const exams=examsForStu(stu);
+  const selEx=exams.find(e=>e.id===o.examId)||null;
+  const sc=selEx?getStuExamScore(stu,selEx.id):null;
+  let body='';
+  if(o.score&&sc)body+=`<section class="pr-sec"><h3 class="pr-h">성적표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${examScoreTblFull(selEx,sc)}</section>`;
+  if(o.graph){
+    const subs=getGradeSubjects(stu).filter(si=>exams.some(ex=>{const s2=getStuExamScore(stu,ex.id);return s2&&si.getGrade(ex,s2);}));
+    if(subs.length){
+      const gs=subs.map(si=>`<div><p class="pr-gt">${escapeHtml(si.label)}</p>${drawGradeGraph(exams,stu,si)}</div>`).join('');
+      body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">등급 추이<span class="pr-h-sub">${subs.length}개 과목</span></h3>${subjectChangesHtml(stu,exams)}<div class="pr-graph">${gs}</div></section>`;
+    }
+  }
+  if(o.wrong&&sc){
+    const w=wrongListHtml(selEx,sc,true);
+    if(w)body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">정오표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${w}</section>`;
+  }
+  if(o.note){
+    const notes=exams.map(ex=>{
+      const n=stu.consultNotes&&stu.consultNotes[ex.id];
+      return (n&&n.note&&n.note.trim())?`<div class="pr-note"><p class="pr-note-h">${escapeHtml(ex.name)}</p><p class="pr-note-b">${escapeHtml(n.note)}</p></div>`:'';
+    }).join('');
+    if(notes)body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">멘토링 기록</h3>${notes}</section>`;
+  }
+  const meta=[stu.school,stu.grade,stu.seat?`좌석 ${stu.seat}`:'',selEx?selEx.name:''].filter(Boolean).join(' · ');
+  return {
+    html:`<div class="pr-doc">
+      <p class="pr-title">${escapeHtml(stu.name||'')} 멘토링 자료</p>
+      <p class="pr-sub">${escapeHtml(meta)} · 출력일 ${new Date().toLocaleDateString('ko-KR')}</p>
+      ${body||'<p class="pr-empty">인쇄할 내용이 없습니다. 포함 항목을 선택해 주세요.</p>'}
+    </div>`,
+    empty:!body
+  };
+}
+function setCPrintOpt(k,v){S.cprintOpts=Object.assign({},consultPrintOpts(S.students.find(x=>x._docId===S.consultStuId)||{}),{[k]:v});refreshConsultPrintPreview();}
+function setCPrintExam(id){S.cprintOpts=Object.assign({},S.cprintOpts||{},{examId:id});openConsultPrintModal();}
+function refreshConsultPrintPreview(){
+  const stu=S.students.find(x=>x._docId===S.consultStuId);if(!stu)return;
+  const el=_('cprintPrev');if(!el)return;
+  const r=buildConsultPrintHtml(stu,consultPrintOpts(stu));
+  el.innerHTML=r.html;
+  const go=_('cprintGo');if(go){go.disabled=r.empty;go.classList.toggle('is-disabled',r.empty);}
+}
+function openConsultPrintModal(examId){
+  const stu=S.students.find(x=>x._docId===S.consultStuId);if(!stu)return;
+  const o=consultPrintOpts(stu,examId);
+  S.cprintOpts=o;
+  const withScore=examsForStu(stu).filter(ex=>hasStuExamScore(stu,ex.id));
+  const chips=withScore.map(ex=>`<button class="dt ${ex.id===o.examId?'on':''}" onclick="setCPrintExam('${ex.id}')">${escapeHtml(ex.name)}</button>`).join('');
+  const chk=(key,label,desc)=>`<label class="sheet-item" style="cursor:pointer">
+    <input type="checkbox" ${o[key]?'checked':''} onchange="setCPrintOpt('${key}',this.checked)" style="width:16px;height:16px;accent-color:#1C64F2;flex:0 0 auto">
+    <span class="sheet-text"><b>${label}</b><span>${desc}</span></span></label>`;
+  _('mCt').style.maxWidth='820px';
+  _('mCt').innerHTML=`<p class="mtitle">${escapeHtml(stu.name||'')} 멘토링 자료 인쇄</p>
+    <p class="msub">인쇄할 시험과 항목을 고르고 미리보기로 확인하세요.</p>
+    ${withScore.length>1?`<p style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px">시험</p><div class="dtabs">${chips}</div>`:''}
+    <p style="font-size:12px;font-weight:700;color:#6b7280;margin:14px 0 6px">포함 항목</p>
+    <div class="sheet-list">
+      ${chk('score','성적표','선택한 시험의 원점수·등급')}
+      ${chk('graph','등급 추이 그래프','과목별 전체 시험 추이')}
+      ${chk('wrong','정오표','문항별 정답·학생 답·채점')}
+      ${chk('note','멘토링 기록','시험별로 기록한 상담 내용')}
+    </div>
+    <p style="font-size:12px;font-weight:700;color:#6b7280;margin:14px 0 6px">미리보기</p>
+    <div id="cprintPrev" style="border:1px solid var(--gray-200);border-radius:10px;padding:14px;background:#fff;max-height:44vh;overflow:auto"></div>
+    <div class="mactions">
+      <button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button>
+      <button class="btn bp" style="flex:1" id="cprintGo" onclick="doConsultPrint()">🖨 인쇄</button>
+    </div>`;
+  openModal();
+  refreshConsultPrintPreview();
+}
+function doConsultPrint(){
+  const stu=S.students.find(x=>x._docId===S.consultStuId);if(!stu)return;
+  const area=_('printRoot');
+  if(!area){toast('인쇄 영역을 찾지 못했습니다.','error');return;}
+  area.innerHTML=buildConsultPrintHtml(stu,consultPrintOpts(stu)).html;
+  closeModal();
+  document.body.classList.add('printing');
+  setTimeout(()=>window.print(),80);
+}
+
 /* ── 예약 현황 인쇄 ──
    기존엔 window.print() 로 직행해서 범위도 못 고르고 결석 학생은 아예 빠졌다.
    옵션(날짜 선택 / 포함 항목)을 받아 인쇄 영역을 그리고, 모달에서 미리보기까지 보여준다. */
