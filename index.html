@@ -467,6 +467,8 @@ tr:last-child td{border-bottom:none}
   /* 인쇄 버튼으로 들어온 경우엔 인쇄 영역만 남긴다. */
   body.printing>*{display:none!important}
   body.printing>#printRoot{display:block!important}
+  /* 인쇄본이 준비된 상태에서는 화면 오버레이가 함께 찍히지 않도록 확실히 숨긴다. */
+  body.printing #mOv,body.printing #pOv,body.printing #toastWrap,body.printing #vLoad{display:none!important}
   .po,.po *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .pr-doc{font-size:10pt}
   .pr-title{font-size:15pt}
@@ -6139,6 +6141,21 @@ function endBookPrint(){
   document.body.classList.remove('printing');
   const r=_('printRoot');if(r)r.innerHTML='';
 }
+/* Ctrl+P 로 바로 인쇄해도 화면이 그대로 찍히지 않게, 지금 화면에 맞는 인쇄본을 먼저 채운다. */
+function autoPreparePrint(){
+  try{
+    if(document.body.classList.contains('printing'))return;
+    const r=_('printRoot');if(!r)return;
+    let html='';
+    const stu=S.consultStuId?S.students.find(x=>x._docId===S.consultStuId):null;
+    if(stu&&S.tab==='consult')html=buildConsultPrintHtml(stu,consultPrintOpts(stu)).html;
+    else if(S.tab==='bookings')html=buildBookingPrintHtml(bookPrintOpts()).html;
+    if(!html)return;
+    r.innerHTML=html;
+    document.body.classList.add('printing');
+  }catch(e){console.error('autoPreparePrint',e);}
+}
+window.addEventListener('beforeprint',autoPreparePrint);
 window.addEventListener('afterprint',endBookPrint);
 window.addEventListener('focus',()=>setTimeout(endBookPrint,300));
 function renderAdminBookings(){
