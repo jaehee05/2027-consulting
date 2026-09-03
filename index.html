@@ -413,6 +413,18 @@ tr:last-child td{border-bottom:none}
 .pr-sm.avg{background:var(--primary-soft);border-color:var(--primary-soft-border)}
 .pr-sm.avg .pr-sm-g{color:var(--primary-text);font-size:17px}
 .pr-h .pr-num{font-style:normal;font-size:9.5px;font-weight:800;color:#fff;background:var(--gray-900);border-radius:4px;padding:2px 5px;margin-right:8px;letter-spacing:.04em;flex:0 0 auto}
+/* 등급 추이 표 */
+.pr-trend{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+.pr-trend th,.pr-trend td{border:1px solid var(--gray-200);padding:5px 6px;text-align:center;white-space:nowrap}
+.pr-trend thead th{background:var(--gray-100);font-size:10.5px;font-weight:700;color:var(--gray-600)}
+.pr-trend tbody th{background:var(--gray-50);font-size:11px;font-weight:700;color:var(--gray-900);text-align:left;padding-left:9px}
+.pr-trend td{color:var(--gray-500);font-weight:600}
+.pr-trend td.now{color:var(--gray-900);font-weight:800;background:var(--primary-soft)}
+.pr-trend td.pr-delta{font-weight:800}
+.pr-up{color:var(--success)}
+.pr-dn{color:var(--danger)}
+.pr-d0{color:var(--gray-400);font-weight:600}
+.pr-legend{font-size:10.5px;color:var(--gray-400);margin-top:8px;text-align:center}
 /* 멘토링 자료 인쇄 */
 .pr-graph{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pr-graph>div{page-break-inside:avoid;break-inside:avoid}
@@ -483,6 +495,9 @@ tr:last-child td{border-bottom:none}
   .pr-sm-g{font-size:14pt}
   .pr-head{margin-bottom:6mm}
   .pr-sum{margin-bottom:6mm}
+  .pr-trend{font-size:9pt}
+  .pr-trend thead th{font-size:8pt}
+  .pr-legend{font-size:7.5pt}
 }
 .po{display:none}
 code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;font-family:monospace}
@@ -3653,7 +3668,7 @@ function subjectChangesHtml(stu,exams){
     ${rows}
   </div>`;
 }
-function drawGradeGraph(exams,stu,subjInfo){
+function drawGradeGraph(exams,stu,subjInfo,opts){
   const W=700,H=240,PL=56,PR=56,PT=24,PB=36;
   const cw=W-PL-PR,ch=H-PT-PB;
   const yFor=(g)=>PT+(g-1)*(ch/8);
@@ -3810,7 +3825,8 @@ function drawGradeGraph(exams,stu,subjInfo){
     @keyframes gg-f{to{opacity:var(--op,1)}}
     @media (prefers-reduced-motion:reduce){.gg-ln{stroke-dashoffset:0;animation:none}.gg-lne,.gg-dt{opacity:var(--op,1);animation:none}}
   </style>`;
-  return `<div>${summary}<div style="overflow-x:auto;display:flex;justify-content:center"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${animStyle}${bands}${gridLines}${yLabels}${xLabels}${path}${dots}${estPath}${estDots}</svg></div>${legend}</div>`;
+  const showSum=!(opts&&opts.summary===false),showLeg=!(opts&&opts.legend===false);
+  return `<div>${showSum?summary:''}<div style="overflow-x:auto;display:flex;justify-content:center"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${animStyle}${bands}${gridLines}${yLabels}${xLabels}${path}${dots}${estPath}${estDots}</svg></div>${showLeg?legend:''}</div>`;
 }
 
 function renderConsultDetail(){
@@ -5849,6 +5865,28 @@ function consultPrintOpts(stu,examId){
   if(!o.examId||!withScore.some(e=>e.id===o.examId))o.examId=withScore.length?withScore[withScore.length-1].id:null;
   return o;
 }
+/* 과목 × 시험 등급 표 — 리포트에서 그래프보다 먼저 읽히는 본문. */
+function cprintTrendTableHtml(exams,stu){
+  const subs=getGradeSubjects(stu);
+  const exs=exams.filter(ex=>hasStuExamScore(stu,ex.id));
+  if(!subs.length||!exs.length)return '';
+  const short=n=>String(n||'').replace(/\s*(모의고사|모의평가|학력평가)\s*$/,'').trim()||n;
+  const rows=subs.map(si=>{
+    const gs=exs.map(ex=>{const sc=getStuExamScore(stu,ex.id);return sc?String(si.getGrade(ex,sc)||''):'';});
+    const nums=gs.map(g=>Number(String(g).split('-')[0]));
+    const seen=nums.map((n,i)=>isNaN(n)?-1:i).filter(i=>i>=0);
+    if(!seen.length)return '';
+    let delta='<span class="pr-d0">—</span>';
+    if(seen.length>=2){
+      const d=nums[seen[seen.length-2]]-nums[seen[seen.length-1]];
+      delta=d>0?`<span class="pr-up">▲ ${d}</span>`:d<0?`<span class="pr-dn">▼ ${Math.abs(d)}</span>`:'<span class="pr-d0">유지</span>';
+    }
+    const last=seen[seen.length-1];
+    return `<tr><th>${escapeHtml(si.label)}</th>${gs.map((g,i)=>`<td class="${i===last?'now':''}">${g||'·'}</td>`).join('')}<td class="pr-delta">${delta}</td></tr>`;
+  }).filter(Boolean).join('');
+  if(!rows)return '';
+  return `<table class="pr-trend"><thead><tr><th>과목</th>${exs.map(ex=>`<th>${escapeHtml(short(ex.name))}</th>`).join('')}<th>직전 대비</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 /* 선택한 시험의 과목별 등급을 한 줄로 요약한다. */
 function cprintSummaryHtml(exam,stu){
   const sc=exam?getStuExamScore(stu,exam.id):null;if(!sc)return '';
@@ -5877,11 +5915,11 @@ function buildConsultPrintHtml(stu,o){
   if(o.graph){
     const subs=getGradeSubjects(stu).filter(si=>exams.some(ex=>{const s2=getStuExamScore(stu,ex.id);return s2&&si.getGrade(ex,s2);}));
     if(subs.length){
-      const g=si=>`<div><p class="pr-gt">${escapeHtml(si.label)}</p>${drawGradeGraph(exams,stu,si)}</div>`;
-      const head=subs.slice(0,2).map(g).join(''),rest=subs.slice(2).map(g).join('');
+      const g=si=>`<div><p class="pr-gt">${escapeHtml(si.label)}</p>${drawGradeGraph(exams,stu,si,{summary:false,legend:false})}</div>`;
       body+=`<section class="pr-sec pr-flow">
-        <div class="pr-keep"><h3 class="pr-h">${num()}등급 추이<span class="pr-h-sub">${subs.length}개 과목</span></h3>${subjectChangesHtml(stu,exams)}<div class="pr-graph">${head}</div></div>
-        ${rest?`<div class="pr-graph">${rest}</div>`:''}</section>`;
+        <div class="pr-keep"><h3 class="pr-h">${num()}등급 추이<span class="pr-h-sub">${subs.length}개 과목</span></h3>${cprintTrendTableHtml(exams,stu)}${subjectChangesHtml(stu,exams)}</div>
+        <div class="pr-graph">${subs.map(g).join('')}</div>
+        <p class="pr-legend">파란 선 = 실측 등급 · 주황 점선 = 예상 등급컷 기준 추정 · 배경 띠는 1·2 / 3·4 / 5·6 / 7·8·9 등급 구간</p></section>`;
     }
   }
   if(o.wrong&&sc){
