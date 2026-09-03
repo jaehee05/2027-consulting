@@ -867,7 +867,8 @@ exports.mentorAi = onRequest(
         },
         body: JSON.stringify({
           model: MENTOR_AI_MODEL,
-          max_tokens: 1600,
+          // 한글은 토큰을 많이 먹는다. 400~700자 초안이라도 1600 이면 문장 중간에 끊겼다.
+          max_tokens: 4000,
           system: MENTOR_SYSTEM,
           messages: [{ role: "user", content: user }],
         }),
@@ -890,7 +891,8 @@ exports.mentorAi = onRequest(
         .join("")
         .trim();
       if (!text) return res.status(502).json({ error: "빈 응답을 받았습니다. 다시 시도해 주세요." });
-      return res.json({ text });
+      // 상한에 걸려 잘렸으면 화면에서 알려 줘야 한다. 조용히 잘린 초안을 넘기지 않는다.
+      return res.json({ text, truncated: data.stop_reason === "max_tokens" });
     } catch (err) {
       console.error("mentorAi 오류:", err);
       return res.status(500).json({ error: String((err && err.message) || err) });

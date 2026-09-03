@@ -4051,10 +4051,11 @@ function openMentorAiModal(){
   openModal();
   if(S.mentorAiText)renderMentorAiOut(S.mentorAiText);
 }
-function renderMentorAiOut(text){
+function renderMentorAiOut(text,truncated){
   const box=_('mentorOut');if(!box)return;
   S.mentorAiText=text;
-  box.innerHTML=`<p style="font-size:12px;font-weight:700;color:#6b7280;margin:0 0 6px">초안 <span style="font-weight:500;color:#9ca3af">— 고쳐 쓰라고 만든 초안입니다. 사실 관계를 꼭 확인하세요.</span></p>
+  box.innerHTML=`${truncated?'<p style="font-size:12px;color:#ea580c;font-weight:700;margin:0 0 6px">길이 상한에 걸려 문장이 끊겼습니다. 다시 만들거나 끝부분을 직접 맺어 주세요.</p>':''}
+    <p style="font-size:12px;font-weight:700;color:#6b7280;margin:0 0 6px">초안 <span style="font-weight:500;color:#9ca3af">— 고쳐 쓰라고 만든 초안입니다. 사실 관계를 꼭 확인하세요.</span></p>
     <textarea class="fi ta" id="mentorText" rows="12" style="font-size:13px;line-height:1.7">${escapeHtml(text)}</textarea>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button class="btn bs bsm" style="flex:1" onclick="applyMentorAi('replace')">본문에 넣기</button>
@@ -4069,7 +4070,7 @@ async function runMentorAi(){
   if(btn){btn.disabled=true;btn.textContent='쓰는 중…';}
   try{
     const r=await mentorAiCall(buildMentorFacts(stu,exam,S.mentorAiFocus,ask));
-    renderMentorAiOut(r.text||'');
+    renderMentorAiOut(r.text||'',r.truncated);
   }catch(e){
     /* 함수를 아직 배포하지 않았으면 404 나 네트워크 오류로 떨어진다. 원문만 보면 원인을 알 수 없다. */
     const raw=e.message||String(e);
