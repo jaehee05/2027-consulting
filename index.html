@@ -393,6 +393,25 @@ tr:last-child td{border-bottom:none}
   .mtitle{font-size:16px}
   .mactions{position:sticky;bottom:-18px;background:var(--surface);margin:8px -18px -18px;padding:14px 18px;border-top:1px solid var(--gray-200);z-index:5}
 }
+/* 멘토링 리포트 — 머리말·요약·섹션 번호 */
+.pr-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;padding-bottom:10px;border-bottom:2.5px solid var(--gray-900);margin-bottom:16px}
+.pr-brand{font-size:10.5px;font-weight:800;letter-spacing:.16em;color:var(--primary);margin-bottom:7px}
+.pr-name{font-size:25px;font-weight:800;letter-spacing:-.7px;line-height:1.1;color:var(--gray-900)}
+.pr-meta{font-size:11.5px;color:var(--gray-500);margin-top:5px}
+.pr-right{text-align:right;flex:0 0 auto}
+.pr-kind{font-size:11px;font-weight:700;color:var(--gray-600);letter-spacing:.08em}
+.pr-date{font-size:10.5px;color:var(--gray-400);margin-top:4px}
+.pr-exam{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:800;color:var(--gray-900);margin-bottom:9px}
+.pr-exam::before{content:'';width:4px;height:15px;background:var(--primary);border-radius:2px;flex:0 0 4px}
+.pr-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(62px,1fr));gap:6px;margin-bottom:18px}
+.pr-sm{border:1px solid var(--gray-200);border-radius:8px;padding:7px 4px 6px;text-align:center;background:var(--gray-50)}
+.pr-sm-l{display:block;font-size:9.5px;font-weight:700;color:var(--gray-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-sm-g{display:block;font-size:19px;font-weight:800;color:var(--gray-900);line-height:1.2;margin-top:2px}
+.pr-sm-g small{font-size:10px;font-weight:700;color:var(--gray-400);margin-left:1px}
+.pr-sm.est .pr-sm-g{color:var(--warning-text)}
+.pr-sm.avg{background:var(--primary-soft);border-color:var(--primary-soft-border)}
+.pr-sm.avg .pr-sm-g{color:var(--primary-text);font-size:17px}
+.pr-h .pr-num{font-style:normal;font-size:9.5px;font-weight:800;color:#fff;background:var(--gray-900);border-radius:4px;padding:2px 5px;margin-right:8px;letter-spacing:.04em;flex:0 0 auto}
 /* 멘토링 자료 인쇄 */
 .pr-graph{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pr-graph>div{page-break-inside:avoid;break-inside:avoid}
@@ -452,6 +471,15 @@ tr:last-child td{border-bottom:none}
   .pr-graph{gap:4mm}
   .pr-gt{font-size:9pt}
   .pr-note-b{font-size:9.5pt}
+  .pr-name{font-size:19pt}
+  .pr-brand{font-size:8pt}
+  .pr-meta,.pr-kind{font-size:8.5pt}
+  .pr-date{font-size:8pt}
+  .pr-exam{font-size:11pt}
+  .pr-sm-l{font-size:7.5pt}
+  .pr-sm-g{font-size:14pt}
+  .pr-head{margin-bottom:6mm}
+  .pr-sum{margin-bottom:6mm}
 }
 .po{display:none}
 code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;font-family:monospace}
@@ -5814,35 +5842,57 @@ function consultPrintOpts(stu,examId){
   if(!o.examId||!withScore.some(e=>e.id===o.examId))o.examId=withScore.length?withScore[withScore.length-1].id:null;
   return o;
 }
+/* 선택한 시험의 과목별 등급을 한 줄로 요약한다. */
+function cprintSummaryHtml(exam,stu){
+  const sc=exam?getStuExamScore(stu,exam.id):null;if(!sc)return '';
+  const nums=[];
+  const cells=getGradeSubjects(stu).map(si=>{
+    const g=si.getGrade(exam,sc);if(!g)return '';
+    const est=si.isEst&&si.isEst(exam,sc);
+    const first=Number(String(g).split('-')[0]);
+    if(!isNaN(first))nums.push(first);
+    return `<div class="pr-sm${est?' est':''}"><span class="pr-sm-l">${escapeHtml(si.label)}</span><span class="pr-sm-g">${escapeHtml(String(g))}</span></div>`;
+  }).filter(Boolean);
+  if(!cells.length)return '';
+  if(nums.length>1){
+    const avg=(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1);
+    cells.push(`<div class="pr-sm avg"><span class="pr-sm-l">평균</span><span class="pr-sm-g">${avg}<small>등급</small></span></div>`);
+  }
+  return `<div class="pr-sum">${cells.join('')}</div>`;
+}
 function buildConsultPrintHtml(stu,o){
   const exams=examsForStu(stu);
   const selEx=exams.find(e=>e.id===o.examId)||null;
   const sc=selEx?getStuExamScore(stu,selEx.id):null;
-  let body='';
-  if(o.score&&sc)body+=`<section class="pr-sec"><h3 class="pr-h">성적표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${examScoreTblFull(selEx,sc)}</section>`;
+  let body='',n=0;
+  const num=()=>`<i class="pr-num">${String(++n).padStart(2,'0')}</i>`;
+  if(o.score&&sc)body+=`<section class="pr-sec"><h3 class="pr-h">${num()}성적표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${examScoreTblFull(selEx,sc)}</section>`;
   if(o.graph){
     const subs=getGradeSubjects(stu).filter(si=>exams.some(ex=>{const s2=getStuExamScore(stu,ex.id);return s2&&si.getGrade(ex,s2);}));
     if(subs.length){
       const gs=subs.map(si=>`<div><p class="pr-gt">${escapeHtml(si.label)}</p>${drawGradeGraph(exams,stu,si)}</div>`).join('');
-      body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">등급 추이<span class="pr-h-sub">${subs.length}개 과목</span></h3>${subjectChangesHtml(stu,exams)}<div class="pr-graph">${gs}</div></section>`;
+      body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">${num()}등급 추이<span class="pr-h-sub">${subs.length}개 과목</span></h3>${subjectChangesHtml(stu,exams)}<div class="pr-graph">${gs}</div></section>`;
     }
   }
   if(o.wrong&&sc){
     const w=wrongListHtml(selEx,sc,true);
-    if(w)body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">정오표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${w}</section>`;
+    if(w)body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">${num()}정오표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${w}</section>`;
   }
   if(o.note){
     const notes=exams.map(ex=>{
       const n=stu.consultNotes&&stu.consultNotes[ex.id];
       return (n&&n.note&&n.note.trim())?`<div class="pr-note"><p class="pr-note-h">${escapeHtml(ex.name)}</p><p class="pr-note-b">${escapeHtml(n.note)}</p></div>`:'';
     }).join('');
-    if(notes)body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">멘토링 기록</h3>${notes}</section>`;
+    if(notes)body+=`<section class="pr-sec pr-flow"><h3 class="pr-h">${num()}멘토링 기록</h3>${notes}</section>`;
   }
-  const meta=[stu.school,stu.grade,stu.seat?`좌석 ${stu.seat}`:'',selEx?selEx.name:''].filter(Boolean).join(' · ');
+  const meta=[stu.school,stu.grade,stu.seat?`좌석 ${stu.seat}`:''].filter(Boolean).join(' · ');
   return {
     html:`<div class="pr-doc">
-      <p class="pr-title">${escapeHtml(stu.name||'')} 멘토링 자료</p>
-      <p class="pr-sub">${escapeHtml(meta)} · 출력일 ${new Date().toLocaleDateString('ko-KR')}</p>
+      <div class="pr-head">
+        <div><p class="pr-brand">KJHEDU</p><p class="pr-name">${escapeHtml(stu.name||'')}</p><p class="pr-meta">${escapeHtml(meta)}</p></div>
+        <div class="pr-right"><p class="pr-kind">멘토링 리포트</p><p class="pr-date">${new Date().toLocaleDateString('ko-KR')}</p></div>
+      </div>
+      ${selEx?`<p class="pr-exam">${escapeHtml(selEx.name)}</p>${cprintSummaryHtml(selEx,stu)}`:''}
       ${body||'<p class="pr-empty">인쇄할 내용이 없습니다. 포함 항목을 선택해 주세요.</p>'}
     </div>`,
     empty:!body
