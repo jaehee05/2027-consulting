@@ -490,6 +490,8 @@ tr:last-child td{border-bottom:none}
   .gg-lne,.gg-dt{opacity:var(--op,1)!important;animation:none!important}
   .pr-graph{grid-template-columns:1fr 1fr;gap:4mm}
   body.pg-land .pr-graph{grid-template-columns:repeat(3,1fr)}
+  /* 여러 명을 한 번에 뽑을 때 학생마다 새 장에서 시작한다. */
+  #printRoot>.pr-doc+.pr-doc{page-break-before:always;break-before:page}
   /* 가로에서는 3열이라 표+그래프 6개가 146mm 남짓 — 한 덩어리로 묶어도 186mm 페이지에 들어간다.
      세로(2열)는 3행이 되어 232mm 라 묶으면 페이지를 넘겨 빈 장이 생기므로 흐르게 둔다. */
   body.pg-land .pr-sec.pr-trendsec{page-break-inside:avoid;break-inside:avoid}
@@ -3600,7 +3602,8 @@ function renderAdminConsult(){
   _('adminC').innerHTML=`<style>#adminC .consult-tbl tbody tr:hover{background:#f9fafb}</style>
   <div class="sh"><span class="shtitle">멘토링 <span style="font-size:13px;font-weight:400;color:#6b7280">(${baseStu.length}명)</span></span></div>
   ${summaryHtml}
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}</div>
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
+    <button class="btn bs bsm" style="margin-left:auto" onclick="openBatchPrintModal()">🖨 여러 명 인쇄</button></div>
   <div class="card" style="padding:0"><div class="tw tw-cards tw-wide"><table class="consult-tbl">
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>질문</th>${examHeaders}<th>기록</th></tr></thead>
     <tbody>${rows||`<tr class="empty-row"><td colspan="${7+cExams.length}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
@@ -6131,6 +6134,109 @@ function buildConsultPrintHtml(stu,o){
     empty:!body
   };
 }
+/* ── 여러 명 한 번에 인쇄 ──────────────────────────────────────────────
+   학생마다 응시한 시험이 다르므로, 고른 시험이 없는 학생은 그 학생의
+   마지막 응시 시험으로 대신한다(무엇으로 대체됐는지 목록에 표시). */
+function batchPrintOpts(){return Object.assign({},CPRINT_DEFAULTS,S.bprintOpts||{});}
+function setBPrintOpt(k,v){S.bprintOpts=Object.assign({},batchPrintOpts(),{[k]:v});openBatchPrintModal();}
+function bpStudents(){
+  const g=S.bprintGrade||'';
+  return bookableStu().filter(s=>!g||s.grade===g)
+    .sort((a,b)=>(a.seat||999)-(b.seat||999)||String(a.name||'').localeCompare(String(b.name||''),'ko'));
+}
+function bpExamFor(stu,examId){
+  const withScore=examsForStu(stu).filter(ex=>hasStuExamScore(stu,ex.id));
+  if(!withScore.length)return null;
+  return withScore.find(e=>e.id===examId)||withScore[withScore.length-1];
+}
+/* 고른 항목 기준으로 실제 나올 게 있는지. 성적이 없어도 멘토링 기록만 있으면 뽑는다. */
+function bpJobFor(stu,o){
+  const ex=bpExamFor(stu,o.examId);
+  const r=buildConsultPrintHtml(stu,Object.assign({},o,{examId:ex?ex.id:null}));
+  return {stu,exam:ex,html:r.html,empty:r.empty};
+}
+function bpSelected(){return S.bprintSel||(S.bprintSel={});}
+function bpToggle(id,on){bpSelected()[id]=!!on;bpUpdateCount();}
+function bpSetAll(on){
+  const sel=bpSelected();
+  bpStudents().forEach(s=>{sel[s._docId]=!!on;});
+  openBatchPrintModal();
+}
+function bpUpdateCount(){
+  const btn=_('bprintGo');if(!btn)return;
+  const n=bpStudents().filter(s=>bpSelected()[s._docId]).length;
+  btn.textContent=n?`🖨 ${n}명 인쇄`:'선택된 학생 없음';
+  btn.disabled=!n;
+}
+function openBatchPrintModal(){
+  const o=batchPrintOpts();
+  const list=bpStudents();
+  const sel=bpSelected();
+  /* 처음 열면 뽑을 게 있는 학생을 전부 선택해 둔다. */
+  if(!S.bprintInit){S.bprintInit=true;list.forEach(s=>{if(!bpJobFor(s,o).empty)sel[s._docId]=true;});}
+  const exams=getExams();
+  const chips=exams.map(ex=>`<button class="dt ${ex.id===o.examId?'on':''}" onclick="setBPrintOpt('examId','${ex.id}')">${escapeHtml(ex.name)}${ex.grade?`<span style="font-size:9px;color:#9ca3af;margin-left:3px">${escapeHtml(ex.grade)}</span>`:''}</button>`).join('');
+  const gtabs=['','고3','고2','고1'].map(g=>`<button class="dt ${((S.bprintGrade||'')===g)?'on':''}" onclick="S.bprintGrade='${g}';openBatchPrintModal()">${g||'전체'}</button>`).join('');
+  const chk=(key,label)=>`<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer;user-select:none">
+    <input type="checkbox" ${o[key]?'checked':''} onchange="setBPrintOpt('${key}',this.checked)" style="width:15px;height:15px;accent-color:#1C64F2">${label}</label>`;
+  const rows=list.map(s=>{
+    const j=bpJobFor(s,o);
+    const on=!!sel[s._docId];
+    const sub=j.empty
+      ?'<span style="color:#dc2626">뽑을 내용 없음</span>'
+      :`${escapeHtml(j.exam?j.exam.name:'')}${(j.exam&&j.exam.id!==o.examId)?'<span style="color:#ea580c;margin-left:4px">← 대신</span>':''}`;
+    return `<label style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid #f3f4f6;cursor:${j.empty?'not-allowed':'pointer'};opacity:${j.empty?'.5':'1'}">
+      <input type="checkbox" ${on&&!j.empty?'checked':''} ${j.empty?'disabled':''} onchange="bpToggle('${s._docId}',this.checked)" style="width:15px;height:15px;accent-color:#1C64F2;flex:0 0 auto">
+      <span style="flex:0 0 34px;font-size:12px;font-weight:700;color:#1C64F2;text-align:center">${s.seat||'—'}</span>
+      <span style="flex:1 1 auto;font-size:13px;font-weight:600;color:#111827">${escapeHtml(s.name||'')}<span style="font-size:11px;font-weight:500;color:#9ca3af;margin-left:6px">${escapeHtml(s.grade||'')}</span></span>
+      <span style="flex:0 0 auto;font-size:11px;color:#6b7280;text-align:right">${sub}</span>
+    </label>`;
+  }).join('');
+  _('mCt').style.maxWidth='720px';
+  _('mCt').innerHTML=`<p class="mtitle">멘토링 자료 여러 명 인쇄</p>
+    <p class="msub">고른 학생마다 한 장씩 새로 시작합니다. 고른 시험을 보지 않은 학생은 그 학생의 마지막 시험으로 대신합니다.</p>
+    <p style="font-size:12px;font-weight:700;color:#6b7280;margin:14px 0 6px">시험</p>
+    <div class="dtabs">${chips||'<span style="font-size:12px;color:#9ca3af">등록된 시험이 없습니다.</span>'}</div>
+    <p style="font-size:12px;font-weight:700;color:#6b7280;margin:14px 0 6px">용지 방향</p>
+    <div class="dtabs">
+      <button class="dt ${o.land!==false?'on':''}" onclick="setBPrintOpt('land',true)">가로 — 표·그래프 넓게</button>
+      <button class="dt ${o.land===false?'on':''}" onclick="setBPrintOpt('land',false)">세로 — 장수 적게</button>
+    </div>
+    <p style="font-size:12px;font-weight:700;color:#6b7280;margin:14px 0 6px">포함 항목</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">${chk('score','성적표')}${chk('graph','등급 추이')}${chk('wrong','정오표')}${chk('note','멘토링 기록')}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:14px 0 6px;flex-wrap:wrap">
+      <p style="font-size:12px;font-weight:700;color:#6b7280;margin:0">학생</p>
+      <div class="dtabs" style="margin:0">${gtabs}</div>
+      <span style="margin-left:auto;display:flex;gap:6px">
+        <button class="btn bs bsm" onclick="bpSetAll(true)">전체 선택</button>
+        <button class="btn bs bsm" onclick="bpSetAll(false)">전체 해제</button>
+      </span>
+    </div>
+    <div style="border:1px solid var(--gray-200);border-radius:10px;max-height:38vh;overflow:auto;background:#fff">
+      ${rows||'<p style="font-size:12px;color:#9ca3af;padding:14px;text-align:center">해당하는 학생이 없습니다.</p>'}
+    </div>
+    <div class="mactions">
+      <button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button>
+      <button class="btn bp" style="flex:1" id="bprintGo" onclick="doBatchConsultPrint()">인쇄</button>
+    </div>`;
+  openModal();
+  bpUpdateCount();
+}
+function doBatchConsultPrint(){
+  const area=_('printRoot');
+  if(!area){toast('인쇄 영역을 찾지 못했습니다.','error');return;}
+  const o=batchPrintOpts();
+  const sel=bpSelected();
+  const jobs=bpStudents().filter(s=>sel[s._docId]).map(s=>bpJobFor(s,o)).filter(j=>!j.empty);
+  if(!jobs.length){toast('뽑을 내용이 있는 학생이 없습니다.','error');return;}
+  area.innerHTML=jobs.map(j=>j.html).join('');
+  applyPrintOrientation(o.land!==false);
+  closeModal();
+  document.body.classList.add('printing');
+  toast(`${jobs.length}명 인쇄를 시작합니다.`);
+  setTimeout(()=>window.print(),60);
+}
+
 function setCPrintOpt(k,v){S.cprintOpts=Object.assign({},consultPrintOpts(S.students.find(x=>x._docId===S.consultStuId)||{}),{[k]:v});refreshConsultPrintPreview();}
 function setCPrintExam(id){S.cprintOpts=Object.assign({},S.cprintOpts||{},{examId:id});openConsultPrintModal();}
 function refreshConsultPrintPreview(){
