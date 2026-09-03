@@ -490,6 +490,9 @@ tr:last-child td{border-bottom:none}
   .gg-lne,.gg-dt{opacity:var(--op,1)!important;animation:none!important}
   .pr-graph{grid-template-columns:1fr 1fr;gap:4mm}
   body.pg-land .pr-graph{grid-template-columns:repeat(3,1fr)}
+  /* 가로에서는 3열이라 표+그래프 6개가 146mm 남짓 — 한 덩어리로 묶어도 186mm 페이지에 들어간다.
+     세로(2열)는 3행이 되어 232mm 라 묶으면 페이지를 넘겨 빈 장이 생기므로 흐르게 둔다. */
+  body.pg-land .pr-sec.pr-trendsec{page-break-inside:avoid;break-inside:avoid}
   .pr-gt{font-size:9pt}
   .pr-note-b{font-size:9.5pt}
   .pr-name{font-size:19pt}
@@ -5976,7 +5979,7 @@ function buildConsultPrintHtml(stu,o){
     if(subs.length){
       const g=si=>`<div><p class="pr-gt">${escapeHtml(si.label)}${cpSubjLabel(si)}</p>${drawGradeGraph(exams,stu,si,{summary:false,legend:false,unit:false})}</div>`;
       const changed=subs.some(si=>si.subjects.length>1);
-      body+=`<section class="pr-sec pr-flow">
+      body+=`<section class="pr-sec pr-flow pr-trendsec">
         <div class="pr-keep"><h3 class="pr-h">${num()}등급 추이<span class="pr-h-sub">${subs.length}개 영역</span></h3>${cprintTrendTableHtml(exams,stu,subs)}</div>
         <div class="pr-graph">${subs.map(g).join('')}</div>
         <p class="pr-legend">파란 선 = 실측 등급 · 주황 점선 = 예상 등급컷 기준 추정${changed?' · <b style="color:#7c3aed">보라 선 = 바꾸기 전 선택과목</b>':''} · 배경 띠는 1·2 / 3·4 / 5·6 / 7·8·9 등급 구간</p></section>`;
