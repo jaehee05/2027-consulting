@@ -495,13 +495,14 @@ tr:last-child td{border-bottom:none}
   /* 그래프는 애니메이션 최종 상태로 고정해야 종이에 나온다. */
   .gg-ln{stroke-dasharray:none!important;stroke-dashoffset:0!important;animation:none!important}
   .gg-lne,.gg-dt{opacity:var(--op,1)!important;animation:none!important}
-  .pr-graph{grid-template-columns:1fr 1fr;gap:4mm}
-  body.pg-land .pr-graph{grid-template-columns:repeat(3,1fr)}
+  /* 세로도 3열로 둔다. 2열이면 6개 영역이 3행이 되어 성적표·등급 추이가
+     한 장에 안 들어간다. 3열이면 2행이라 1페이지에 맞는다. */
+  .pr-graph{grid-template-columns:repeat(3,1fr);gap:4mm}
   /* 여러 명을 한 번에 뽑을 때 학생마다 새 장에서 시작한다. */
   #printRoot>.pr-doc+.pr-doc{page-break-before:always;break-before:page}
-  /* 가로에서는 3열이라 표+그래프 6개가 146mm 남짓 — 한 덩어리로 묶어도 186mm 페이지에 들어간다.
-     세로(2열)는 3행이 되어 232mm 라 묶으면 페이지를 넘겨 빈 장이 생기므로 흐르게 둔다. */
-  body.pg-land .pr-sec.pr-trendsec{page-break-inside:avoid;break-inside:avoid}
+  /* 표 + 그래프 6개를 한 덩어리로 본다. 3열이면 그래프가 2행이라
+     가로(186mm)·세로(269mm) 어느 쪽 페이지에도 들어간다. */
+  .pr-sec.pr-trendsec{page-break-inside:avoid;break-inside:avoid}
   .pr-gt{font-size:9pt}
   .pr-note-b{font-size:9.5pt}
   .pr-name{font-size:19pt}
@@ -6142,7 +6143,7 @@ function buildConsultPrintHtml(stu,o){
         <div><p class="pr-brand">KJHEDU</p><p class="pr-name">${escapeHtml(stu.name||'')}</p><p class="pr-meta">${escapeHtml(meta)}</p></div>
         <div class="pr-right"><p class="pr-kind">멘토링 리포트</p><p class="pr-date">${new Date().toLocaleDateString('ko-KR')}</p></div>
       </div>
-      ${selEx?`<p class="pr-exam">${escapeHtml(selEx.name)}</p>${cprintSummaryHtml(selEx,stu)}`:''}
+      ${selEx?`<p class="pr-exam">${escapeHtml(selEx.name)}</p>${o.land===false?'':cprintSummaryHtml(selEx,stu)}`:''}
       ${body||'<p class="pr-empty">인쇄할 내용이 없습니다. 포함 항목을 선택해 주세요.</p>'}
     </div>`,
     empty:!body
