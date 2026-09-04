@@ -6090,8 +6090,53 @@ function cpSlotGrade(exam,sc,k,rawKey,ovKey){
   if(k==='his')return getAbsGrade('his',raw);
   return getExamGrade(exam,waSlotSubj(sc,k),raw);
 }
+/* 탐구는 칸(exp1/exp2)이 아니라 과목을 따라 이어 붙인다.
+   1·2선택은 사탐 → 과탐 순으로 적으므로 한 과목만 바꿔도 두 칸이 같이 밀린다.
+   (1 생명과학Ⅰ / 2 지구과학Ⅰ → 지구과학Ⅰ을 사회·문화로: 1 사회·문화 / 2 생명과학Ⅰ)
+   칸 기준으로 그리면 두 과목이 다 바뀐 것처럼 보이므로, 마지막 시험의 과목을
+   기준으로 삼고 이전 시험은 같은 과목끼리 먼저 이어 붙인 뒤 남는 것을 채운다. */
+const CP_EXP_SLOTS=['exp1','exp2'];
+function cpExpSlotsUsed(exam,sc){
+  return CP_EXP_SLOTS.filter(k=>cpSlotGrade(exam,sc,k,k+'Raw',k+'GradeOverride'));
+}
+function cpExpSeries(stu,exams){
+  const withSc=exams.filter(ex=>getStuExamScore(stu,ex.id));
+  if(!withSc.length)return [];
+  const last=withSc[withSc.length-1];
+  const anchors=cpExpSlotsUsed(last,getStuExamScore(stu,last.id))
+    .map(k=>waSlotSubj(getStuExamScore(stu,last.id),k));
+  if(!anchors.length)return [];
+  /* map[examId][i] = 그 시험에서 i번째 계열이 쓰는 칸 */
+  const map={};
+  withSc.forEach(ex=>{
+    const sc=getStuExamScore(stu,ex.id);
+    const free=cpExpSlotsUsed(ex,sc);
+    const row=new Array(anchors.length).fill(null);
+    anchors.forEach((subj,i)=>{
+      const hit=free.findIndex(k=>waSlotSubj(sc,k)===subj);
+      if(hit>=0){row[i]=free[hit];free.splice(hit,1);}
+    });
+    /* 같은 과목이 없는 계열에는 남은 칸을 순서대로 붙인다 = 과목을 바꾼 경우 */
+    for(let i=0;i<row.length&&free.length;i++)if(!row[i])row[i]=free.shift();
+    map[ex.id]=row;
+  });
+  const slotAt=(ex,i)=>(map[ex.id]||[])[i]||null;
+  return anchors.map((_,i)=>{
+    const subs=[];
+    withSc.forEach(ex=>{
+      const k=slotAt(ex,i);if(!k)return;
+      const sj=waSlotSubj(getStuExamScore(stu,ex.id),k);
+      if(sj&&!subs.includes(sj))subs.push(sj);
+    });
+    return {key:'exp'+(i+1),label:'탐구 '+(i+1),subjects:subs,
+      getGrade:(ex,sc)=>{const k=slotAt(ex,i);return k?cpSlotGrade(ex,sc,k,k+'Raw',k+'GradeOverride'):'';},
+      isEst:(ex,sc)=>{const k=slotAt(ex,i);return !!k&&!(sc&&sc[k+'GradeOverride'])&&isEstGrade(ex,waSlotSubj(sc,k));},
+      hasCuts:()=>true,
+      subjAt:(ex,sc)=>{const k=slotAt(ex,i);return k?waSlotSubj(sc,k):'';}};
+  });
+}
 function cprintSlotSubjects(stu,exams){
-  return CP_SLOTS.map(([k,label,rawKey,ovKey])=>{
+  const main=CP_SLOTS.filter(([k])=>k!=='exp1'&&k!=='exp2').map(([k,label,rawKey,ovKey])=>{
     const subs=[];let any=false;
     exams.forEach(ex=>{
       const sc=getStuExamScore(stu,ex.id);if(!sc)return;
@@ -6107,6 +6152,7 @@ function cprintSlotSubjects(stu,exams){
       hasCuts:()=>true,
       subjAt:(ex,sc)=>waSlotSubj(sc,k)};
   }).filter(Boolean);
+  return main.concat(cpExpSeries(stu,exams).filter(si=>si.subjects.length));
 }
 /* '경제 → 사회·문화' 처럼 바뀐 과목을 보여준다. 이전 과목은 그래프와 같은 색. */
 function cpSubjLabel(si){
