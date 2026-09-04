@@ -115,6 +115,7 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .wa-sec{padding:12px 0;border-top:1px solid var(--gray-100);page-break-inside:avoid;break-inside:avoid}
 .wa-sec .wa-h,.wa-sec .wa-part{page-break-after:avoid;break-after:avoid}
 .wa-sec .wa-part+.oj-wrap{page-break-before:avoid;break-before:avoid}
+.wa-part-blk{page-break-inside:avoid;break-inside:avoid}
 .wa-sec.first{border-top:none;padding-top:0}
 .wa-h{display:flex;align-items:baseline;gap:7px;font-size:13px;font-weight:700;color:var(--gray-900);margin-bottom:8px;flex-wrap:wrap}
 .wa-subj{font-size:11.5px;font-weight:600;color:var(--primary)}
@@ -503,6 +504,22 @@ tr:last-child td{border-bottom:none}
   /* 표 + 그래프 6개를 한 덩어리로 본다. 3열이면 그래프가 2행이라
      가로(186mm)·세로(269mm) 어느 쪽 페이지에도 들어간다. */
   .pr-sec.pr-trendsec{page-break-inside:avoid;break-inside:avoid}
+  /* 세로에서는 정오표를 과목 통째가 아니라 공통/선택 단위로 나눈다.
+     국어 한 과목이 100mm 라 그래프 아래 남는 52mm 에 통째로는 못 들어가고,
+     한 장을 통으로 비우게 된다. 가로는 지금처럼 과목 단위를 유지한다. */
+  body:not(.pg-land) .pr-wrongsec .pr-keep,
+  body:not(.pg-land) .pr-wrongsec .wa-sec,
+  body:not(.pg-land) .pr-wrongsec .wa-part-blk{page-break-inside:auto;break-inside:auto}
+  /* 나뉘더라도 표 하나는 절대 쪼개지 않는다(문항 번호·정답·내 답·채점이 4행 한 벌). */
+  body:not(.pg-land) .pr-wrongsec .oj-tbl{page-break-inside:avoid;break-inside:avoid}
+  /* 그래프 아래 남는 52mm 에 정오표 첫 표까지 들어가도록 세로에서만 여백을 줄인다.
+     몇 mm 차이로 한 장을 통으로 비우게 되므로 값을 올릴 때는 다시 재 볼 것. */
+  body:not(.pg-land) .pr-sec.pr-trendsec{margin-bottom:3mm}
+  body:not(.pg-land) .pr-wrongsec .pr-h{margin-bottom:5mm}
+  body:not(.pg-land) .pr-wrongsec .wa-h{margin-bottom:4px}
+  body:not(.pg-land) .pr-wrongsec .wa-part{margin:4px 0 3px}
+  body:not(.pg-land) .pr-wrongsec .pr-h,
+  body:not(.pg-land) .pr-wrongsec .wa-h{page-break-after:avoid;break-after:avoid}
   .pr-gt{font-size:9pt}
   .pr-note-b{font-size:9.5pt}
   .pr-name{font-size:19pt}
@@ -2424,8 +2441,9 @@ function wrongListBlocks(exam,sc){
     const parts=(common>0&&common<items.length)
       ?[['공통과목',0,common-1],[`선택과목(<b>${escapeHtml(subj)}</b>)`,common,items.length-1]]
       :[['',0,items.length-1]];
+    /* 공통 / 선택을 각각 감싸 둔다. 세로 인쇄에서는 이 단위로 페이지를 나눈다. */
     const body=parts.map(([plabel,from,to])=>
-      (plabel?`<p class="wa-part">▪ ${plabel}</p>`:'')+ojTablesHtml(items,arr,from,to)).join('');
+      `<div class="wa-part-blk">${plabel?`<p class="wa-part">▪ ${plabel}</p>`:''}${ojTablesHtml(items,arr,from,to)}</div>`).join('');
     blocks.push(`<div class="wa-sec${blocks.length?'':' first'}">
       <p class="wa-h">${label}<span class="wa-subj">${escapeHtml(subj)}</span><span class="wa-n">${akKeyed(items)?`${wrong.length?`오답 ${wrong.length}문항`:'전부 정답'} · ${akScore(items,arr)}점`:'정답 등록 전'}</span></p>
       ${body}</div>`);
@@ -6157,7 +6175,7 @@ function buildConsultPrintHtml(stu,o){
   }
   if(o.wrong&&sc){
     const wb=wrongListBlocks(selEx,sc);
-    if(wb.length)body+=`<section class="pr-sec pr-flow">
+    if(wb.length)body+=`<section class="pr-sec pr-flow pr-wrongsec">
       <div class="pr-keep"><h3 class="pr-h">${num()}정오표<span class="pr-h-sub">${escapeHtml(selEx.name)}</span></h3>${wb[0]}</div>
       ${wb.slice(1).join('')}</section>`;
   }
