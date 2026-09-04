@@ -129,6 +129,7 @@ Popup specifics:
 - **성적표의 '해당 없음' 대각선(`.dl`)은 배경이 아니라 SVG 선이다.** 원래는 `linear-gradient`로 1px 띠를 그렸는데, 인쇄하면 배경 그래픽이 꺼져 있을 땐 아예 사라지고 켜져 있어도 그 띠가 인쇄 해상도로 래스터라이즈되며 끊긴 점선처럼 나왔다. 지금은 `_DL_SVG`(`preserveAspectRatio="none"` + `vector-effect="non-scaling-stroke"`)를 칸 안에 절대배치해 칸 크기와 무관하게 굵기가 일정한 벡터 선으로 그린다. `.dl` 칸에 무언가 더 넣을 일이 생기면 SVG가 `position:absolute`라는 점을 기억할 것.
 
 - **여러 명 한 번에 인쇄** — 멘토링 목록의 **🖨 여러 명 인쇄** → `openBatchPrintModal` → `doBatchConsultPrint`. 고른 학생마다 `buildConsultPrintHtml`을 돌려 `#printRoot`에 `.pr-doc`을 나란히 붙이고, `@media print`의 `#printRoot>.pr-doc+.pr-doc{break-before:page}`가 **둘째 학생부터** 새 장에서 시작하게 한다(첫 학생은 인접 형제가 없어 걸리지 않는다). 옵션 상태는 1인 인쇄와 분리된 `S.bprintOpts`/`S.bprintSel`을 쓴다 — 같은 걸 공유하면 한쪽에서 항목을 끄면 다른 쪽도 꺼진다.
+- 목록은 **좌석순 / 예약순 / 학년순 / 이름순**으로 정렬할 수 있고(`BP_SORTS`, `S.bprintSort`), **인쇄되는 순서가 곧 목록 순서**다(`doBatchConsultPrint` 가 `bpStudents()` 를 그대로 쓴다). 예약순은 목록 화면과 같은 규칙 — 예약한 학생이 먼저, 그 안에서 날짜→시간, 미예약은 뒤로 몰아 좌석순. 상담 순서대로 뽑아 두면 그대로 들고 들어갈 수 있으라고 넣은 것이므로, 정렬을 건드릴 땐 인쇄 순서까지 같이 바뀌는지 확인할 것. 각 행에 예약 일시를 같이 보여 준다.
 - 학생마다 응시한 시험이 다르므로(`examsForStu`가 학년으로 갈린다) **고른 시험을 안 본 학생은 그 학생의 마지막 응시 시험으로 대체**하고, 목록에 `← 대신`으로 표시한다. 뽑을 게 없는 학생(`buildConsultPrintHtml(...).empty`)은 체크박스가 비활성이고 인쇄 대상에서도 빠진다.
 
 ## 멘토링 기록 AI 초안
