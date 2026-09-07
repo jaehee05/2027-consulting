@@ -22,7 +22,7 @@ The three deploy targets are **independent** — pick the right one for the chan
 - **Web frontend (`index.html`, `privacy.html`, `favicon.png`)** — Vercel auto-deploys from GitHub `main` on every push. Live site: `https://www.kjhedu.kr/`. No `vercel.json` in repo; config is on the Vercel side. **A `git push` is sufficient** — do not run `firebase deploy --only hosting`. The `consulting-dd53f.web.app` Firebase Hosting site exists but is unused (404).
 - **Cloud Functions** — `firebase deploy --only functions --project consulting-dd53f` (from repo root, after `cd functions && npm install`).
 - **Firestore rules** — `firebase deploy --only firestore:rules --project consulting-dd53f`.
-- **Storage rules** — `firebase deploy --only storage --project consulting-dd53f`. Storage was finally provisioned on 2026-09-02 (bucket `consulting-dd53f.firebasestorage.app`, `asia-northeast3`, production rules) and the repo's `storage.rules` released then; before that 질문 게시판 사진 첨부 could not work at all. If an upload ever fails again, check the error code the toast now prints (`storage/unauthorized` → rules, `storage/unauthenticated` → the Firebase Auth session died even though the app session survived).
+- **Storage rules** — `firebase deploy --only storage --project consulting-dd53f`. Storage was finally provisioned on 2026-09-02 (bucket `consulting-dd53f.firebasestorage.app`, `asia-northeast3`, production rules) and the repo's `storage.rules` released then; before that 게시판 사진 첨부 could not work at all. If an upload ever fails again, check the error code the toast now prints (`storage/unauthorized` → rules, `storage/unauthenticated` → the Firebase Auth session died even though the app session survived).
 - **Mobile app** — `cd mobile && npm run ios` (or `android`). Only needed for App/Play Store releases; not part of the web deploy flow.
 
 Firebase project: **`consulting-dd53f`** (set as `default` in `.firebaserc`).
@@ -108,6 +108,26 @@ Popup specifics:
 - **오늘 하루 보지 않기 is `localStorage` only** — key `popupHide_<docId>` holding a date string. Nothing is written to Firestore, so it is per-browser and resets at midnight. Never "fix" this by storing dismissals per student.
 - `S.popupShown` makes the popup fire once per session; `doLogout` resets it (and `_popupsLoaded`) so the next login shows it again.
 - The sample 팝업 is seeded once by `popupSeedSample()` when an admin first opens the 공지사항 tab, guarded by `config.popupSeeded`. Deleting the sample must not bring it back — that flag is the guard, so don't seed off an empty-collection check.
+
+### 게시판 (`posts`)
+
+A standalone, always-open board — **not** tied to a booking. Added 2026-09-08, replacing the old 상담 전 질문 & 고민 board that lived inside each `bookings` doc as a `posts` array (that array, and the even older `question`/`comments` fields, are no longer read or written anywhere; the one legacy post left in Firestore was not migrated).
+
+This is the **general** board. The separate 질문 게시판 (token-gated Q&A) is its own feature with its own collections — keep the two apart: this one's code is prefixed `bd*`, that one's is `qa*`.
+
+- **Doc**: `{body, photos[], secret, pinned, authorId, authorRole:'student'|'admin', authorName, authorGrade, createdAt, updatedAt, comments[]}`. Comments are an inline array `{_id, role, name, authorId, body, photos[], ts}` — one doc per thread, whole array rewritten on every comment.
+- **`authorId`** is the student's `_docId` for students and `S.user.id` for staff. Everything that asks "is this mine?" (`bdCanRead`, `bdCanEdit`, comment delete) compares against `bdMyId()`, so don't switch it to `accountId`.
+- **비밀글 is `secret:true`** — visible to the author and any staff account. Non-owners get `bdLockedCardHtml` (a 🔒 stub with only the date), never the body or the author's name. **This is client-side only**; `firestore.rules` still opens the whole collection, so a determined student could read it via the SDK.
+- Kept in sync by `startPostsListener()` (`onSnapshot`), so every CRUD handler writes to Firestore **only** and lets the listener update `S.posts` and re-render — the same rule as `notices`. Writing locally too produces duplicates.
+- `bdRerender()` is the single re-render entry point; it dispatches to the student page, the tablet, the admin tab, the 예약 상세 modal (`S.bdModalBookingId`, set by `openBookDetail` and cleared by `closeModal`), or 멘토링 상세.
+- **Two renderers**: `bdBoardHtml()` is the whole board (composer + 전체/답변대기/내 글 filter), used by both the student 게시판 tab and the admin 게시판 tab. `bdStudentSectionHtml(studentId)` is the one-student, no-composer section embedded in 멘토링 상세, 예약 상세, and the tablet.
+- Photos go to Storage under `board/<postId>/<scope>/`, matched by `storage.rules`. A new post gets its doc id from `db.collection('posts').doc()` *before* uploading so the path is stable.
+- Admin tab badge = `bdUnansweredCount()` (student posts with no admin comment). The student tab shows a red dot from `bdStuNewCount()`, which compares against a `localStorage` `bdSeen` timestamp — per-browser, like the popup dismissals.
+- The 멘토링 목록 **게시글** column and its summary chip come from `S.posts` (`_bdHas`), not from bookings any more.
+
+### Student view tabs
+
+The student page (`#vStu`) gained a two-tab bar (`#stuTabs`: 홈 / 게시판) on 2026-09-08. `renderStu()` renders the tab bar and then branches on `S.stuTab`; `setStuTab` also stamps `bdMarkSeen()`. **The bar is hidden while `S.scoreWizardExamId` is set** — the wizard renders into the same `#stuC`, so leaving it mid-input would discard the answers. `renderScoreWizard` calls `renderStuTabs()` for exactly that reason.
 
 ### Printing (예약 현황)
 

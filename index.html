@@ -711,7 +711,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
     <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="stuChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">멘토링</span></div>
     <div class="tr"><span class="uname" id="stuUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
-  <div class="page" style="max-width:660px"><div id="stuC"></div></div>
+  <div class="page" style="max-width:660px"><div class="tabs" id="stuTabs"></div><div id="stuC"></div></div>
 </div>
 
 <!-- 관리자/뷰어 뷰 -->
@@ -878,7 +878,8 @@ const S = {
   notices:[], noticeEditId:null, noticeComposerOpen:false,
   popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false, scoreGradeTab:'',
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
-  qbComposerOpen:null, qbPostEditId:null, qbDraftFiles:{}, qbCommentDraftFiles:{}
+  questions:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
+  bdFilter:'all', bdModalBookingId:null, stuTab:'home'
 };
 
 const _=id=>document.getElementById(id);
@@ -1248,6 +1249,7 @@ const ADMIN_TABS=[
   {id:'schedule', label:'일정 관리', group:'예약',  icon:'📅', desc:'날짜·시간대와 예약 기간 설정'},
   {id:'exams',    label:'시험 관리', group:'운영',  icon:'📝', desc:'시험 추가와 등급컷'},
   {id:'notices',  label:'공지사항',  group:'운영',  icon:'📢', desc:'학생에게 보이는 공지'},
+  {id:'board',    label:'게시판',    group:'운영',  icon:'💬', desc:'학생과 함께 쓰는 자유 게시판'},
   {id:'alimtalk', label:'알림톡',    group:'운영',  icon:'📩', desc:'템플릿과 발송 설정'},
   {id:'accounts', label:'계정 관리', group:'운영',  icon:'⚙️', desc:'ADMIN / OP / TEST 계정'},
 ];
@@ -1259,6 +1261,7 @@ function adminTabList(){
 function adminTabBadge(id){
   if(id==='bookings')return pendingReqCountForAdmin();
   if(id==='students')return S.user?.type==='admin'?pendingAddStudentCount():0;
+  if(id==='board')return bdUnansweredCount();
   return 0;
 }
 function adminTabLabel(t){return (S.user?.type==='admin'?t.label:(t.opLabel||t.label));}
@@ -1429,6 +1432,36 @@ function startNoticesListener(){
   },err=>{console.error('notices listener error',err);});
 }
 function stopNoticesListener(){if(_ntListener){try{_ntListener();}catch(e){}_ntListener=null;}_ntSeedDone=false;}
+
+// 게시판(posts) 실시간 동기화. 학생·관리자 모두 [게시판] 탭에서 본다.
+let _bdListener=null,_bdSeedDone=false;
+function startPostsListener(){
+  if(_bdListener){try{_bdListener();}catch(e){}_bdListener=null;}
+  _bdSeedDone=false;
+  _bdListener=db.collection('posts').onSnapshot(snap=>{
+    const isStudent=S.user&&S.user.type==='student';
+    let changed=false;
+    snap.docChanges().forEach(ch=>{
+      const d={_docId:ch.doc.id,...ch.doc.data()};
+      if(ch.type==='added'||ch.type==='modified'){
+        const idx=S.posts.findIndex(q=>q._docId===d._docId);
+        if(idx<0)S.posts.push(d);else S.posts[idx]=d;
+        if(_bdSeedDone)changed=true;
+      }else if(ch.type==='removed'){
+        S.posts=S.posts.filter(q=>q._docId!==d._docId);
+        if(_bdSeedDone)changed=true;
+      }
+    });
+    _bdSeedDone=true;
+    if(!changed)return;
+    // 미답변 수가 바뀌면 탭 배지도 따라가야 한다.
+    if(!isStudent)updateAdminTabs();
+    if(isStudent)safeRerenderStu();
+    else if(S.tab==='board')renderAdminBoard();
+    else if(S.tab==='consult'&&S.consultStuId)renderConsultDetail();
+  },err=>{console.error('posts listener error',err);});
+}
+function stopPostsListener(){if(_bdListener){try{_bdListener();}catch(e){}_bdListener=null;}_bdSeedDone=false;}
 
 // 학생 호출(calls) 실시간 리스너.
 // OP: status=pending 인 호출을 차단 모달로 표시.
@@ -1612,7 +1645,7 @@ function renderTabletConsult(stu){
   const graphTabs=subjects.map((s,i)=>`<button class="dt ${i===graphTabIdx?'on':''}" onclick="S.tabletGraphTab=${i};renderTablet()">${escapeHtml(s.label)}</button>`).join('');
   const selSubj=subjects[graphTabIdx]||subjects[0];
   const graphBody=selSubj?drawGradeGraph(exams,stu,selSubj):'';
-  const qInfo=booking?qBoardHtml(booking,{role:'admin'}):'';
+  const qInfo=bdStudentSectionHtml(stu._docId,{staff:true});
   const noteTabIdx=Math.min(S.tabletNoteTab||0,Math.max(0,exams.length-1));
   const selNoteExam=exams[noteTabIdx];
   const noteTabs=exams.map((ex,i)=>{
@@ -1702,7 +1735,8 @@ function fetchCoreSnaps(){
     db.collection('bookings').get(),
     db.collection('requests').get(),
     db.collection('lectures').get(),
-    db.collection('notices').get()
+    db.collection('notices').get(),
+    db.collection('posts').get()
   ]);
 }
 // 부팅 프리페치는 Firestore 연결이 붙기 전에 나가고, get() 은 그 상태에서 기다리지 않고
@@ -1726,8 +1760,9 @@ async function loadAll(){
   try{
     try{localStorage.setItem('sessHint','1');}catch(_){}
     const pre=_bootSnaps;_bootSnaps=null;
-    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap]=await fetchCoreSnapsRetry(pre);
+    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap,bdSnap]=await fetchCoreSnapsRetry(pre);
     S.notices=ntSnap.docs.map(d=>({_docId:d.id,...d.data()}));
+    S.posts=bdSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.lectures=lecSnap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0));
     S.students=stuSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.schedule=scSnap.exists?scSnap.data():{dates:JSON.parse(JSON.stringify(DFLT_DATES))};
@@ -1753,6 +1788,7 @@ async function loadAll(){
   startRequestsListener();
   startBookingsListener();
   startNoticesListener();
+  startPostsListener();
   if(S.user&&S.user.type!=='student')startCallsListener();
   if(S.user&&(S.user.type==='admin'||S.user.type==='tablet'))startTabletSessionListener();
 }
@@ -1908,13 +1944,14 @@ function doLogout(){
   stopRequestsListener();
   stopBookingsListener();
   stopNoticesListener();
+  stopPostsListener();
   stopCallsListener();
   stopTabletSessionListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
-  S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];
+  S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];S.posts=[];
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
-  S.qbComposerOpen=null;S.qbPostEditId=null;S.qbDraftFiles={};S.qbCommentDraftFiles={};
+  S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;S.stuTab='home';
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   S._pendingAdmin=null;
@@ -1953,14 +1990,37 @@ async function createFirstAdmin(){
 }
 
 /* ── STUDENT ── */
+/* 학생 화면 탭 — 홈(예약·성적·멘토링)과 게시판. 게시판에 새 글/새 답변이 있으면 점을 찍는다. */
+const STU_TABS=[{id:'home',label:'홈'},{id:'board',label:'게시판'}];
+function renderStuTabs(){
+  const el=_('stuTabs');if(!el)return;
+  /* 성적 입력 마법사 중에 탭을 누르면 입력이 날아가므로 아예 숨긴다. */
+  if(S.scoreWizardExamId){el.innerHTML='';el.style.display='none';return;}
+  el.style.display='';
+  const cur=S.stuTab||'home';
+  const newCnt=bdStuNewCount();
+  el.innerHTML=STU_TABS.map(t=>{
+    const dot=t.id==='board'&&newCnt>0&&cur!=='board'
+      ?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':'';
+    return `<button class="tab ${cur===t.id?'on':''}" onclick="setStuTab('${t.id}')">${t.label}${dot}</button>`;
+  }).join('');
+}
+function setStuTab(tab){
+  S.stuTab=tab;
+  if(tab==='board')bdMarkSeen();
+  renderStu();
+  try{window.scrollTo({top:0,behavior:'smooth'});}catch(_){window.scrollTo(0,0);}
+}
 function renderStu(){
+  renderStuTabs();
+  if((S.stuTab||'home')==='board'){clearBookCountdown();_('stuC').innerHTML=bdBoardHtml();return;}
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
   const examCards=examsForStu(myStu).map(ex=>examScoreCardHtml(ex,myStu)).join('');
   const consultCard=myStu?stuConsultNotesCardHtml(myStu):'';
   const graphCard=myStu?stuGradeGraphCardHtml(myStu):'';
   const noticeCard=noticeStudentCardHtml();
-  if(myB){clearBookCountdown();_('stuC').innerHTML=noticeCard+bookCardHtml(myB)+qBoardHtml(myB,{role:'student'})+consultCard+graphCard+examCards;}
+  if(myB){clearBookCountdown();_('stuC').innerHTML=noticeCard+bookCardHtml(myB)+consultCard+graphCard+examCards;}
   else if(myStu){
     const bOpen=isBookingOpen();
     const pl=bookPeriodLabel();
@@ -2187,6 +2247,7 @@ function startScoreWizard(examId){
 
 function renderScoreWizard(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
+  renderStuTabs();
   const steps=getScoreSteps(exam);const step=S.scoreStep;const c=_('stuC');
   if(step>=steps.length){
     c.innerHTML=`<div class="card sw-done">
@@ -2555,8 +2616,14 @@ function stuConsultNotesCardHtml(stu){
   </div>`;
 }
 
-// 상담 전 질문 & 고민 — 게시판 형식. 학생/관리자 모두 새 글 작성 가능. 각 글에 댓글 + 사진 첨부.
-function qbFmtTs(ts){
+/* ── 게시판 (collection: posts) ──
+   학생·관리자 모두 글을 쓰고 댓글로 답변하는 상시 게시판. 예약과 무관하게 항상 열려 있다.
+   기본은 전체 공개이고, 학생이 '비밀글'로 올리면 본인과 관리자에게만 본문이 보인다
+   (목록에는 잠금 표시만 남겨 글이 사라진 것처럼 보이지 않게 한다).
+   문서 형태: {body, photos[], secret, pinned, authorId, authorRole, authorName,
+              authorGrade, createdAt, updatedAt, comments[]}
+   댓글: {_id, role, name, authorId, body, photos[], ts} */
+function bdFmtTs(ts){
   if(!ts)return '';
   const d=new Date(ts),diff=Date.now()-ts,day=86400000;
   let rel;
@@ -2567,46 +2634,52 @@ function qbFmtTs(ts){
   else rel=d.toLocaleDateString('ko-KR');
   return `<span title="${d.toLocaleString('ko-KR')}">${rel}</span>`;
 }
-// 레거시 booking.question/booking.comments → posts[0] 형태로 일관성 있게 노출.
-function qbGetPosts(booking){
-  if(Array.isArray(booking.posts))return booking.posts;
-  if(booking.question){
-    return [{
-      _id:'legacy',
-      body:booking.question,
-      photos:[],
-      ts:booking.questionTs||0,
-      role:'student',
-      name:booking.studentName||'',
-      comments:Array.isArray(booking.comments)?booking.comments:[]
-    }];
+function bdIsStaff(){return !!S.user&&S.user.type!=='student';}
+function bdMyId(){return S.user?.type==='student'?(S.studentDocId||''):(S.user?.id||'');}
+function bdMyName(){
+  if(S.user?.type==='student'){
+    const stu=S.students.find(s=>s._docId===S.studentDocId);
+    return stu?.name||S.user?.name||'학생';
   }
-  return [];
+  return S.user?.name||'관리자';
 }
-// 저장 전 posts 정규화 (undefined 제거 — Firestore 거부).
-function qbNormalizePosts(posts){
-  return posts.map(p=>{
-    const out={
-      _id:p._id||uid(),
-      body:p.body||'',
-      photos:Array.isArray(p.photos)?p.photos.map(x=>({url:x.url,path:x.path,name:x.name||''})):[],
-      ts:p.ts||Date.now(),
-      role:p.role||'student',
-      name:p.name||'',
-      comments:Array.isArray(p.comments)?p.comments.map(c=>({
-        _id:c._id||uid(),
-        role:c.role||'student',
-        name:c.name||'',
-        body:c.body||'',
-        photos:Array.isArray(c.photos)?c.photos.map(x=>({url:x.url,path:x.path,name:x.name||''})):[],
-        ts:c.ts||Date.now()
-      })):[]
-    };
-    if(p.editedTs)out.editedTs=p.editedTs;
-    return out;
+function bdMyRole(){return S.user?.type==='student'?'student':'admin';}
+// 비밀글은 작성자 본인과 관리자만 본문을 볼 수 있다.
+function bdCanRead(q){
+  if(!q.secret)return true;
+  if(bdIsStaff())return true;
+  return q.authorId&&q.authorId===bdMyId();
+}
+function bdCanEdit(q){return bdIsStaff()||(q.authorId&&q.authorId===bdMyId());}
+function bdComments(q){return Array.isArray(q.comments)?q.comments:[];}
+function bdAnswered(q){return bdComments(q).some(c=>c.role==='admin');}
+function bdSorted(list){
+  return [...list].sort((a,b)=>{
+    const ap=a.pinned?1:0,bp=b.pinned?1:0;
+    if(ap!==bp)return bp-ap;
+    return (b.createdAt||0)-(a.createdAt||0);
   });
 }
-async function qbCompressImage(file,maxDim=1600,quality=0.85){
+// 관리자 탭 배지 — 관리자 댓글이 아직 없는 학생 질문 수.
+function bdUnansweredCount(){
+  return S.posts.filter(q=>q.authorRole!=='admin'&&!bdAnswered(q)).length;
+}
+/* 학생용 '새 글' 표시. 마지막으로 게시판을 연 시각 이후에 올라온 남의 글/내 글의 답변을 센다. */
+function bdSeenTs(){try{return Number(localStorage.getItem('bdSeen')||0)||0;}catch(_){return 0;}}
+function bdMarkSeen(){try{localStorage.setItem('bdSeen',String(Date.now()));}catch(_){}}
+function bdStuNewCount(){
+  const seen=bdSeenTs();if(!seen)return 0;
+  const me=bdMyId();
+  let n=0;
+  S.posts.forEach(q=>{
+    if(!bdCanRead(q))return;
+    if((q.createdAt||0)>seen&&q.authorId!==me)n++;
+    if(q.authorId===me)n+=bdComments(q).filter(c=>c.role==='admin'&&(c.ts||0)>seen).length;
+  });
+  return n;
+}
+
+async function bdCompressImage(file,maxDim=1600,quality=0.85){
   if(!file||!file.type||!file.type.startsWith('image/'))return file;
   const dataUrl=await new Promise((resolve,reject)=>{
     const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);
@@ -2619,12 +2692,13 @@ async function qbCompressImage(file,maxDim=1600,quality=0.85){
   w=Math.round(w*scale);h=Math.round(h*scale);
   const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
   canvas.getContext('2d').drawImage(img,0,0,w,h);
-  return await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
+  const blob=await new Promise(res=>canvas.toBlob(res,'image/jpeg',quality));
+  return blob||file;
 }
-async function qbUploadPhoto(file,bid,scopeId){
-  const blob=await qbCompressImage(file);
+async function bdUploadPhoto(file,qid,scopeId){
+  const blob=await bdCompressImage(file);
   const fname=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
-  const path=`qboard/${bid}/${scopeId}/${fname}`;
+  const path=`board/${qid}/${scopeId}/${fname}`;
   try{
     const ref=(await getStorage()).ref(path);
     await ref.put(blob,{contentType:'image/jpeg'});
@@ -2632,7 +2706,7 @@ async function qbUploadPhoto(file,bid,scopeId){
     return {url,path,name:file.name||fname};
   }catch(e){
     /* Firebase Storage 미설정/권한 오류를 원인 코드까지 보여줘야 진단이 된다. */
-    console.error('qbUploadPhoto failed',e);
+    console.error('bdUploadPhoto failed',e);
     const code=e&&e.code?String(e.code):'';
     if(code==='storage/unauthorized')throw new Error('사진 업로드 권한이 없습니다. 관리자에게 문의해 주세요. ('+code+')');
     if(code==='storage/unauthenticated')throw new Error('로그인이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요. ('+code+')');
@@ -2640,334 +2714,363 @@ async function qbUploadPhoto(file,bid,scopeId){
     throw new Error('사진 업로드에 실패했습니다. 관리자에게 문의해 주세요.'+(code?' ('+code+')':(e&&e.message?' ('+e.message+')':'')));
   }
 }
-async function qbDeletePhotos(photos){
+async function bdDeletePhotos(photos){
   if(!Array.isArray(photos)||!photos.length)return;
   const st=await getStorage();
   await Promise.all(photos.map(p=>p?.path?st.ref(p.path).delete().catch(()=>{}):null));
 }
-function qbPhotosHtml(photos){
+function bdNormPhotos(a){return Array.isArray(a)?a.map(x=>({url:x.url,path:x.path,name:x.name||''})):[];}
+// 저장 전 댓글 정규화 (undefined 제거 — Firestore 거부).
+function bdNormComments(list){
+  return (Array.isArray(list)?list:[]).map(c=>({
+    _id:c._id||uid(),
+    role:c.role||'student',
+    name:c.name||'',
+    authorId:c.authorId||'',
+    body:c.body||'',
+    photos:bdNormPhotos(c.photos),
+    ts:c.ts||Date.now()
+  }));
+}
+function bdPhotosHtml(photos){
   if(!Array.isArray(photos)||!photos.length)return '';
   const cells=photos.map(p=>`<a href="${p.url}" target="_blank" rel="noopener" style="display:block;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb"><img src="${p.url}" alt="${escapeHtml(p.name||'')}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" loading="lazy"></a>`).join('');
   return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${cells}</div>`;
 }
-function qbDraftPreviewHtml(scopeKey,kind){
-  const list=(kind==='comment'?S.qbCommentDraftFiles:S.qbDraftFiles)[scopeKey]||[];
+function bdDraftPreviewHtml(scopeKey,kind){
+  const list=(kind==='comment'?S.bdCommentDraftFiles:S.bdDraftFiles)[scopeKey]||[];
   if(!list.length)return '';
-  const items=list.map((f,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb"><img src="${f.dataUrl}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="qbRemoveDraftFile('${scopeKey}',${i},'${kind}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('');
-  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" id="qb-draft-preview-${kind}-${scopeKey}">${items}</div>`;
+  const items=list.map((f,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb"><img src="${f.dataUrl}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="bdRemoveDraftFile('${scopeKey}',${i},'${kind}')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('');
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px" id="bd-draft-preview-${kind}-${scopeKey}">${items}</div>`;
 }
-function qbHandleFileInput(input,scopeKey,kind){
+function bdHandleFileInput(input,scopeKey,kind){
   const files=Array.from(input.files||[]);
   if(!files.length)return;
-  const bucket=kind==='comment'?S.qbCommentDraftFiles:S.qbDraftFiles;
+  const bucket=kind==='comment'?S.bdCommentDraftFiles:S.bdDraftFiles;
   if(!bucket[scopeKey])bucket[scopeKey]=[];
   let pending=files.length;
   files.forEach(f=>{
-    if(!f.type.startsWith('image/')){pending--;if(!pending)qbRerenderDraftPreview(scopeKey,kind);return;}
+    if(!f.type.startsWith('image/')){pending--;if(!pending)bdRerenderDraftPreview(scopeKey,kind);return;}
     const r=new FileReader();
-    r.onload=()=>{bucket[scopeKey].push({file:f,dataUrl:r.result});pending--;if(!pending)qbRerenderDraftPreview(scopeKey,kind);};
-    r.onerror=()=>{pending--;if(!pending)qbRerenderDraftPreview(scopeKey,kind);};
+    r.onload=()=>{bucket[scopeKey].push({file:f,dataUrl:r.result});pending--;if(!pending)bdRerenderDraftPreview(scopeKey,kind);};
+    r.onerror=()=>{pending--;if(!pending)bdRerenderDraftPreview(scopeKey,kind);};
     r.readAsDataURL(f);
   });
   input.value='';
 }
-function qbRemoveDraftFile(scopeKey,idx,kind){
-  const bucket=kind==='comment'?S.qbCommentDraftFiles:S.qbDraftFiles;
+function bdRemoveDraftFile(scopeKey,idx,kind){
+  const bucket=kind==='comment'?S.bdCommentDraftFiles:S.bdDraftFiles;
   if(!bucket[scopeKey])return;
   bucket[scopeKey].splice(idx,1);
-  qbRerenderDraftPreview(scopeKey,kind);
+  bdRerenderDraftPreview(scopeKey,kind);
 }
-function qbRerenderDraftPreview(scopeKey,kind){
-  const anchor=document.getElementById(`qb-draft-anchor-${kind}-${scopeKey}`);
-  if(anchor)anchor.innerHTML=qbDraftPreviewHtml(scopeKey,kind);
+function bdRerenderDraftPreview(scopeKey,kind){
+  const anchor=_(`bd-draft-anchor-${kind}-${scopeKey}`);
+  if(anchor)anchor.innerHTML=bdDraftPreviewHtml(scopeKey,kind);
 }
-function qbCanEdit(post,role){
-  if(role==='admin')return true;
-  return post.role==='student';
-}
-function qBoardHtml(booking,ctx){
-  const role=ctx?.role||'student';
-  const isStudent=role==='student',isAdmin=!isStudent;
-  const stu=S.students.find(s=>s._docId===booking.studentId);
-  const studentName=booking.studentName||stu?.name||'학생';
-  const bid=booking._docId;
-  const posts=qbGetPosts(booking).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
-  const composerOpen=S.qbComposerOpen===bid;
-  const editingPostId=S.qbPostEditId&&S.qbPostEditId.bid===bid?S.qbPostEditId.pid:null;
 
-  const composerBtn=composerOpen?'':`<button class="btn bp bsm" style="font-size:12px;padding:6px 12px" onclick="qbOpenComposer('${bid}')">+ 새 질문</button>`;
-  const composerScope='new_'+bid;
-  const composerHtml=composerOpen?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
-    <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 질문 작성</p>
-    <textarea class="fi ta" id="qb-new-input-${bid}" rows="4" placeholder="${isStudent?'예) 수학 미적분 단원이 어려워요':'학생들에게 안내할 내용을 입력하세요'}"></textarea>
+/* ── 렌더 ── */
+function bdLockedCardHtml(q){
+  return `<div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+    <span style="font-size:14px">🔒</span>
+    <span style="font-size:13px;color:#9ca3af">비밀글입니다.</span>
+    <span style="font-size:11px;color:#d1d5db;margin-left:auto">${bdFmtTs(q.createdAt)}</span>
+  </div>`;
+}
+function bdPostHtml(q,ctx){
+  const id=q._docId;
+  const staff=ctx.staff;
+  if(!bdCanRead(q))return bdLockedCardHtml(q);
+  const isStudentPost=q.authorRole!=='admin';
+  const bgCol=isStudentPost?'#eff6ff':'#fef2f2';
+  const borderCol=isStudentPost?'#bfdbfe':'#fecaca';
+  const badge=isStudentPost?'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>';
+  const gradeChip=isStudentPost&&q.authorGrade?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:'';
+  const lock=q.secret?'<span title="비밀글" style="font-size:11px">🔒</span>':'';
+  const pin=q.pinned?'<span style="font-size:11px;color:#b45309;font-weight:700">📌 고정</span>':'';
+  const answered=isStudentPost?(bdAnswered(q)
+    ?'<span class="bx" style="font-size:10px;font-weight:700;background:#dcfce7;color:#15803d">답변완료</span>'
+    :'<span class="bx" style="font-size:10px;font-weight:700;background:#fef3c7;color:#92400e">답변대기</span>'):'';
+  const edited=q.updatedAt&&q.updatedAt>(q.createdAt||0)?'<span style="color:#9ca3af;font-size:11px">· 수정됨</span>':'';
+  const isEditing=S.bdPostEditId&&S.bdPostEditId.id===id;
+  const mine=bdCanEdit(q);
+  const editBtn=mine?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="bdStartEdit('${id}')">수정</button>`:'';
+  const delBtn=mine?`<button class="btn bd bsm" style="font-size:11px;padding:4px 10px" onclick="bdDelPost('${id}')">삭제</button>`:'';
+  const pinBtn=staff?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="bdTogglePin('${id}')">${q.pinned?'고정 해제':'고정'}</button>`:'';
+
+  const editScope='edit_'+id;
+  let bodyHtml;
+  if(isEditing){
+    const keep=Array.isArray(S.bdPostEditId.keepPhotos)?S.bdPostEditId.keepPhotos:[];
+    const secretRow=q.authorRole!=='admin'?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-edit-secret-${id}" ${q.secret?'checked':''}> 🔒 비밀글 (나와 관리자만 볼 수 있어요)</label>`:'';
+    bodyHtml=`<div>
+      <textarea class="fi ta" id="bd-edit-input-${id}" rows="4">${escapeHtml(q.body||'')}</textarea>
+      ${secretRow}
+      <div style="margin-top:8px;font-size:11px;color:#6b7280">기존 사진:</div>
+      ${keep.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${keep.map((ph,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb"><img src="${ph.url}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="bdRemoveExistingPhoto('${id}',${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('')}</div>`:'<p style="font-size:11px;color:#9ca3af;margin-top:4px">없음</p>'}
+      <div style="margin-top:8px">
+        <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 추가<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${editScope}','post')"></label>
+      </div>
+      <div id="bd-draft-anchor-post-${editScope}">${bdDraftPreviewHtml(editScope,'post')}</div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn bs bsm" style="flex:1" onclick="bdCancelEdit()">취소</button>
+        <button class="btn bp bsm" style="flex:1" onclick="bdSaveEdit('${id}')">저장</button>
+      </div>
+    </div>`;
+  }else{
+    bodyHtml=`<p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6;margin-top:6px">${escapeHtml(q.body||'')}</p>${bdPhotosHtml(q.photos)}`;
+  }
+
+  const comments=bdComments(q);
+  const commentsHtml=comments.map(c=>{
+    const isAdminCmt=c.role==='admin';
+    const canDel=staff||(c.authorId&&c.authorId===bdMyId());
+    const cBadge=isAdminCmt?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
+    const cDel=canDel?`<button onclick="bdDelComment('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1" title="삭제">×</button>`:'';
+    const cAccent=isAdminCmt?'#dc2626':'#3b82f6';
+    return `<div style="border-left:3px solid ${cAccent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px">${cBadge}<b>${escapeHtml(c.name||'')}</b><span style="color:#9ca3af">· ${bdFmtTs(c.ts)}</span></div>
+        ${cDel}
+      </div>
+      <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body||'')}</p>
+      ${bdPhotosHtml(c.photos)}
+    </div>`;
+  }).join('');
+
+  const cScope='cmt_'+id;
+  const cPlaceholder=staff?'학생에게 댓글로 답변하기':'추가 질문이나 코멘트 남기기';
+  const commentInputHtml=`<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb">
+    <textarea class="fi ta" id="bd-cmt-input-${id}" rows="2" placeholder="${cPlaceholder}"></textarea>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${cScope}','comment')"></label>
+      <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="bdAddComment('${id}')">댓글 등록</button>
+    </div>
+    <div id="bd-draft-anchor-comment-${cScope}">${bdDraftPreviewHtml(cScope,'comment')}</div>
+  </div>`;
+
+  return `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:10px;padding:12px 14px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;flex-wrap:wrap">${pin}${badge}<b>${escapeHtml(q.authorName||'')}</b>${gradeChip}${lock}${answered}<span style="color:#9ca3af">· ${bdFmtTs(q.createdAt)}</span>${edited}</div>
+      ${isEditing?'':`<div style="display:flex;gap:6px">${pinBtn}${editBtn}${delBtn}</div>`}
+    </div>
+    ${bodyHtml}
+    ${comments.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:12px 0 6px">댓글 (${comments.length})</p>${commentsHtml}`:''}
+    ${commentInputHtml}
+  </div>`;
+}
+function bdComposerHtml(){
+  const staff=bdIsStaff();
+  const scope='new';
+  if(!S.bdComposerOpen)return '';
+  const secretRow=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-new-secret"> 🔒 비밀글로 올리기 (나와 관리자만 볼 수 있어요)</label>`;
+  return `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
+    <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 글 작성</p>
+    <textarea class="fi ta" id="bd-new-input" rows="4" placeholder="${staff?'학생들에게 안내할 내용을 입력하세요':'예) 수학 미적분 단원이 어려워요'}"></textarea>
+    ${secretRow}
     <div style="margin-top:8px">
-      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="qbHandleFileInput(this,'${composerScope}','post')"></label>
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${scope}','post')"></label>
       <span style="font-size:11px;color:#9ca3af;margin-left:8px">최대 8MB, JPEG/PNG</span>
     </div>
-    <div id="qb-draft-anchor-post-${composerScope}">${qbDraftPreviewHtml(composerScope,'post')}</div>
+    <div id="bd-draft-anchor-post-${scope}">${bdDraftPreviewHtml(scope,'post')}</div>
     <div style="display:flex;gap:6px;margin-top:10px">
-      <button class="btn bs bsm" style="flex:1" onclick="qbCloseComposer('${bid}')">취소</button>
-      <button class="btn bp bsm" style="flex:1" onclick="qbCreatePost('${bid}','${role}')">작성</button>
+      <button class="btn bs bsm" style="flex:1" onclick="bdCloseComposer()">취소</button>
+      <button class="btn bp bsm" style="flex:1" onclick="bdCreatePost()">등록</button>
     </div>
-  </div>`:'';
-
-  const postsHtml=posts.length?posts.map(p=>{
-    const isEditing=editingPostId===p._id;
-    const isPostStudent=p.role!=='admin';
-    const accent=isPostStudent?'#3b82f6':'#dc2626';
-    const bgCol=isPostStudent?'#eff6ff':'#fef2f2';
-    const borderCol=isPostStudent?'#bfdbfe':'#fecaca';
-    const badge=isPostStudent?'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>';
-    const name=p.name||(isPostStudent?studentName:'관리자');
-    const tsLine=p.ts?qbFmtTs(p.ts):'';
-    const editedMark=p.editedTs?'<span style="color:#9ca3af;font-size:11px">· 수정됨</span>':'';
-    const canEditPost=isStudent?(p.role==='student'):true;
-    const canDelPost=isAdmin||(isStudent&&p.role==='student');
-    const editBtn=canEditPost?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qbStartEditPost('${bid}','${p._id}')">수정</button>`:'';
-    const delBtn=canDelPost?`<button class="btn bd bsm" style="font-size:11px;padding:4px 10px" onclick="qbDelPost('${bid}','${p._id}')">삭제</button>`:'';
-
-    const editScope='edit_'+bid+'_'+p._id;
-    let bodyHtml;
-    if(isEditing){
-      bodyHtml=`<div>
-        <textarea class="fi ta" id="qb-edit-input-${bid}-${p._id}" rows="4">${escapeHtml(p.body||'')}</textarea>
-        <div style="margin-top:8px;font-size:11px;color:#6b7280">기존 사진:</div>
-        ${(p.photos||[]).length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${p.photos.map((ph,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb"><img src="${ph.url}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="qbRemoveExistingPhoto('${bid}','${p._id}',${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('')}</div>`:'<p style="font-size:11px;color:#9ca3af;margin-top:4px">없음</p>'}
-        <div style="margin-top:8px">
-          <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 추가<input type="file" accept="image/*" multiple style="display:none" onchange="qbHandleFileInput(this,'${editScope}','post')"></label>
-        </div>
-        <div id="qb-draft-anchor-post-${editScope}">${qbDraftPreviewHtml(editScope,'post')}</div>
-        <div style="display:flex;gap:6px;margin-top:10px">
-          <button class="btn bs bsm" style="flex:1" onclick="qbCancelEditPost()">취소</button>
-          <button class="btn bp bsm" style="flex:1" onclick="qbSaveEditPost('${bid}','${p._id}')">저장</button>
-        </div>
-      </div>`;
-    }else{
-      bodyHtml=`<p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6;margin-top:6px">${escapeHtml(p.body||'')}</p>${qbPhotosHtml(p.photos)}`;
-    }
-
-    const comments=Array.isArray(p.comments)?p.comments:[];
-    const commentsHtml=comments.length?comments.map(c=>{
-      const isAdminCmt=c.role==='admin';
-      const canDel=isAdmin||(isStudent&&c.role==='student');
-      const cBadge=isAdminCmt?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
-      const cName=c.name||(isAdminCmt?'관리자':studentName);
-      const cDel=canDel?`<button onclick="qbDelComment('${bid}','${p._id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1" title="삭제">×</button>`:'';
-      const cAccent=isAdminCmt?'#dc2626':'#3b82f6';
-      return `<div style="border-left:3px solid ${cAccent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:6px;font-size:12px">${cBadge}<b>${escapeHtml(cName)}</b><span style="color:#9ca3af">· ${qbFmtTs(c.ts)}</span></div>
-          ${cDel}
-        </div>
-        <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body||'')}</p>
-        ${qbPhotosHtml(c.photos)}
-      </div>`;
-    }).join(''):'';
-
-    const cScope='cmt_'+bid+'_'+p._id;
-    const cPlaceholder=isAdmin?'학생에게 댓글로 답변하기':'추가 질문이나 코멘트 남기기';
-    const commentInputHtml=`<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb">
-      <textarea class="fi ta" id="qb-cmt-input-${bid}-${p._id}" rows="2" placeholder="${cPlaceholder}"></textarea>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-        <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="qbHandleFileInput(this,'${cScope}','comment')"></label>
-        <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="qbAddComment('${bid}','${p._id}','${role}')">댓글 등록</button>
-      </div>
-      <div id="qb-draft-anchor-comment-${cScope}">${qbDraftPreviewHtml(cScope,'comment')}</div>
-    </div>`;
-
-    return `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:10px;padding:12px 14px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px">${badge}<b>${escapeHtml(name)}</b>${tsLine?`<span style="color:#9ca3af">· ${tsLine}</span>`:''}${editedMark}</div>
-        ${isEditing?'':`<div style="display:flex;gap:6px">${editBtn}${delBtn}</div>`}
-      </div>
-      ${bodyHtml}
-      ${comments.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:12px 0 6px">댓글 (${comments.length})</p>${commentsHtml}`:''}
-      ${commentInputHtml}
-    </div>`;
-  }).join(''):(composerOpen?'':`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px;margin-bottom:14px">${isStudent?'아직 작성된 질문이 없습니다. 위 [+ 새 질문] 버튼으로 작성하세요.':'학생이 아직 질문을 작성하지 않았습니다.'}</div>`);
-
-  const totalComments=posts.reduce((n,p)=>n+(Array.isArray(p.comments)?p.comments.length:0),0);
-
+  </div>`;
+}
+const BD_FILTERS=[{id:'all',label:'전체'},{id:'unanswered',label:'답변대기'},{id:'mine',label:'내 글'}];
+function bdFilterBarHtml(){
+  const cur=S.bdFilter||'all';
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${BD_FILTERS.map(f=>{
+    const on=cur===f.id;
+    return `<button onclick="bdSetFilter('${f.id}')" style="border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#1C64F2':'#fff'};color:${on?'#fff':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${f.label}</button>`;
+  }).join('')}</div>`;
+}
+function bdFilteredPosts(){
+  const me=bdMyId();
+  let list=S.posts.filter(q=>bdIsStaff()||bdCanRead(q)||q.secret);
+  const f=S.bdFilter||'all';
+  if(f==='unanswered')list=list.filter(q=>q.authorRole!=='admin'&&!bdAnswered(q));
+  else if(f==='mine')list=list.filter(q=>q.authorId===me);
+  if(f!=='all')list=list.filter(q=>bdCanRead(q));
+  return bdSorted(list);
+}
+// 게시판 본문. 학생 화면과 관리자 탭이 같은 마크업을 쓴다.
+function bdBoardHtml(){
+  const staff=bdIsStaff();
+  const posts=bdFilteredPosts();
+  const total=S.posts.filter(q=>bdCanRead(q)).length;
+  /* 학생에게 전체 미답변 수를 보여주면 못 읽는 비밀글의 존재까지 드러나므로 관리자에게만 표시한다. */
+  const pending=staff?bdUnansweredCount():0;
+  const btn=S.bdComposerOpen?'':`<button class="btn bp bsm" style="font-size:12px;padding:6px 12px" onclick="bdOpenComposer()">+ ${staff?'새 글':'글쓰기'}</button>`;
+  const emptyMsg=(S.bdFilter||'all')==='all'
+    ?(staff?'아직 등록된 글이 없습니다.':'아직 등록된 글이 없습니다. 위 [+ 글쓰기] 버튼으로 첫 글을 남겨보세요.')
+    :'조건에 맞는 글이 없습니다.';
+  const listHtml=posts.length?posts.map(q=>bdPostHtml(q,{staff})).join('')
+    :`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px;margin-bottom:14px">${emptyMsg}</div>`;
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">게시판</p>
+      <span style="font-size:11px;color:#6b7280">글 ${total}${pending?` · 답변대기 ${pending}`:''}</span>
+      <div style="margin-left:auto">${btn}</div>
+    </div>
+    ${staff?'':'<p style="font-size:11px;color:#9ca3af;margin-bottom:10px">모든 학생이 볼 수 있는 공개 게시판입니다. 개인적인 내용은 🔒 비밀글로 올려주세요.</p>'}
+    ${bdFilterBarHtml()}
+    ${bdComposerHtml()}
+    ${listHtml}
+  </div>`;
+}
+/* 멘토링 상세·예약 상세·태블릿에 붙는 한 학생 전용 섹션. 작성은 게시판에서만 하고 여기서는 답변만 단다. */
+function bdStudentSectionHtml(studentId,ctx){
+  const staff=ctx?.staff??bdIsStaff();
+  const list=bdSorted(S.posts.filter(q=>q.authorId===studentId&&q.authorRole!=='admin'));
+  const body=list.length?list.map(q=>bdPostHtml(q,{staff})).join('')
+    :'<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">이 학생이 작성한 질문이 없습니다.</div>';
+  const pending=list.filter(q=>!bdAnswered(q)).length;
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-      <p style="font-size:15px;font-weight:700">상담 게시판 · 질문 & 고민</p>
-      <span style="font-size:11px;color:#6b7280">글 ${posts.length}${totalComments?` · 댓글 ${totalComments}`:''}</span>
-      <div style="margin-left:auto">${composerBtn}</div>
+      <p style="font-size:15px;font-weight:700">게시판 · 이 학생의 글</p>
+      <span style="font-size:11px;color:#6b7280">글 ${list.length}${pending?` · 답변대기 ${pending}`:''}</span>
     </div>
-    ${composerHtml}
-    ${postsHtml}
+    ${body}
   </div>`;
 }
 
-function qbOpenComposer(bid){S.qbComposerOpen=bid;S.qbPostEditId=null;qbRerenderFor(bid);}
-function qbCloseComposer(bid){
-  S.qbComposerOpen=null;
-  delete S.qbDraftFiles['new_'+bid];
-  qbRerenderFor(bid);
+/* ── 상태 전환 ── */
+function bdSetFilter(f){S.bdFilter=f;bdRerender();}
+function bdOpenComposer(){S.bdComposerOpen=true;S.bdPostEditId=null;bdRerender();}
+function bdCloseComposer(){S.bdComposerOpen=false;delete S.bdDraftFiles['new'];bdRerender();}
+function bdStartEdit(id){
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  S.bdPostEditId={id,keepPhotos:bdNormPhotos(q.photos)};
+  S.bdComposerOpen=false;
+  bdRerender();
 }
-function qbStartEditPost(bid,pid){
-  S.qbPostEditId={bid,pid};S.qbComposerOpen=null;
-  // 편집 진입 시 기존 사진 사본 보관 (편집 중 제거 추적용)
-  const myB=S.bookings.find(b=>b._docId===bid);
-  const post=qbGetPosts(myB||{}).find(p=>p._id===pid);
-  if(post)S.qbPostEditId.keepPhotos=(post.photos||[]).slice();
-  qbRerenderFor(bid);
+function bdCancelEdit(){
+  const e=S.bdPostEditId;
+  if(e)delete S.bdDraftFiles['edit_'+e.id];
+  S.bdPostEditId=null;
+  bdRerender();
 }
-function qbCancelEditPost(){
-  const e=S.qbPostEditId;
-  if(e){delete S.qbDraftFiles['edit_'+e.bid+'_'+e.pid];}
-  S.qbPostEditId=null;
-  if(e)qbRerenderFor(e.bid);
-}
-function qbRemoveExistingPhoto(bid,pid,idx){
-  const e=S.qbPostEditId;if(!e||e.bid!==bid||e.pid!==pid)return;
-  if(!Array.isArray(e.keepPhotos))return;
+function bdRemoveExistingPhoto(id,idx){
+  const e=S.bdPostEditId;if(!e||e.id!==id||!Array.isArray(e.keepPhotos))return;
   e.keepPhotos.splice(idx,1);
-  // 편집 패널만 다시 그림
-  qbRerenderFor(bid);
+  bdRerender();
 }
 
-async function qbCreatePost(bid,role){
-  const t=_('qb-new-input-'+bid);
-  const txt=(t?.value||'').trim();
-  const scope='new_'+bid;
-  const drafts=S.qbDraftFiles[scope]||[];
+/* ── 액션 ──
+   Firestore 에만 쓰고 S.posts 갱신·재렌더는 onSnapshot 리스너에 맡긴다.
+   로컬에서 직접 push/filter 하면 리스너의 즉시 발화와 겹쳐 중복 항목이 생긴다. */
+async function bdCreatePost(){
+  const txt=(_('bd-new-input')?.value||'').trim();
+  const drafts=S.bdDraftFiles['new']||[];
   if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
-  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
-  let name='';
-  if(role==='admin')name=S.user?.name||'관리자';
-  else{const stu=S.students.find(s=>s._docId===myB.studentId);name=stu?.name||myB.studentName||'학생';}
-  const pid=uid();
+  const role=bdMyRole();
+  const secret=role==='student'&&!!_('bd-new-secret')?.checked;
+  const stu=role==='student'?S.students.find(s=>s._docId===S.studentDocId):null;
+  const ref=db.collection('posts').doc();
   showLoad(true);
   try{
     const photos=[];
-    for(const f of drafts){
-      const ph=await qbUploadPhoto(f.file,bid,pid);
-      photos.push(ph);
-    }
-    const newPost={_id:pid,body:txt,photos,ts:Date.now(),role,name,comments:[]};
-    const existing=qbGetPosts(myB);
-    const next=qbNormalizePosts([...existing,newPost]);
-    const upd={posts:next};
-    if(myB.question!==undefined)upd.question=firebase.firestore.FieldValue.delete();
-    if(myB.questionTs!==undefined)upd.questionTs=firebase.firestore.FieldValue.delete();
-    if(myB.comments!==undefined)upd.comments=firebase.firestore.FieldValue.delete();
-    await db.collection('bookings').doc(bid).update(upd);
-    myB.posts=next;delete myB.question;delete myB.questionTs;delete myB.comments;
-    delete S.qbDraftFiles[scope];
-    S.qbComposerOpen=null;
-    qbRerenderFor(bid);
+    for(const f of drafts)photos.push(await bdUploadPhoto(f.file,ref.id,'post'));
+    const now=Date.now();
+    await ref.set({
+      body:txt,photos,secret,pinned:false,
+      authorId:bdMyId(),authorRole:role,authorName:bdMyName(),authorGrade:stu?.grade||'',
+      createdAt:now,updatedAt:now,comments:[]
+    });
+    delete S.bdDraftFiles['new'];
+    S.bdComposerOpen=false;
+    toast('등록되었습니다.','success');
+    bdRerender();
   }catch(e){toast('등록 실패: '+e.message,'error');}
   showLoad(false);
 }
-async function qbSaveEditPost(bid,pid){
-  const t=_('qb-edit-input-'+bid+'-'+pid);
-  const txt=(t?.value||'').trim();
-  const scope='edit_'+bid+'_'+pid;
-  const drafts=S.qbDraftFiles[scope]||[];
-  const editState=S.qbPostEditId;
-  const keep=editState&&editState.bid===bid&&editState.pid===pid&&Array.isArray(editState.keepPhotos)?editState.keepPhotos:null;
-  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
-  const existing=qbGetPosts(myB);
-  const target=existing.find(p=>p._id===pid);if(!target){toast('글을 찾을 수 없습니다.','error');return;}
-  if(!txt&&!drafts.length&&(!keep||!keep.length)){toast('내용 또는 사진을 입력하세요.','warn');return;}
+async function bdSaveEdit(id){
+  const q=S.posts.find(x=>x._docId===id);if(!q){toast('글을 찾을 수 없습니다.','error');return;}
+  const txt=(_('bd-edit-input-'+id)?.value||'').trim();
+  const scope='edit_'+id;
+  const drafts=S.bdDraftFiles[scope]||[];
+  const e=S.bdPostEditId;
+  const keep=e&&e.id===id&&Array.isArray(e.keepPhotos)?e.keepPhotos:bdNormPhotos(q.photos);
+  if(!txt&&!drafts.length&&!keep.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
+  const secretEl=_('bd-edit-secret-'+id);
   showLoad(true);
   try{
-    const removed=(target.photos||[]).filter(orig=>!(keep||[]).some(k=>k.path===orig.path));
-    await qbDeletePhotos(removed);
-    const newPhotos=[];
-    for(const f of drafts){
-      const ph=await qbUploadPhoto(f.file,bid,pid);
-      newPhotos.push(ph);
-    }
-    const next=qbNormalizePosts(existing.map(p=>{
-      if(p._id!==pid)return p;
-      return {...p,body:txt,photos:[...(keep||[]),...newPhotos],editedTs:Date.now()};
-    }));
-    await db.collection('bookings').doc(bid).update({posts:next});
-    myB.posts=next;
-    delete S.qbDraftFiles[scope];
-    S.qbPostEditId=null;
-    qbRerenderFor(bid);
-  }catch(e){toast('저장 실패: '+e.message,'error');}
+    const removed=bdNormPhotos(q.photos).filter(o=>!keep.some(k=>k.path===o.path));
+    await bdDeletePhotos(removed);
+    const added=[];
+    for(const f of drafts)added.push(await bdUploadPhoto(f.file,id,'post'));
+    const upd={body:txt,photos:[...keep,...added],updatedAt:Date.now()};
+    if(secretEl)upd.secret=!!secretEl.checked;
+    await db.collection('posts').doc(id).update(upd);
+    delete S.bdDraftFiles[scope];
+    S.bdPostEditId=null;
+    bdRerender();
+  }catch(err){toast('저장 실패: '+err.message,'error');}
   showLoad(false);
 }
-async function qbDelPost(bid,pid){
-  if(!(await confirmDialog({title:'질문 삭제',message:'이 글을 삭제하시겠습니까? 댓글과 첨부 사진도 함께 삭제됩니다.',confirmLabel:'삭제',kind:'danger'})))return;
-  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
-  const existing=qbGetPosts(myB);
-  const target=existing.find(p=>p._id===pid);if(!target)return;
+async function bdDelPost(id){
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  if(!(await confirmDialog({title:'글 삭제',message:'이 글을 삭제하시겠습니까? 댓글과 첨부 사진도 함께 삭제됩니다.',confirmLabel:'삭제',kind:'danger'})))return;
   showLoad(true);
   try{
-    const allPhotos=[...(target.photos||[]),...((target.comments||[]).flatMap(c=>c.photos||[]))];
-    await qbDeletePhotos(allPhotos);
-    const next=qbNormalizePosts(existing.filter(p=>p._id!==pid));
-    const upd={posts:next};
-    if(myB.question!==undefined)upd.question=firebase.firestore.FieldValue.delete();
-    if(myB.questionTs!==undefined)upd.questionTs=firebase.firestore.FieldValue.delete();
-    if(myB.comments!==undefined)upd.comments=firebase.firestore.FieldValue.delete();
-    await db.collection('bookings').doc(bid).update(upd);
-    myB.posts=next;delete myB.question;delete myB.questionTs;delete myB.comments;
-    qbRerenderFor(bid);
+    await bdDeletePhotos([...bdNormPhotos(q.photos),...bdComments(q).flatMap(c=>bdNormPhotos(c.photos))]);
+    await db.collection('posts').doc(id).delete();
+    if(S.bdPostEditId&&S.bdPostEditId.id===id)S.bdPostEditId=null;
+    bdRerender();
   }catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);
 }
-async function qbAddComment(bid,pid,role){
-  const t=_('qb-cmt-input-'+bid+'-'+pid);
-  const txt=(t?.value||'').trim();
-  const scope='cmt_'+bid+'_'+pid;
-  const drafts=S.qbCommentDraftFiles[scope]||[];
+async function bdTogglePin(id){
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  showLoad(true);
+  try{await db.collection('posts').doc(id).update({pinned:!q.pinned});}
+  catch(e){toast('변경 실패: '+e.message,'error');}
+  showLoad(false);
+}
+async function bdAddComment(id){
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  const txt=(_('bd-cmt-input-'+id)?.value||'').trim();
+  const scope='cmt_'+id;
+  const drafts=S.bdCommentDraftFiles[scope]||[];
   if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
-  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
-  let name='';
-  if(role==='admin')name=S.user?.name||'관리자';
-  else{const stu=S.students.find(s=>s._docId===myB.studentId);name=stu?.name||myB.studentName||'학생';}
   const cid=uid();
   showLoad(true);
   try{
     const photos=[];
-    for(const f of drafts){
-      const ph=await qbUploadPhoto(f.file,bid,pid+'_'+cid);
-      photos.push(ph);
-    }
-    const cmt={_id:cid,role,name,body:txt,photos,ts:Date.now()};
-    const existing=qbGetPosts(myB);
-    const next=qbNormalizePosts(existing.map(p=>p._id===pid?{...p,comments:[...(p.comments||[]),cmt]}:p));
-    const upd={posts:next};
-    if(myB.question!==undefined)upd.question=firebase.firestore.FieldValue.delete();
-    if(myB.questionTs!==undefined)upd.questionTs=firebase.firestore.FieldValue.delete();
-    if(myB.comments!==undefined)upd.comments=firebase.firestore.FieldValue.delete();
-    await db.collection('bookings').doc(bid).update(upd);
-    myB.posts=next;delete myB.question;delete myB.questionTs;delete myB.comments;
-    delete S.qbCommentDraftFiles[scope];
-    qbRerenderFor(bid);
+    for(const f of drafts)photos.push(await bdUploadPhoto(f.file,id,'c_'+cid));
+    const cmt={_id:cid,role:bdMyRole(),name:bdMyName(),authorId:bdMyId(),body:txt,photos,ts:Date.now()};
+    await db.collection('posts').doc(id).update({comments:bdNormComments([...bdComments(q),cmt])});
+    delete S.bdCommentDraftFiles[scope];
+    bdRerender();
   }catch(e){toast('등록 실패: '+e.message,'error');}
   showLoad(false);
 }
-async function qbDelComment(bid,pid,cid){
+async function bdDelComment(id,cid){
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
   if(!(await confirmDialog({title:'댓글 삭제',message:'이 댓글을 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
-  const myB=S.bookings.find(b=>b._docId===bid);if(!myB)return;
-  const existing=qbGetPosts(myB);
-  const target=existing.find(p=>p._id===pid);if(!target)return;
-  const cmt=(target.comments||[]).find(c=>c._id===cid);
+  const cmt=bdComments(q).find(c=>c._id===cid);
   showLoad(true);
   try{
-    if(cmt)await qbDeletePhotos(cmt.photos);
-    const next=qbNormalizePosts(existing.map(p=>p._id===pid?{...p,comments:(p.comments||[]).filter(c=>c._id!==cid)}:p));
-    await db.collection('bookings').doc(bid).update({posts:next});
-    myB.posts=next;
-    qbRerenderFor(bid);
+    if(cmt)await bdDeletePhotos(bdNormPhotos(cmt.photos));
+    await db.collection('posts').doc(id).update({comments:bdNormComments(bdComments(q).filter(c=>c._id!==cid))});
+    bdRerender();
   }catch(e){toast('삭제 실패: '+e.message,'error');}
   showLoad(false);
 }
-function qbRerenderFor(bid){
+/* 게시판이 떠 있을 수 있는 모든 자리를 한 번에 갱신한다. */
+function bdRerender(){
   if(S.user?.type==='student'){renderStu();return;}
+  if(S.user?.type==='tablet'){if(typeof renderTablet==='function')renderTablet();return;}
+  if(S.tab==='board'){renderAdminBoard();return;}
   const modal=_('mOv');
-  if(modal&&!modal.classList.contains('hidden'))openBookDetail(bid);
-  if(S.tab==='consult'&&S.consultStuId){
-    const myB=S.bookings.find(b=>b._docId===bid);
-    if(myB&&myB.studentId===S.consultStuId)renderConsultDetail();
-  }
+  if(modal&&!modal.classList.contains('hidden')&&S.bdModalBookingId)openBookDetail(S.bdModalBookingId);
+  if(S.tab==='consult'&&S.consultStuId)renderConsultDetail();
+}
+function renderAdminBoard(){
+  _('adminC').innerHTML=bdBoardHtml();
 }
 
 // 공지사항 게시판. 정렬: 고정(pinned) → 최신 createdAt 순. 작성/수정/삭제/고정은 관리자(ADMIN/OP)만.
@@ -3022,7 +3125,7 @@ function noticeBoardHtml(){
     itemsHtml=list.map(n=>{
       const isEditing=S.noticeEditId===n._docId;
       const pinBadge=n.pinned?'<span class="bx bb" style="font-size:10px;font-weight:700;margin-right:6px">📌 고정</span>':'';
-      const ts=n.createdAt?qbFmtTs(n.createdAt):'';
+      const ts=n.createdAt?bdFmtTs(n.createdAt):'';
       const author=escapeHtml(n.authorName||'관리자');
       const adminBtns=`<div style="display:flex;gap:4px;margin-left:auto">
         <button class="btn bs bsm" style="font-size:11px;padding:3px 8px" onclick="noticeTogglePin('${n._docId}')">${n.pinned?'고정 해제':'고정'}</button>
@@ -3575,6 +3678,7 @@ async function setTab(tab){
   else if(tab==='schedule')renderAdminSchedule();
   else if(tab==='bookings')renderAdminBookings();
   else if(tab==='notices')renderAdminNotices();
+  else if(tab==='board')renderAdminBoard();
   else if(tab==='logins')renderAdminLogins();
   else if(tab==='accounts'){await loadAdmins();if(S.tab!=='accounts')return;renderAdminAccounts();}
   else if(tab==='alimtalk')renderAdminAlimtalk();
@@ -3625,24 +3729,24 @@ function renderAdminConsult(){
   const examCounts=cExams.map(ex=>({ex,n:baseStu.filter(s=>examAppliesTo(ex,s)&&hasStuExamScore(s,ex.id)).length,tot:examTargetCount(ex,baseStu)}));
   const noteAny=baseStu.filter(s=>_consultNoteState(s)!=='none').length;
   const noteVisible=baseStu.filter(s=>_consultNoteState(s)==='visible').length;
-  const _qbHas=bk=>{if(!bk)return false;if(Array.isArray(bk.posts)&&bk.posts.length)return true;return !!(bk.question&&bk.question.trim());};
-  const questionCount=baseStu.filter(s=>_qbHas(bookingByStu[s._docId])).length;
+  const _bdHas=stuId=>S.posts.some(q=>q.authorId===stuId&&q.authorRole!=='admin');
+  const postCount=baseStu.filter(s=>_bdHas(s._docId)).length;
   const stat=(label,val,color)=>`<span style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:999px;padding:5px 12px;font-size:12px;white-space:nowrap"><span style="color:#6b7280;font-weight:600">${label}</span><b style="color:${color||'#111827'}">${val}</b></span>`;
   const summaryHtml=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
     ${stat('예약',`${bookedCount}/${total}`,'#1C64F2')}
-    ${stat('질문',`${questionCount}/${bookedCount}`,'#ea580c')}
+    ${stat('게시글',`${postCount}/${total}`,'#ea580c')}
     ${examCounts.map(({ex,n,tot})=>stat(ex.name.replace(/\s*모의.*$/,'')+(ex.grade?` ${ex.grade}`:''),`${n}/${tot}`,'#15803d')).join('')}
     ${stat('기록',`${noteAny}/${total}${noteVisible?` · 공개 ${noteVisible}`:''}`,'#7c3aed')}
   </div>`;
   const rows=sorted.map(s=>{
     const bk=bookingByStu[s._docId];
     const booked=!!bk;
-    const hasQuestion=_qbHas(bk);
+    const hasPost=_bdHas(s._docId);
     const noteState=_consultNoteState(s);
     const scoreCells=cExams.map(ex=>`<td data-label="${escapeHtml(ex.name)}" class="${examAppliesTo(ex,s)?'':'cell-hide'}" style="text-align:center;line-height:1">${examScoreCell(ex,s,_OK_SVG)}</td>`).join('');
-    const questionCell=hasQuestion
-      ? `<td data-label="질문" style="text-align:center;line-height:1" title="질문 작성됨"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M9.5 9a2.5 2.5 0 1 1 4.5 1.5c-.7.6-1.5.9-1.5 2"/><circle cx="12" cy="17" r="0.9" fill="#ea580c" stroke="none"/></svg></td>`
-      : `<td data-label="질문" style="text-align:center;line-height:1">${_NA_DOT}</td>`;
+    const postCell=hasPost
+      ? `<td data-label="게시글" style="text-align:center;line-height:1" title="게시글 작성됨"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M9.5 9a2.5 2.5 0 1 1 4.5 1.5c-.7.6-1.5.9-1.5 2"/><circle cx="12" cy="17" r="0.9" fill="#ea580c" stroke="none"/></svg></td>`
+      : `<td data-label="게시글" style="text-align:center;line-height:1">${_NA_DOT}</td>`;
     const noteCell=noteState==='visible'
       ? `<td data-label="기록" style="text-align:center;line-height:1"><div style="display:inline-flex;align-items:center;gap:4px">${_OK_SVG}<span style="font-size:10px;font-weight:700;color:#15803d;background:#dcfce7;border-radius:6px;padding:1px 5px">공개</span></div></td>`
       : noteState==='private'
@@ -3654,7 +3758,7 @@ function renderAdminConsult(){
       <td data-label="" class="cell-head" style="font-weight:600"><span>${escapeHtml(s.name||'')}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}<span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${escapeHtml(s.grade||'')}</span></span></td>
       <td data-label="학교">${escapeHtml(s.school||'')}</td>
       <td data-label="예약" style="text-align:center;line-height:1">${booked?_OK_SVG:_NA_DOT}</td>
-      ${questionCell}
+      ${postCell}
       ${scoreCells}
       ${noteCell}
     </tr>`;}).join('');
@@ -3667,7 +3771,7 @@ function renderAdminConsult(){
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
     <button class="btn bs bsm" style="margin-left:auto" onclick="openBatchPrintModal()">🖨 여러 명 인쇄</button></div>
   <div class="card" style="padding:0"><div class="tw tw-cards tw-wide"><table class="consult-tbl">
-    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>질문</th>${examHeaders}<th>기록</th></tr></thead>
+    <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>게시글</th>${examHeaders}<th>기록</th></tr></thead>
     <tbody>${rows||`<tr class="empty-row"><td colspan="${7+cExams.length}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
   </table></div></div>`;
 }
@@ -3943,7 +4047,7 @@ function renderConsultDetail(){
   const graphTabs=subjects.map((s,i)=>`<button class="dt ${i===graphTabIdx?'on':''}" onclick="S.consultGraphTab=${i};renderConsultDetail()">${s.label}</button>`).join('');
   const selSubj=subjects[graphTabIdx]||subjects[0];
   const graphBody=drawGradeGraph(exams,stu,selSubj);
-  const qInfo=booking?qBoardHtml(booking,{role:'admin'}):'';
+  const qInfo=bdStudentSectionHtml(stu._docId,{staff:true});
   const _sess=S.tabletSession;
   const _isActive=_sess&&_sess.studentId===stu._docId;
   const _otherActive=_sess&&_sess.studentId&&_sess.studentId!==stu._docId;
@@ -6884,6 +6988,7 @@ function openBookDetail(docId){
   const b=S.bookings.find(x=>x._docId===docId);if(!b)return;
   const stu=S.students.find(s=>s._docId===b.studentId);
   const isAdmin=S.user.type==='admin';const stuId=b.studentId;
+  S.bdModalBookingId=docId;
   const examSections=examsForStu(stu).map(ex=>{
     const hasSc=hasStuExamScore(stu,ex.id);const sc=getStuExamScore(stu,ex.id);
     const btns=isAdmin?`<div style="display:flex;gap:6px">${hasSc?`<button class="btn bd bsm" onclick="adminDelExamScore('${stuId}','${ex.id}','booking','${docId}')">삭제</button>`:''}<button class="btn bp bsm" onclick="openAdminScoreEdit('${stuId}','${ex.id}','booking','${docId}')">${hasSc?'수정':'입력'}</button></div>`:'';
@@ -6916,7 +7021,7 @@ function openBookDetail(docId){
     ${actionsHtml}
     ${attSection}
     ${examSections}
-    ${qBoardHtml(b,{role:isAdmin?'admin':'student'})}`;openModal();}
+    ${bdStudentSectionHtml(stuId,{staff:true})}`;openModal();}
 
 async function adminDelExamScore(stuDocId, examId, from, bookDocId){
   const ex=getExam(examId);if(!ex)return;
@@ -8169,7 +8274,7 @@ function toast(msg,kind='info',opts={}){
 /* ── MODAL ── */
 let _confirmResolver=null;
 function openModal(){const ov=_('mOv');ov.classList.remove('hidden');ov.style.display='flex';}
-function closeModal(){if(_modalLocked)return;const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';_('mCt').style.maxWidth='';if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;r(false);}}
+function closeModal(){if(_modalLocked)return;const ov=_('mOv');ov.classList.add('hidden');ov.style.display='none';S.bdModalBookingId=null;_('mCt').style.maxWidth='';if(_confirmResolver){const r=_confirmResolver;_confirmResolver=null;r(false);}}
 /* 카카오톡 채널 주소. 비워 두면 버튼이 뜨지 않는다. */
 const KAKAO_CHANNEL_URL='https://pf.kakao.com/_MtGCX/chat';
 function kakaoChannelUrl(){return (S.config&&S.config.kakaoChannelUrl)||KAKAO_CHANNEL_URL||'';}
@@ -8302,7 +8407,7 @@ function previewAsStudent(stuDocId){
   S.adminPreviewSnapshot={user:S.user,studentDocId:S.studentDocId,tab:S.tab,consultStuId:S.consultStuId,opScoreStuId:S.opScoreStuId};
   S.user={type:'student',id:stu.accountId||stuDocId,name:stu.name,isPreview:true,_adminName:S.adminPreviewSnapshot.user.name||'관리자'};
   S.studentDocId=stuDocId;
-  S.consultStuId=null;S.opScoreStuId=null;S.tab=null;
+  S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.stuTab='home';
   _('stuUname').textContent=stu.name+' 학생 (관리자 미리보기)';
   showView('vStu');applyChips();renderStu();
   applyAdminPreviewBanner();

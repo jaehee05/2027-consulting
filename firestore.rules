@@ -6,8 +6,10 @@ service cloud.firestore {
     //   settings/* — 뿌리오 API 크리덴셜. ppurioAdmin Cloud Function 만 접근.
     //   admins/*  — 관리자 아이디/평문 비밀번호/PIN. adminApi/loginToken Cloud
     //               Function 만 접근. (Phase 1 보안 강화)
-    // 나머지(students, bookings, requests, notices, schedule, config, lectures)는
-    // 임시 개방 — Phase 2 에서 Firebase Auth 클레임 기반 권한으로 단계적 강화 예정.
+    // 나머지(students, bookings, requests, notices, posts, schedule, config,
+    // lectures)는 임시 개방 — Phase 2 에서 Firebase Auth 클레임 기반 권한으로 단계적 강화 예정.
+    // posts(게시판) 의 비밀글(secret:true)도 현재는 클라이언트에서만 가려지므로,
+    // 서버 단 보호는 Phase 2 에서 함께 들어가야 한다.
     match /{collection}/{docPath=**} {
       allow read, write: if collection != 'settings' && collection != 'admins';
     }
