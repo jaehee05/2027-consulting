@@ -7,6 +7,7 @@ const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
 const { sendAlimtalk, sendAlimtalkToAdmins } = require("./ppurio");
 const tokens = require("./tokens");
+const moderation = require("./moderation");
 
 setGlobalOptions({ region: "asia-northeast3", retry: false, maxInstances: 10 });
 
@@ -997,6 +998,11 @@ exports.tokenApi = onRequest(async (req, res) => {
         return res.json(await tokens.addQuestionComment(fs, {
           questionId: p.questionId, actor, body: p.body, photos: p.photos,
         }));
+      case "deleteComment":
+        if (!isAdmin) await requireStudent();
+        return res.json(await tokens.deleteQuestionComment(fs, {
+          questionId: p.questionId, commentId: p.commentId, actor,
+        }));
       case "deleteQuestion":
         if (!isAdmin) await requireStudent();
         return res.json(await tokens.deleteQuestion(fs, { questionId: p.questionId, actor }));
@@ -1022,6 +1028,26 @@ exports.tokenApi = onRequest(async (req, res) => {
       case "backfillGrants":
         requireAdmin();
         return res.json(await tokens.backfillSignupGrants(fs, { by }));
+
+      /* 자유게시판 이용 서약 — 본인이 지울 수 없는 곳에 남겨야 제재 근거가 된다. */
+      case "agreePledge": {
+        const student = await requireStudent();
+        return res.json(await moderation.agreePledge(fs, {
+          studentId: student.id, version: p.version, name: student.name,
+        }));
+      }
+
+      /* 자유게시판 제재 — 정지당한 학생이 스스로 풀 수 없어야 하므로 여기를 거친다. */
+      case "banBoard":
+        requireAdmin();
+        return res.json(await moderation.banBoard(fs, {
+          studentId: p.studentId, reason: p.reason, by,
+        }));
+      case "unbanBoard":
+        requireAdmin();
+        return res.json(await moderation.unbanBoard(fs, {
+          studentId: p.studentId, reason: p.reason, by,
+        }));
 
       default:
         return res.status(400).json({ error: `알 수 없는 action: ${action}` });

@@ -200,6 +200,41 @@ describe("질문 댓글 권한", () => {
     expect(typeof q.answeredAt).toBe("number");
   });
 
+  test("학생은 자기 댓글만 지울 수 있다", async () => {
+    const id = await makeQuestion();
+    await tokens.addQuestionComment(fs, {
+      questionId: id, actor: { id: student.id, name: student.name, role: "student" }, body: "내 댓글",
+    });
+    const cid = (await fs.doc(`questions/${id}`).get()).data().comments[0]._id;
+
+    await expect(tokens.deleteQuestionComment(fs, {
+      questionId: id, commentId: cid, actor: { id: "other", name: "남", role: "student" },
+    })).rejects.toMatchObject({ status: 403 });
+
+    await tokens.deleteQuestionComment(fs, {
+      questionId: id, commentId: cid, actor: { id: student.id, name: student.name, role: "student" },
+    });
+    expect((await fs.doc(`questions/${id}`).get()).data().comments).toHaveLength(0);
+  });
+
+  test("관리자 댓글이 모두 지워지면 답변대기로 되돌아간다", async () => {
+    const id = await makeQuestion();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답변" });
+    expect((await fs.doc(`questions/${id}`).get()).data().status).toBe("answered");
+    const cid = (await fs.doc(`questions/${id}`).get()).data().comments[0]._id;
+    await tokens.deleteQuestionComment(fs, { questionId: id, commentId: cid, actor: adminActor });
+    const q = (await fs.doc(`questions/${id}`).get()).data();
+    expect(q.status).toBe("pending");
+    expect(q.answeredAt).toBeNull();
+  });
+
+  test("없는 댓글을 지우려 하면 404", async () => {
+    const id = await makeQuestion();
+    await expect(tokens.deleteQuestionComment(fs, {
+      questionId: id, commentId: "nope", actor: adminActor,
+    })).rejects.toMatchObject({ status: 404 });
+  });
+
   test("댓글은 토큰을 쓰지 않는다", async () => {
     const id = await makeQuestion();
     const before = await tokens.getBalance(fs, student.id);
@@ -256,6 +291,20 @@ describe("결제 요청 흐름", () => {
     expect(out.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(await tokens.getBalance(fs, student.id)).toBe(10);
     expect(await ledgerFor(student.id)).toHaveLength(1);
+  });
+
+  test("보너스가 붙은 상품은 보너스까지 지급된다", async () => {
+    await setPolicy({ unitPrice: 1000, packages: [{ id: "b10", tokens: 10, bonus: 1, order: 1 }] });
+    const id = (await tokens.createPaymentRequest(fs, { student, packageId: "b10" })).id;
+    const pr = (await fs.doc(`paymentRequests/${id}`).get()).data();
+    expect(pr).toMatchObject({ tokens: 10, bonus: 1, totalTokens: 11, amount: 10000 });
+
+    await tokens.markPaymentSent(fs, { requestId: id, by: adminActor });
+    await tokens.markPaymentPaid(fs, { requestId: id, by: adminActor });
+    expect(await tokens.getBalance(fs, student.id)).toBe(11);
+    const led = await ledgerFor(student.id);
+    expect(led[0]).toMatchObject({ delta: 11, reason: "purchase" });
+    expect(led[0].note).toContain("보너스");
   });
 
   test("결제 완료된 요청은 취소할 수 없다", async () => {

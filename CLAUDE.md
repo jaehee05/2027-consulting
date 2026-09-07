@@ -141,12 +141,27 @@ Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see
   - 결제 완료: the `status === 'sent'` precondition is inside the transaction, so a double click grants once and the second call gets `409`.
   - 신규 학생 기본 지급: `onStudentCreate` trigger → `grantSignupTokens`, which no-ops when a balance doc already exists (triggers retry).
 - **`tokenBalances/{studentId}` is deliberately a separate collection**, not a field on the student doc — `students` must stay client-writable for nicknames and scores, and a blanket path rule can't carve out one field.
-- **`paymentRequests` snapshot the price at request time** (`tokens`, `unitPrice`, `discountType/Value`, `listPrice`, `discount`, `amount`), so later policy edits never change a pending request's amount. 요청됨 → 발송완료 → 결제완료, with 취소 allowed only from the first two; each transition stores its timestamp and the admin who did it.
+- **`paymentRequests` snapshot the price at request time** (`tokens`, `bonus`, `totalTokens`, `unitPrice`, `discountType/Value`, `listPrice`, `discount`, `amount`), so later policy edits never change a pending request's amount. Payment grants `totalTokens` (falling back to `tokens` for pre-bonus docs).
+- **보너스 토큰** (`bonus` on a package) adds tokens instead of cutting the price — it never enters the amount calculation. Discount and bonus can be combined.
+- The 토큰 설정 editor **must not re-render on every keystroke**: rebuilding a number input mid-typing jumps the cursor and turns the transient empty string back into `0`. `qaOnPolicyInput()` syncs the draft and swaps only the computed price text (`qa-pk-sum-*`). 요청됨 → 발송완료 → 결제완료, with 취소 allowed only from the first two; each transition stores its timestamp and the admin who did it.
 - **토큰은 스레드 단위로 과금한다** — a question costs `questionCost` once when the thread is opened; comments inside it are free. Say it that way in UI copy.
 - The 질문 tab is a **feed → detail** pair like 자유게시판, not an accordion: `qaFeedRowHtml` shows 상태칩 + 제목 + a two-line `-webkit-line-clamp` body preview, and `qaDetailHtml` takes over the pane when `S.qa.openId` is set (cleared by `qaCloseDetail`, a sub-tab change, or opening the composer).
 - The Q&A listeners run **only while `#vQa` is open** (`showView` calls `qaStopListeners()` on any other view) — ledger and payment history are school-wide.
 
 **Tests**: `functions/test/`. `npm test` runs the pure pricing tests; `npm run test:emu` boots the Firestore emulator and runs everything (31 tests), including concurrency and double-grant. The emulator needs a Java runtime — this Mac has Temurin 21 at `~/.local/java/jdk-21.0.12.1+1/Contents/Home`; export `JAVA_HOME` to that and put its `bin` on `PATH` before running.
+
+### 자유게시판 이용 서약 · 제재 (`boardPledges` / `boardBans`)
+
+Both are **server-only writes** through `tokenApi` (`functions/moderation.js`), for the same reason: a record the subject can edit is worthless. A pledge the student could delete becomes "I never agreed"; a ban they could clear enforces nothing. Reads stay open so the client can `onSnapshot` them.
+
+- **이용 서약** — `bdPledgeOk()` gates the whole board (`bdBoardHtml` returns `bdPledgeHtml()` first). The student must tick 동의 before the feed appears. `BD_PLEDGE_VERSION` is stamped on the record; **bump it when the rules text changes** and everyone re-agrees. Staff skip the gate.
+- **`BD_RULES` is the single source** for the rules modal, the pledge sentences (`pledge` field, first person), and the 신고 사유 dropdown — a student must never be reportable for something not in the rules.
+- **제재는 영구 이용정지 하나뿐**. Tiered durations were deliberately rejected — 위반이면 영구, 오처리면 해제. `banBoard` refuses if already banned and `unbanBoard` refuses if not, so a double click can't double-log; both keep `history`.
+- A banned student keeps every other feature (멘토링·성적·질문게시판); only 자유게시판 writing is blocked — the FAB, the composer and the comment box all disappear, and `bdCreatePost`/`bdAddComment` re-check before writing.
+
+### 질문게시판 환불 규정
+
+`QA_REFUND_SECTIONS` (가능/불가/방법). Deliberately strict: full refund **only** within 7 days *and* with zero tokens used — opening a question thread counts as use. That floor exists because 전자상거래법 does not let you refuse 청약철회 on a wholly unused purchase; everything above it is closed. Bonus and gifted tokens are never refundable.
 
 ### 학생 화면에서 부르는 호칭
 

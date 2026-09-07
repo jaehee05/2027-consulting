@@ -19,6 +19,8 @@ service cloud.firestore {
           || c == 'tokenLedger'
           || c == 'questions'
           || c == 'paymentRequests'
+          || c == 'boardBans'
+          || c == 'boardPledges'
           || (c == 'config' && d == 'tokens');
     }
 

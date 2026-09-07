@@ -36,6 +36,24 @@ describe("packagePrice", () => {
   });
 });
 
+describe("보너스 토큰", () => {
+  test("보너스는 금액을 바꾸지 않고 토큰만 더한다", () => {
+    const [p] = normalizePackages([{ id: "a", tokens: 10, bonus: 1 }], 1000);
+    expect(p).toMatchObject({ tokens: 10, bonus: 1, totalTokens: 11, amount: 10000 });
+  });
+
+  test("보너스와 할인은 같이 쓸 수 있다", () => {
+    const [p] = normalizePackages(
+      [{ id: "a", tokens: 30, bonus: 5, discountType: "amount", discountValue: 5000 }], 1000);
+    expect(p).toMatchObject({ tokens: 30, bonus: 5, totalTokens: 35, amount: 25000 });
+  });
+
+  test("보너스가 없거나 음수면 0", () => {
+    expect(normalizePackages([{ id: "a", tokens: 5 }], 100)[0]).toMatchObject({ bonus: 0, totalTokens: 5 });
+    expect(normalizePackages([{ id: "b", tokens: 5, bonus: -3 }], 100)[0]).toMatchObject({ bonus: 0, totalTokens: 5 });
+  });
+});
+
 describe("normalizePackages", () => {
   test("order 순으로 정렬하고 금액을 채워 준다", () => {
     const out = normalizePackages(

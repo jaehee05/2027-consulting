@@ -60,9 +60,13 @@ function normalizePackages(raw, unitPrice) {
   return (Array.isArray(raw) ? raw : [])
     .map((p, i) => {
       const price = packagePrice(p, unitPrice);
+      // 보너스는 값을 깎지 않고 토큰을 더 얹는다. 금액 계산에는 들어가지 않는다.
+      const bonus = Math.max(0, Math.floor(num(p.bonus)));
       return {
         id: String(p.id || `pkg_${i}`),
         tokens: price.tokens,
+        bonus,
+        totalTokens: price.tokens + bonus,
         active: p.active !== false,
         order: Math.floor(num(p.order, i)),
         discountType: ["percent", "amount"].includes(p.discountType) ? p.discountType : "none",
@@ -241,6 +245,32 @@ async function addQuestionComment(fs, { questionId, actor, body, photos }) {
   });
 }
 
+/** 댓글 삭제. 학생은 자기 댓글만, 관리자는 전부. 토큰은 돌려주지 않는다(애초에 댓글은 무료다). */
+async function deleteQuestionComment(fs, { questionId, commentId, actor }) {
+  const now = Date.now();
+  return fs.runTransaction(async (tx) => {
+    const qRef = fs.doc(`questions/${questionId}`);
+    const snap = await tx.get(qRef);
+    if (!snap.exists) throw new ApiError(404, "질문을 찾을 수 없습니다.");
+    const q = snap.data();
+    const list = Array.isArray(q.comments) ? q.comments : [];
+    const target = list.find((c) => c._id === commentId);
+    if (!target) throw new ApiError(404, "댓글을 찾을 수 없습니다.");
+    if (actor.role !== "admin" && target.authorId !== actor.id) {
+      throw new ApiError(403, "본인 댓글만 삭제할 수 있습니다.");
+    }
+    const next = list.filter((c) => c._id !== commentId);
+    const upd = { comments: next, updatedAt: now };
+    // 관리자 댓글이 다 지워지면 다시 답변대기로 돌린다 — 아니면 답변 없는 글이 답변완료로 남는다.
+    if (!next.some((c) => c.role === "admin")) {
+      upd.status = "pending";
+      upd.answeredAt = null;
+    }
+    tx.update(qRef, upd);
+    return { ok: true, status: upd.status || q.status };
+  });
+}
+
 async function deleteQuestion(fs, { questionId, actor }) {
   const qRef = fs.doc(`questions/${questionId}`);
   const snap = await qRef.get();
@@ -273,6 +303,8 @@ async function createPaymentRequest(fs, { student, packageId }) {
     studentPhone: student.phone || "",
     packageId: pkg.id,
     tokens: pkg.tokens,
+    bonus: pkg.bonus,
+    totalTokens: pkg.totalTokens,
     unitPrice: policy.unitPrice,
     discountType: pkg.discountType,
     discountValue: pkg.discountValue,
@@ -286,7 +318,7 @@ async function createPaymentRequest(fs, { student, packageId }) {
     canceledAt: null, canceledById: "", canceledByName: "",
     ledgerId: "",
   });
-  return { id: ref.id, amount: pkg.amount, tokens: pkg.tokens };
+  return { id: ref.id, amount: pkg.amount, tokens: pkg.tokens, bonus: pkg.bonus, totalTokens: pkg.totalTokens };
 }
 
 async function markPaymentSent(fs, { requestId, by }) {
@@ -319,12 +351,15 @@ async function markPaymentPaid(fs, { requestId, by }) {
     if (pr.status !== "sent") {
       throw new ApiError(409, `'발송완료' 상태에서만 결제 완료로 바꿀 수 있습니다. (현재: ${pr.status})`);
     }
-    const tokens = Math.max(0, Math.floor(num(pr.tokens)));
+    // 보너스 필드가 없던 예전 요청은 tokens 로 떨어진다.
+    const tokens = Math.max(0, Math.floor(num(pr.totalTokens, num(pr.tokens))));
     const { ref: balRef, balance } = await readBalance(tx, fs, pr.studentId);
     const next = balance + tokens;
     const ledRef = ledgerEntry(tx, fs, {
       studentId: pr.studentId, delta: tokens, reason: "purchase", refId: requestId,
-      balanceAfter: next, note: `${tokens}토큰 구매`, by, now,
+      balanceAfter: next,
+      note: num(pr.bonus) > 0 ? `${num(pr.tokens)}토큰 구매 + 보너스 ${num(pr.bonus)}토큰` : `${tokens}토큰 구매`,
+      by, now,
     });
     tx.set(balRef, { balance: next, updatedAt: now }, { merge: true });
     tx.update(ref, {
@@ -379,7 +414,7 @@ async function savePolicy(fs, patch) {
       patch.packages === undefined ? cur.packages : patch.packages,
       Math.max(0, Math.floor(num(patch.unitPrice, cur.unitPrice)))
     ).map((p) => ({
-      id: p.id, tokens: p.tokens, active: p.active, order: p.order,
+      id: p.id, tokens: p.tokens, bonus: p.bonus, active: p.active, order: p.order,
       discountType: p.discountType, discountValue: p.discountValue,
     })),
     updatedAt: Date.now(),
@@ -403,6 +438,7 @@ module.exports = {
   adjustTokens,
   createQuestion,
   addQuestionComment,
+  deleteQuestionComment,
   deleteQuestion,
   createPaymentRequest,
   markPaymentSent,
