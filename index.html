@@ -2905,7 +2905,7 @@ function bdPostHtml(q,ctx){
   if(isEditing){
     const keep=Array.isArray(S.bdPostEditId.keepPhotos)?S.bdPostEditId.keepPhotos:[];
     const opts=isStudentPost?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-edit-secret-${id}" ${q.secret?'checked':''}> 🔒 비밀글 (나와 선생님만 볼 수 있어요)</label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-edit-anon-${id}" ${q.anon?'checked':''} onchange="_('bd-edit-nick-${id}').style.display=this.checked?'':'none'"> 🙈 익명으로 표시</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-edit-real-${id}" ${q.anon?'':'checked'} onchange="_('bd-edit-nick-${id}').style.display=this.checked?'none':''"> 🙋 실명으로 표시</label>
       <input class="fi" id="bd-edit-nick-${id}" style="margin-top:6px;display:${q.anon?'':'none'}" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(q.authorNick||bdMyNick())}">`:'';
     bodyHtml=`<div>
       <input class="fi" id="bd-edit-title-${id}" maxlength="60" placeholder="제목" value="${escapeHtml(q.title||'')}" style="margin-bottom:8px;font-weight:700">
@@ -3006,7 +3006,7 @@ function bdCommentsHtml(q,staff){
 
   const replyTo=S.bdReplyTo&&all.find(c=>c._id===S.bdReplyTo);
   const cScope='cmt_'+id;
-  const anonRow=staff?'':`<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;cursor:pointer;white-space:nowrap"><input type="checkbox" id="bd-cmt-anon-${id}" checked> 익명</label>`;
+  const anonRow=staff?'':`<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;cursor:pointer;white-space:nowrap"><input type="checkbox" id="bd-cmt-real-${id}"> 실명</label>`;
   const input=`<div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:4px">
     ${replyTo?`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#1C64F2;margin-bottom:6px"><span>↳ ${bdCommentName(q,replyTo)}에게 대댓글</span><button onclick="bdCancelReply()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:12px">취소</button></div>`:''}
     <textarea class="fi ta" id="bd-cmt-input-${id}" rows="2" placeholder="댓글을 입력하세요."></textarea>
@@ -3029,8 +3029,9 @@ function bdComposerHtml(){
   const scope='new';
   if(!S.bdComposerOpen)return '';
   const opts=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-new-secret"> 🔒 비밀글로 올리기 (나와 선생님만 볼 수 있어요)</label>
-    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-new-anon" checked onchange="_('bd-new-nick').style.display=this.checked?'':'none'"> 🙈 익명으로 올리기</label>
-    <input class="fi" id="bd-new-nick" style="margin-top:6px" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(bdMyNick())}">`;
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-new-real" onchange="_('bd-new-nick').style.display=this.checked?'none':''"> 🙋 실명으로 올리기 (내 이름이 공개됩니다)</label>
+    <input class="fi" id="bd-new-nick" style="margin-top:6px" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(bdMyNick())}">
+    <p style="font-size:11px;color:#9ca3af;margin-top:6px">기본은 익명입니다. 실명으로 올리려면 위를 체크하세요.</p>`;
   return `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
     <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 글 작성</p>
     <input class="fi" id="bd-new-title" maxlength="60" placeholder="제목" style="margin-bottom:8px;font-weight:700">
@@ -3182,7 +3183,8 @@ async function bdCreatePost(){
   if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const role=bdMyRole();
   const secret=role==='student'&&!!_('bd-new-secret')?.checked;
-  const anon=role==='student'&&!!_('bd-new-anon')?.checked;
+  /* 자유게시판은 익명이 기본이고 실명 공개가 선택이다. */
+  const anon=role==='student'&&!_('bd-new-real')?.checked;
   const nick=anon?((_('bd-new-nick')?.value||'').trim()||'익명'):'';
   const stu=role==='student'?S.students.find(s=>s._docId===S.studentDocId):null;
   const ref=db.collection('posts').doc();
@@ -3215,8 +3217,8 @@ async function bdSaveEdit(id){
   const keep=e&&e.id===id&&Array.isArray(e.keepPhotos)?e.keepPhotos:bdNormPhotos(q.photos);
   if(!txt&&!drafts.length&&!keep.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const secretEl=_('bd-edit-secret-'+id);
-  const anonEl=_('bd-edit-anon-'+id);
-  const nick=anonEl&&anonEl.checked?((_('bd-edit-nick-'+id)?.value||'').trim()||'익명'):'';
+  const realEl=_('bd-edit-real-'+id);
+  const nick=realEl&&!realEl.checked?((_('bd-edit-nick-'+id)?.value||'').trim()||'익명'):'';
   showLoad(true);
   try{
     const removed=bdNormPhotos(q.photos).filter(o=>!keep.some(k=>k.path===o.path));
@@ -3226,7 +3228,7 @@ async function bdSaveEdit(id){
     const upd={body:txt,photos:[...keep,...added],updatedAt:Date.now()};
     if(_('bd-edit-title-'+id))upd.title=title.slice(0,60);
     if(secretEl)upd.secret=!!secretEl.checked;
-    if(anonEl){upd.anon=!!anonEl.checked;upd.authorNick=nick;if(anonEl.checked)await bdSaveNick(nick);}
+    if(realEl){upd.anon=!realEl.checked;upd.authorNick=nick;if(!realEl.checked)await bdSaveNick(nick);}
     await db.collection('posts').doc(id).update(upd);
     delete S.bdDraftFiles[scope];
     S.bdPostEditId=null;
@@ -3260,7 +3262,7 @@ async function bdAddComment(id){
   const drafts=S.bdCommentDraftFiles[scope]||[];
   if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const cid=uid();
-  const cAnon=bdMyRole()==='student'&&!!_('bd-cmt-anon-'+id)?.checked;
+  const cAnon=bdMyRole()==='student'&&!_('bd-cmt-real-'+id)?.checked;
   const cNick='';
   const parentId=S.bdReplyTo&&bdComments(q).some(c=>c._id===S.bdReplyTo)?S.bdReplyTo:'';
   const anonNo=cAnon?bdAnonNoFor(q,bdMyId()):0;
@@ -3527,12 +3529,12 @@ function qaStuTokensHtml(){
 
   const pkgHtml=pkgs.length?`<div class="stgrid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">${pkgs.map(p=>{
     const off=p.discount>0;
-    return `<div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:6px">
+    return `<div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px;background:#fff;display:flex;flex-direction:column">
       <p style="font-size:18px;font-weight:800;color:#1C64F2">${p.tokens}<span style="font-size:12px;font-weight:600;color:#6b7280"> 토큰</span></p>
-      ${off?`<p style="font-size:12px;color:#9ca3af;text-decoration:line-through">${fmtWon(p.listPrice)}</p>
-        <p style="font-size:11px;color:#dc2626;font-weight:700">${p.discountType==='percent'?`${p.discountValue}% 할인`:`${fmtWon(p.discountValue)} 할인`}</p>`:''}
-      <p style="font-size:16px;font-weight:800">${fmtWon(p.amount)}</p>
-      <button class="btn bp bsm" style="margin-top:4px" onclick="qaRequestPayment('${p.id}')">결제 요청</button>
+      <div style="flex:1;min-height:34px;margin-top:6px">${off?`<p style="font-size:12px;color:#9ca3af;text-decoration:line-through">${fmtWon(p.listPrice)}</p>
+        <p style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">${p.discountType==='percent'?`${p.discountValue}% 할인`:`${fmtWon(p.discountValue)} 할인`}</p>`:''}</div>
+      <p style="font-size:16px;font-weight:800;margin-bottom:10px">${fmtWon(p.amount)}</p>
+      <button class="btn bp bsm" onclick="qaRequestPayment('${p.id}')">결제 요청</button>
     </div>`;}).join('')}</div>`
     :`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">지금은 판매 중인 토큰 상품이 없습니다.</div>`;
 
