@@ -104,6 +104,11 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .tab{padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray-500);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;flex-shrink:0;white-space:nowrap}
 .tab.on{color:var(--primary);border-bottom-color:var(--primary)}.tab:hover{color:var(--gray-900)}
 .tw{overflow-x:auto}
+/* 자유게시판 플로팅 글쓰기 버튼. 카카오톡 채널 런처와 겹치지 않게 그 위에 앉힌다. */
+.bd-fab{position:fixed;right:20px;bottom:88px;z-index:880;height:44px;padding:0 18px;border-radius:999px;border:none;background:var(--primary);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(28,100,242,.32);display:inline-flex;align-items:center;gap:6px}
+.bd-fab:hover{background:var(--primary-hover)}
+.bd-fab:active{transform:translateY(1px)}
+@media(max-width:640px){.bd-fab{right:14px;bottom:78px;height:42px;padding:0 16px;font-size:13px}}
 /* 카카오톡 채널 문의 버튼 — 채널톡 런처 자리를 그대로 이어받는다(파스텔 블루). */
 #kakaoCh{position:fixed;right:20px;bottom:20px;z-index:900;width:56px;height:56px;border-radius:50%;background:linear-gradient(140deg,#e3edff,#c3d9ff);border:1px solid rgba(28,100,242,.16);display:none;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(28,100,242,.22);transition:transform .15s,box-shadow .15s,background .15s;-webkit-tap-highlight-color:transparent}
 #kakaoCh.on{display:flex}
@@ -890,7 +895,7 @@ const S = {
   popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false, scoreGradeTab:'',
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
   posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
-  bdFilter:'all', bdModalBookingId:null,
+  bdFilter:'all', bdModalBookingId:null, bdOpenId:null,
   qa:{policy:null,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',
       composerOpen:false,openId:null,stuQuery:'',draft:null,loaded:false}
 };
@@ -1965,7 +1970,7 @@ function doLogout(){
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];S.posts=[];
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
-  S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;
+  S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;S.bdOpenId=null;
   S.qa={policy:null,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',composerOpen:false,openId:null,stuQuery:'',draft:null,loaded:false};
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
@@ -2833,6 +2838,7 @@ function bdPostHtml(q,ctx){
   }
 
   const comments=bdComments(q);
+  const liked=bdLiked(q),likeCount=bdLikes(q).length;
   const commentsHtml=comments.map(c=>{
     const isAdminCmt=c.role==='admin';
     const canDel=staff||(c.authorId&&c.authorId===bdMyId());
@@ -2869,6 +2875,10 @@ function bdPostHtml(q,ctx){
       ${isEditing?'':`<div style="display:flex;gap:6px">${pinBtn}${editBtn}${delBtn}</div>`}
     </div>
     ${bodyHtml}
+    ${isEditing?'':`<div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(0,0,0,.05)">
+      <button onclick="bdToggleLike('${id}',event)" style="border:1px solid ${liked?'#fca5a5':'#e5e7eb'};background:${liked?'#fee2e2':'#fff'};color:${liked?'#dc2626':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer">♥ 공감 ${likeCount}</button>
+      <span style="font-size:12px;color:#9ca3af">💬 댓글 ${comments.length}</span>
+    </div>`}
     ${comments.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:12px 0 6px">댓글 (${comments.length})</p>${commentsHtml}`:''}
     ${commentInputHtml}
   </div>`;
@@ -2911,35 +2921,97 @@ function bdFilteredPosts(){
   if(f!=='all')list=list.filter(q=>bdCanRead(q));
   return bdSorted(list);
 }
-// 게시판 본문. 학생 화면과 관리자 탭이 같은 마크업을 쓴다.
-function bdBoardHtml(){
+
+/* ── 공감 ──
+   posts 는 클라이언트 쓰기가 열려 있어 여기서 바로 토글한다. 누른 사람 id 를 배열로 들고 있어야
+   같은 사람이 두 번 눌러도 숫자가 부풀지 않는다. */
+function bdLikes(q){return Array.isArray(q.likes)?q.likes:[];}
+function bdLiked(q){const me=bdMyId();return !!me&&bdLikes(q).includes(me);}
+async function bdToggleLike(id,ev){
+  if(ev)ev.stopPropagation();
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  const me=bdMyId();if(!me)return;
+  const fv=firebase.firestore.FieldValue;
+  try{
+    await db.collection('posts').doc(id).update({
+      likes:bdLiked(q)?fv.arrayRemove(me):fv.arrayUnion(me)
+    });
+  }catch(e){toast('처리 실패: '+e.message,'error');}
+}
+
+/* ── 목록(피드) ──
+   에브리타임처럼 한 줄짜리 카드로 훑고, 눌러서 상세로 들어간다. */
+function bdPreviewText(q){
+  const t=(q.body||'').replace(/\s+/g,' ').trim();
+  return t.length>90?t.slice(0,90)+'…':t;
+}
+function bdFeedRowHtml(q){
+  const id=q._docId;
+  if(!bdCanRead(q)){
+    return `<div style="border-bottom:1px solid #f1f3f5;padding:14px 4px;display:flex;align-items:center;gap:8px;color:#9ca3af;font-size:13px">
+      <span>🔒</span><span>비밀글입니다.</span><span style="margin-left:auto;font-size:11px;color:#d1d5db">${bdFmtTs(q.createdAt)}</span></div>`;
+  }
+  const cmts=bdComments(q).length;
+  const likes=bdLikes(q).length;
+  const thumb=(q.photos||[])[0];
+  const isAdminPost=q.authorRole==='admin';
+  const nameLine=`${q.pinned?'<span style="color:#b45309;font-weight:700">📌 </span>':''}${bdShowName(q)}`;
+  return `<div onclick="bdOpen('${id}')" style="border-bottom:1px solid #f1f3f5;padding:14px 4px;cursor:pointer;display:flex;gap:12px;align-items:flex-start">
+    <div style="flex:1;min-width:0">
+      <p style="font-size:14px;color:#111827;line-height:1.5;margin-bottom:6px;word-break:break-word">${escapeHtml(bdPreviewText(q))||'<span style="color:#9ca3af">(사진)</span>'}</p>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;flex-wrap:wrap">
+        <span style="color:${isAdminPost?'#dc2626':'#6b7280'};font-weight:600">${nameLine}</span>
+        <span>·</span><span>${bdFmtTs(q.createdAt)}</span>
+        ${q.secret?'<span title="비밀글">🔒</span>':''}
+        <span style="margin-left:4px;color:#dc2626;font-weight:600">♥ ${likes}</span>
+        <span style="color:#1C64F2;font-weight:600">💬 ${cmts}</span>
+      </div>
+    </div>
+    ${thumb?`<img src="${thumb.url}" alt="" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;flex-shrink:0">`:''}
+  </div>`;
+}
+function bdListHtml(){
   const staff=bdIsStaff();
   const posts=bdFilteredPosts();
   const total=S.posts.filter(q=>bdCanRead(q)).length;
-  const btn=S.bdComposerOpen?'':`<button class="btn bp bsm" style="font-size:12px;padding:6px 12px" onclick="bdOpenComposer()">+ ${staff?'새 글':'글쓰기'}</button>`;
-  const emptyMsg=(S.bdFilter||'all')==='all'
-    ?(staff?'아직 등록된 글이 없습니다.':'아직 등록된 글이 없습니다. 위 [+ 글쓰기] 버튼으로 첫 글을 남겨보세요.')
-    :'조건에 맞는 글이 없습니다.';
-  const listHtml=posts.length?posts.map(q=>bdPostHtml(q,{staff})).join('')
-    :`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px;margin-bottom:14px">${emptyMsg}</div>`;
-  return `<div class="card" style="margin-bottom:12px">
+  const empty=`<div style="padding:40px 18px;text-align:center;color:#9ca3af;font-size:13px">${
+    (S.bdFilter||'all')==='all'?'아직 등록된 글이 없습니다. 첫 글을 남겨보세요.':'조건에 맞는 글이 없습니다.'}</div>`;
+  return `<div class="card" style="margin-bottom:12px;padding-bottom:6px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <p style="font-size:15px;font-weight:700">자유게시판</p>
       <span style="font-size:11px;color:#6b7280">글 ${total}</span>
-      <div style="margin-left:auto">${btn}</div>
     </div>
     ${staff?'':'<p style="font-size:11px;color:#9ca3af;margin-bottom:10px">모든 학생이 볼 수 있는 공개 게시판입니다. 개인적인 내용은 🔒 비밀글로 올려주세요.</p>'}
     ${bdFilterBarHtml()}
     ${bdComposerHtml()}
-    ${listHtml}
-  </div>`;
+    ${posts.length?posts.map(bdFeedRowHtml).join(''):empty}
+  </div>
+  ${S.bdComposerOpen?'':`<button class="bd-fab" onclick="bdOpenComposer()" aria-label="글쓰기" title="글쓰기">✏️ 글쓰기</button>`}`;
 }
+
+/* ── 상세 ── */
+function bdDetailHtml(q){
+  return `<button class="btn bs bsm" style="margin-bottom:12px" onclick="bdCloseDetail()">← 목록</button>
+  <div class="card">${bdPostHtml(q,{staff:bdIsStaff(),detail:true})}</div>`;
+}
+
+function bdBoardHtml(){
+  if(S.bdOpenId){
+    const q=S.posts.find(x=>x._docId===S.bdOpenId);
+    if(q&&bdCanRead(q))return bdDetailHtml(q);
+    S.bdOpenId=null;
+  }
+  return bdListHtml();
+}
+function bdOpen(id){S.bdOpenId=id;S.bdComposerOpen=false;bdRerender();try{window.scrollTo({top:0});}catch(_){}}
+function bdCloseDetail(){S.bdOpenId=null;S.bdPostEditId=null;bdRerender();}
+
 /* 멘토링 상세·예약 상세·태블릿에 붙는 한 학생 전용 섹션. 작성은 게시판에서만 하고 여기서는 답변만 단다. */
 function bdStudentSectionHtml(studentId,ctx){
   const staff=ctx?.staff??bdIsStaff();
   const list=bdSorted(S.posts.filter(q=>q.authorId===studentId&&q.authorRole!=='admin'));
-  const body=list.length?list.map(q=>bdPostHtml(q,{staff})).join('')
-    :'<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">이 학생이 작성한 질문이 없습니다.</div>';
+  const body=list.length?list.map(q=>bdPostHtml(q,{staff,detail:true})).join('')
+    :'<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">이 학생이 작성한 글이 없습니다.</div>';
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
       <p style="font-size:15px;font-weight:700">자유게시판 · 이 학생의 글</p>
@@ -2951,7 +3023,7 @@ function bdStudentSectionHtml(studentId,ctx){
 
 /* ── 상태 전환 ── */
 function bdSetFilter(f){S.bdFilter=f;bdRerender();}
-function bdOpenComposer(){S.bdComposerOpen=true;S.bdPostEditId=null;bdRerender();}
+function bdOpenComposer(){S.bdComposerOpen=true;S.bdPostEditId=null;S.bdOpenId=null;bdRerender();}
 function bdCloseComposer(){S.bdComposerOpen=false;delete S.bdDraftFiles['new'];bdRerender();}
 function bdStartEdit(id){
   const q=S.posts.find(x=>x._docId===id);if(!q)return;
@@ -8544,6 +8616,7 @@ function goBoard(){
     ?(S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생')
     :S.user.name;
   bdMarkSeen();
+  S.bdOpenId=null;S.bdComposerOpen=false;
   showView('vBoard');applyChips();
   renderBoardView();
   if(!_skipPush)navPush({v:'vBoard'});

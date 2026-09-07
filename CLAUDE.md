@@ -20,7 +20,7 @@ This is a single-page admin/student web app for a consulting (멘토링) busines
 The three deploy targets are **independent** — pick the right one for the change:
 
 - **Web frontend (`index.html`, `privacy.html`, `favicon.png`)** — Vercel auto-deploys from GitHub `main` on every push. Live site: `https://www.kjhedu.kr/`. No `vercel.json` in repo; config is on the Vercel side. **A `git push` is sufficient** — do not run `firebase deploy --only hosting`. The `consulting-dd53f.web.app` Firebase Hosting site exists but is unused (404).
-- **Cloud Functions** — `firebase deploy --only functions --project consulting-dd53f` (from repo root, after `cd functions && npm install`).
+- **Cloud Functions** — `firebase deploy --only functions --project consulting-dd53f` (from repo root, after `cd functions && npm install`). **`functions/.env` is gitignored and may not exist on the machine you're on**; a full functions deploy from a machine without it would redeploy the alimtalk functions with their `PPURIO_PROXY_*` vars missing. When you only changed one function, name it: `--only functions:tokenApi`.
 - **Firestore rules** — `firebase deploy --only firestore:rules --project consulting-dd53f`.
 - **Storage rules** — `firebase deploy --only storage --project consulting-dd53f`. Storage was finally provisioned on 2026-09-02 (bucket `consulting-dd53f.firebasestorage.app`, `asia-northeast3`, production rules) and the repo's `storage.rules` released then; before that 게시판 사진 첨부 could not work at all. If an upload ever fails again, check the error code the toast now prints (`storage/unauthorized` → rules, `storage/unauthenticated` → the Firebase Auth session died even though the app session survived).
 - **Mobile app** — `cd mobile && npm run ios` (or `android`). Only needed for App/Play Store releases; not part of the web deploy flow.
@@ -111,20 +111,38 @@ Popup specifics:
 
 ### 자유게시판 (`posts`)
 
-Reached from the **home hub** as its own view (`#vBoard` / `goBoard()`), the way 상벌점 used to be — it is *not* a tab inside 멘토링. Added 2026-09-08, replacing the old 상담 전 질문 & 고민 board that lived inside each `bookings` doc as a `posts` array (that array, and the older `question`/`comments` fields, are no longer read or written; the one legacy post in Firestore was not migrated).
+Reached from the **home hub** as its own view (`#vBoard` / `goBoard()`), the way 상벌점 used to be — not a tab inside 멘토링. Students and ADMIN only; **OP(viewer) never sees it** (기존처럼 멘토링만). Replaced the old 상담 전 질문 & 고민 board that lived inside each `bookings` doc as a `posts` array (that array and the older `question`/`comments` fields are no longer read or written).
 
-This is the **free-for-all** board. The token-gated 질문 게시판 is a separate feature with its own collections — keep them apart: this one's code is prefixed `bd*`, that one's is `qa*`. Deliberately has **no 답변대기/답변완료 concept**; that belongs to the Q&A board.
+Modelled on **에브리타임**: a compact feed you scan, tap into a detail page, 공감 and 댓글 counts on every row, floating 글쓰기 button. Code prefix `bd*`. The token-gated 질문게시판 is a separate feature (`qa*`) — keep them apart.
 
-- **Doc**: `{body, photos[], secret, pinned, anon, authorNick, authorId, authorRole:'student'|'admin', authorName, authorGrade, createdAt, updatedAt, comments[]}`. Comments are an inline array `{_id, role, name, nick, anon, authorId, body, photos[], ts}` — one doc per thread, whole array rewritten on every comment.
-- **`authorId`** is the student's `_docId` for students and `S.user.id` for staff. Everything that asks "is this mine?" (`bdCanRead`, `bdCanEdit`, comment delete) compares against `bdMyId()`, so don't switch it to `accountId`.
-- **비밀글 (`secret:true`)** — author + staff only. Non-owners get `bdLockedCardHtml` (a 🔒 stub with only the date). **Client-side only**; `firestore.rules` still opens the collection.
-- **익명 (`anon:true`)** — the nickname is shown instead of the real name, and the 학년 chip is suppressed. `bdShowName` is the single place that decides a display name; **staff always additionally see the real name in parentheses**, same principle as 비밀글. The nickname persists on `students[].nickname` via `bdSaveNick` so it pre-fills next time.
-- Kept in sync by `startPostsListener()` (`onSnapshot`), so every CRUD handler writes to Firestore **only** and lets the listener update `S.posts` and re-render — same rule as `notices`.
-- `bdRerender()` is the single re-render entry point; it checks `#vBoard` first, then the student page, the tablet, the 예약 상세 modal (`S.bdModalBookingId`), or 멘토링 상세.
-- **Two renderers**: `bdBoardHtml()` is the whole board (composer + 전체/내 글 filter), rendered into `#boardC`. `bdStudentSectionHtml(studentId)` is the one-student, no-composer section embedded in 멘토링 상세, 예약 상세, and the tablet.
-- Photos go to Storage under `board/<postId>/<scope>/`, matched by `storage.rules`. A new post takes its doc id from `db.collection('posts').doc()` *before* uploading so the path is stable.
-- The home card shows a red dot from `bdStuNewCount()`, compared against a `localStorage` `bdSeen` timestamp stamped by `goBoard()` — per-browser, like the popup dismissals.
-- The 멘토링 목록 **게시글** column and its summary chip come from `S.posts` (`_bdHas`), not from bookings.
+- **Doc**: `{body, photos[], secret, pinned, anon, authorNick, likes[], authorId, authorRole:'student'|'admin', authorName, authorGrade, createdAt, updatedAt, comments[]}`. No title — like 에브리타임, a post is just a body. Comments are an inline array `{_id, role, name, nick, anon, authorId, body, photos[], ts}`.
+- **`authorId`** is the student's `_docId` for students and `S.user.id` for staff. Everything that asks "is this mine?" (`bdCanRead`, `bdCanEdit`, `bdLiked`, comment delete) compares against `bdMyId()`; don't switch it to `accountId`.
+- **비밀글 (`secret:true`)** — author + staff only. Non-owners get a 🔒 stub row with only the date, never the body or author. **Client-side only**; `firestore.rules` still opens `posts`.
+- **익명 (`anon:true`)** — nickname instead of real name, 학년 chip suppressed. `bdShowName` is the single place that decides a display name; **staff always additionally see the real name in parentheses**, same principle as 비밀글. The nickname persists on `students[].nickname` via `bdSaveNick`.
+- **공감** is `likes[]` holding user ids, toggled with `arrayUnion`/`arrayRemove` — an id array rather than a counter so a double tap can't inflate the number.
+- **Three renderers**: `bdListHtml()` (feed + composer + FAB) and `bdDetailHtml()` (one post expanded) both go through `bdBoardHtml()`, which branches on `S.bdOpenId`. `bdStudentSectionHtml(studentId)` is the one-student, no-composer section embedded in 멘토링 상세, 예약 상세, and the tablet — it renders posts in detail form.
+- Kept in sync by `startPostsListener()` (`onSnapshot`); CRUD handlers write to Firestore **only** and let the listener re-render, same rule as `notices`. `bdRerender()` is the single re-render entry point (checks `#vBoard` first, then student page, tablet, 예약 상세 modal via `S.bdModalBookingId`, 멘토링 상세).
+- Photos go to Storage under `board/<postId>/<scope>/`. A new post takes its doc id from `db.collection('posts').doc()` *before* uploading so the path is stable. The 질문게시판 reuses `bdUploadPhoto` with a throwaway batch id, so its photos also land under `board/` — one `storage.rules` match covers both.
+- The home card shows a red dot from `bdStuNewCount()` against a `localStorage` `bdSeen` timestamp stamped by `goBoard()` — per-browser, like popup dismissals.
+- The 멘토링 목록 **게시글** column and its summary chip come from `S.posts` (`_bdHas`).
+
+### 질문게시판 · 토큰 (`questions` / `tokenBalances` / `tokenLedger` / `paymentRequests` / `config/tokens`)
+
+Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see only their own questions; ADMIN sees all. OP(viewer) is excluded everywhere. Code prefix `qa*`.
+
+**Everything that moves tokens is server-side.** `firestore.rules` blocks client writes to these five paths (`serverOnlyWrite()`), and `tokenApi` (`functions/index.js`) is the only writer. Reads stay open so the client can use `onSnapshot`. **Never open these to client writes** — a student could otherwise set their own balance.
+
+- **`functions/tokens.js`** holds the logic and takes a `firestore` instance rather than reaching for the ambient one, so the emulator tests drive the same code the function runs.
+- **Every token movement happens inside `runTransaction`**, reading the balance in the same transaction that writes it, plus the ledger row. Writing the ledger outside would let the two drift.
+  - 질문 작성: balance check and deduction share one transaction, so concurrent submits can't go negative (`402` once the balance runs out).
+  - 결제 완료: the `status === 'sent'` precondition is inside the transaction, so a double click grants once and the second call gets `409`.
+  - 신규 학생 기본 지급: `onStudentCreate` trigger → `grantSignupTokens`, which no-ops when a balance doc already exists (triggers retry).
+- **`tokenBalances/{studentId}` is deliberately a separate collection**, not a field on the student doc — `students` must stay client-writable for nicknames and scores, and a blanket path rule can't carve out one field.
+- **`paymentRequests` snapshot the price at request time** (`tokens`, `unitPrice`, `discountType/Value`, `listPrice`, `discount`, `amount`), so later policy edits never change a pending request's amount. 요청됨 → 발송완료 → 결제완료, with 취소 allowed only from the first two; each transition stores its timestamp and the admin who did it.
+- **토큰은 스레드 단위로 과금한다** — a question costs `questionCost` once when the thread is opened; comments inside it are free. Say it that way in UI copy.
+- The Q&A listeners run **only while `#vQa` is open** (`showView` calls `qaStopListeners()` on any other view) — ledger and payment history are school-wide.
+
+**Tests**: `functions/test/`. `npm test` runs the pure pricing tests; `npm run test:emu` boots the Firestore emulator and runs everything (31 tests), including concurrency and double-grant. The emulator needs a Java runtime — this Mac has Temurin 21 at `~/.local/java/jdk-21.0.12.1+1/Contents/Home`; export `JAVA_HOME` to that and put its `bin` on `PATH` before running.
 
 ### 학생 화면에서 부르는 호칭
 
