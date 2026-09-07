@@ -896,8 +896,8 @@ const S = {
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
   posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
   bdFilter:'all', bdModalBookingId:null, bdOpenId:null, bdReplyTo:null, boardBans:{}, boardPledges:{},
-  qa:{policy:null,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',
-      composerOpen:false,openId:null,stuQuery:'',draft:null,loaded:false}
+  qa:{policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',
+      composerOpen:false,openId:null,stuQuery:'',draft:null,draftDirty:false,loaded:false}
 };
 
 const _=id=>document.getElementById(id);
@@ -1992,7 +1992,7 @@ function doLogout(){
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
   S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;S.bdOpenId=null;S.bdReplyTo=null;
-  S.qa={policy:null,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',composerOpen:false,openId:null,stuQuery:'',draft:null,loaded:false};
+  S.qa={policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',composerOpen:false,openId:null,stuQuery:'',draft:null,draftDirty:false,loaded:false};
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   S._pendingAdmin=null;
@@ -3528,18 +3528,16 @@ function qaPackages(activeOnly){
 async function qaCall(action,payload){return callFn(TOKEN_API_URL,{action,payload},true);}
 
 /* ── 환불 규정 ──
-   전자상거래법상 '이미 사용한 디지털 콘텐츠'는 청약철회 대상이 아니지만, 한 개도 쓰지 않은
-   경우까지 막으면 법에 어긋난다. 그래서 '미사용분 7일 이내'만 열어 두고 나머지는 닫는다. */
-/* 일반적인 환불 규정 안내 형식 — 가능/불가/방법/문의로 나눈다.
-   전자상거래법상 '이미 사용한 디지털 콘텐츠'는 청약철회 대상이 아니지만, 한 개도 쓰지 않은
-   경우까지 막으면 법에 어긋난다. 그래서 미사용분 7일 이내만 열어 두고 나머지는 닫는다. */
+   가능/불가/방법으로 나눈 일반적인 안내 형식. 전자상거래법상 '이미 사용한 디지털 콘텐츠'는
+   청약철회 대상이 아니지만 한 개도 쓰지 않은 경우까지 막으면 법에 어긋나므로, 미사용분만
+   열어 둔다. 기간(3일)은 운영 정책으로 정한 값이다. */
 const QA_REFUND_SECTIONS=[
   {title:'환불이 가능한 경우',color:'#15803d',items:[
-    '결제일로부터 <b>7일 이내</b>이며, 구매한 토큰을 <b>한 개도 사용하지 않은</b> 경우 전액 환불해 드립니다.'
+    '결제일로부터 <b>3일 이내</b>이며, 구매한 토큰을 <b>한 개도 사용하지 않은</b> 경우 전액 환불해 드립니다.'
   ]},
   {title:'환불이 불가능한 경우',color:'#991b1b',items:[
     '토큰을 한 개라도 사용한 경우 (질문 스레드를 연 시점부터 사용한 것으로 봅니다)',
-    '결제일로부터 7일이 지난 경우',
+    '결제일로부터 3일이 지난 경우',
     '보너스로 받은 토큰과 무상으로 지급받은 토큰',
     '이용규칙 위반으로 이용이 정지된 경우 남은 토큰'
   ]},
@@ -3577,6 +3575,10 @@ function qaStartListeners(){
 
   on(db.doc('config/tokens'),snap=>{
     S.qa.policy=snap.exists?snap.data():{};
+    S.qa.policyLoaded=true;
+    /* 편집을 시작하지 않았다면 새 정책으로 초안을 다시 만든다. 로딩 전에 [토큰 설정]을 열면
+       빈 초안이 만들어지는데, 그대로 저장하면 판매 옵션이 통째로 지워진다. */
+    if(!S.qa.draftDirty)S.qa.draft=null;
     renderQa();
   });
   const qCol=db.collection('questions');
@@ -3814,7 +3816,7 @@ function qaStuTokensHtml(){
       <span style="font-size:11px;color:#6b7280">1토큰 ${fmtWon(pol.unitPrice)}</span>
     </div>
     ${pkgHtml}
-    <div class="info" style="margin-top:12px"><p>결제 요청을 보내면 선생님이 확인 후 <b>결제선생</b>으로 결제 링크를 보내드립니다. 결제가 확인되면 토큰이 자동으로 지급됩니다.</p></div>
+    <div class="info" style="margin-top:12px"><p>결제 요청을 보내면 확인 후 <b>결제선생</b>으로 결제 링크를 보내드립니다. 결제가 확인되면 토큰이 자동으로 지급됩니다.</p></div>
     <p style="font-size:11px;color:#9ca3af;margin-top:10px">토큰은 한 번 사용하면 환불되지 않습니다. <button onclick="qaOpenRefund()" style="background:none;border:none;color:#1C64F2;font-size:11px;font-weight:700;cursor:pointer;padding:0;text-decoration:underline">환불 규정</button></p>
   </div>
 
@@ -3982,27 +3984,29 @@ function qaRefreshPkgPrices(){
     if(el)el.innerHTML=qaPkgSummaryHtml(p,d.unitPrice);
   });
 }
-function qaOnPolicyInput(){qaSyncDraftFromDom();qaRefreshPkgPrices();}
-function qaAddPackage(){qaSyncDraftFromDom().packages.push({id:'pkg_'+uid(),tokens:5,bonus:0,active:true,order:S.qa.draft.packages.length,discountType:'none',discountValue:0});renderQa();}
-function qaRemovePackage(i){const d=qaSyncDraftFromDom();d.packages.splice(i,1);renderQa();}
-function qaResetPolicy(){S.qa.draft=null;renderQa();}
+function qaOnPolicyInput(){S.qa.draftDirty=true;qaSyncDraftFromDom();qaRefreshPkgPrices();}
+function qaOnPolicyChange(){S.qa.draftDirty=true;qaSyncDraftFromDom();renderQa();}
+function qaAddPackage(){S.qa.draftDirty=true;qaSyncDraftFromDom().packages.push({id:'pkg_'+uid(),tokens:5,bonus:0,active:true,order:S.qa.draft.packages.length,discountType:'none',discountValue:0});renderQa();}
+function qaRemovePackage(i){S.qa.draftDirty=true;const d=qaSyncDraftFromDom();d.packages.splice(i,1);renderQa();}
+function qaResetPolicy(){S.qa.draft=null;S.qa.draftDirty=false;renderQa();}
 
 function qaAdminPolicyHtml(){
+  if(!S.qa.policyLoaded)return '<div class="card"><p style="font-size:13px;color:#6b7280">설정을 불러오는 중…</p></div>';
   const d=qaPolicyDraft();
   const pkgRows=d.packages.map((p,i)=>`<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;align-items:end">
         <div class="fg" style="margin:0"><label class="fl">토큰 수</label><input class="fi" id="qa-pk-tokens-${i}" type="number" min="1" inputmode="numeric" value="${p.tokens}" oninput="qaOnPolicyInput()"></div>
         <div class="fg" style="margin:0"><label class="fl">보너스 토큰</label><input class="fi" id="qa-pk-bonus-${i}" type="number" min="0" inputmode="numeric" value="${p.bonus||0}" oninput="qaOnPolicyInput()"></div>
         <div class="fg" style="margin:0"><label class="fl">할인 방식</label>
-          <select class="fi fsel" id="qa-pk-dtype-${i}" onchange="qaSyncDraftFromDom();renderQa()">
+          <select class="fi fsel" id="qa-pk-dtype-${i}" onchange="qaOnPolicyChange()">
             <option value="none" ${p.discountType==='none'?'selected':''}>없음</option>
             <option value="percent" ${p.discountType==='percent'?'selected':''}>정률(%)</option>
             <option value="amount" ${p.discountType==='amount'?'selected':''}>정액(원)</option>
           </select></div>
         <div class="fg" style="margin:0"><label class="fl">할인 값</label><input class="fi" id="qa-pk-dval-${i}" type="number" min="0" inputmode="numeric" value="${p.discountValue}" ${p.discountType==='none'?'disabled':''} oninput="qaOnPolicyInput()"></div>
-        <div class="fg" style="margin:0"><label class="fl">정렬</label><input class="fi" id="qa-pk-order-${i}" type="number" inputmode="numeric" value="${p.order}" oninput="qaSyncDraftFromDom()"></div>
+        <div class="fg" style="margin:0"><label class="fl">정렬</label><input class="fi" id="qa-pk-order-${i}" type="number" inputmode="numeric" value="${p.order}" oninput="qaOnPolicyInput()"></div>
         <div class="fg" style="margin:0"><label class="fl">노출</label>
-          <label style="display:flex;align-items:center;gap:6px;height:40px;font-size:13px"><input type="checkbox" id="qa-pk-active-${i}" ${p.active?'checked':''} onchange="qaSyncDraftFromDom()"> 활성</label></div>
+          <label style="display:flex;align-items:center;gap:6px;height:40px;font-size:13px"><input type="checkbox" id="qa-pk-active-${i}" ${p.active?'checked':''} onchange="qaOnPolicyChange()"> 활성</label></div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
         <span id="qa-pk-sum-${i}" style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">${qaPkgSummaryHtml(p,d.unitPrice)}</span>
@@ -4013,8 +4017,8 @@ function qaAdminPolicyHtml(){
   return `<div class="card" style="margin-bottom:12px">
     <p style="font-size:15px;font-weight:700;margin-bottom:12px">토큰 정책</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
-      <div class="fg" style="margin:0"><label class="fl">신규 학생 기본 지급 (개)</label><input class="fi" id="qa-p-signup" type="number" min="0" inputmode="numeric" value="${d.signupGrant}" oninput="qaSyncDraftFromDom()"></div>
-      <div class="fg" style="margin:0"><label class="fl">질문 스레드 1개 차감 (개)</label><input class="fi" id="qa-p-cost" type="number" min="0" inputmode="numeric" value="${d.questionCost}" oninput="qaSyncDraftFromDom()"></div>
+      <div class="fg" style="margin:0"><label class="fl">신규 학생 기본 지급 (개)</label><input class="fi" id="qa-p-signup" type="number" min="0" inputmode="numeric" value="${d.signupGrant}" oninput="qaOnPolicyInput()"></div>
+      <div class="fg" style="margin:0"><label class="fl">질문 스레드 1개 차감 (개)</label><input class="fi" id="qa-p-cost" type="number" min="0" inputmode="numeric" value="${d.questionCost}" oninput="qaOnPolicyInput()"></div>
       <div class="fg" style="margin:0"><label class="fl">1토큰 단가 (원)</label><input class="fi" id="qa-p-unit" type="number" min="0" inputmode="numeric" value="${d.unitPrice}" oninput="qaOnPolicyInput()"></div>
     </div>
     <p style="font-size:11px;color:#9ca3af">기본 지급량은 앞으로 등록되는 학생부터 적용됩니다. 이미 등록된 학생은 [학생 잔액] 탭에서 일괄 지급하세요.</p>
@@ -4092,7 +4096,7 @@ async function qaDelQuestion(id){
 async function qaRequestPayment(pkgId){
   const p=qaPackages(true).find(x=>x.id===pkgId);if(!p)return;
   const label=p.bonus?`${p.tokens}토큰 + 보너스 ${p.bonus}토큰`:`${p.tokens}토큰`;
-  if(!(await confirmDialog({title:'결제 요청',message:`${label}을 ${fmtWon(p.amount)}에 요청합니다.\n선생님이 확인 후 결제선생으로 결제 링크를 보내드립니다.\n\n토큰을 한 개라도 사용하면 환불되지 않습니다.`,confirmLabel:'요청하기'})))return;
+  if(!(await confirmDialog({title:'결제 요청',message:`${label}을 ${fmtWon(p.amount)}에 요청합니다.\n확인 후 결제선생으로 결제 링크를 보내드립니다.\n\n토큰을 한 개라도 사용하면 환불되지 않습니다.`,confirmLabel:'요청하기'})))return;
   showLoad(true);
   try{await qaCall('requestPayment',{packageId:pkgId});toast('결제 요청을 보냈습니다.','success');}
   catch(e){toast(e.message,'error');}
@@ -4136,7 +4140,7 @@ async function qaSavePolicy(){
   showLoad(true);
   try{
     await qaCall('savePolicy',d);
-    S.qa.draft=null;
+    S.qa.draft=null;S.qa.draftDirty=false;
     toast('저장되었습니다.','success');
     renderQa();
   }catch(e){toast(e.message,'error');}
