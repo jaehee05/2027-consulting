@@ -895,7 +895,7 @@ const S = {
   popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false, scoreGradeTab:'',
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
   posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
-  bdFilter:'all', bdModalBookingId:null, bdOpenId:null,
+  bdFilter:'all', bdModalBookingId:null, bdOpenId:null, bdReplyTo:null,
   qa:{policy:null,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',
       composerOpen:false,openId:null,stuQuery:'',draft:null,loaded:false}
 };
@@ -1970,7 +1970,7 @@ function doLogout(){
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];S.posts=[];
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
-  S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;S.bdOpenId=null;
+  S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;S.bdOpenId=null;S.bdReplyTo=null;
   S.qa={policy:null,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',composerOpen:false,openId:null,stuQuery:'',draft:null,loaded:false};
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
@@ -2744,7 +2744,11 @@ function bdNormComments(list){
     photos:bdNormPhotos(c.photos),
     ts:c.ts||Date.now(),
     anon:!!c.anon,
-    nick:c.nick||''
+    nick:c.nick||'',
+    anonNo:Math.max(0,Math.floor(Number(c.anonNo)||0)),
+    parentId:c.parentId||'',
+    likes:Array.isArray(c.likes)?c.likes.filter(x=>typeof x==='string'):[],
+    reports:(Array.isArray(c.reports)?c.reports:[]).map(r=>({byId:r.byId||'',byName:r.byName||'',ts:r.ts||Date.now()}))
   }));
 }
 function bdPhotosHtml(photos){
@@ -2785,6 +2789,97 @@ function bdRerenderDraftPreview(scopeKey,kind){
 }
 
 /* ── 렌더 ── */
+/* ── 익명 번호 ──
+   에브리타임처럼 한 글 안에서 익명 댓글에 익명1, 익명2… 를 붙인다. 같은 사람이 여러 번 달면
+   같은 번호를 유지해야 하므로 글쓴이별로 번호를 기억해 두고, 글쓴이 본인은 '익명(글쓴이)'로 구분한다. */
+function bdAnonNoFor(q,authorId){
+  const seen=new Map();
+  let n=0;
+  for(const c of bdComments(q)){
+    if(!c.anon||!c.authorId)continue;
+    if(c.authorId===q.authorId)continue;
+    if(!seen.has(c.authorId))seen.set(c.authorId,++n);
+  }
+  if(authorId===q.authorId)return 0;
+  return seen.has(authorId)?seen.get(authorId):n+1;
+}
+function bdCommentName(q,c){
+  const isAdminCmt=c.role==='admin';
+  if(isAdminCmt){
+    if(bdIsStaff())return escapeHtml(c.name||'관리자');
+    return c.name&&c.name!=='관리자'?escapeHtml(c.name)+' 선생님':'선생님';
+  }
+  if(!c.anon)return escapeHtml(c.name||'');
+  const label=c.authorId===q.authorId?'익명(글쓴이)':'익명'+(c.anonNo||bdAnonNoFor(q,c.authorId));
+  return label+(bdIsStaff()&&c.name?`<span style="color:#9ca3af;font-weight:400"> (${escapeHtml(c.name)})</span>`:'');
+}
+
+const BD_AVATAR='<span style="display:inline-flex;width:28px;height:28px;border-radius:50%;background:#e5e7eb;align-items:center;justify-content:center;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="#9ca3af"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8z"/></svg></span>';
+const BD_AVATAR_SM='<span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:#e5e7eb;align-items:center;justify-content:center;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="#9ca3af"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8z"/></svg></span>';
+
+function bdAbsTs(ts){
+  if(!ts)return '';
+  const d=new Date(ts),p=n=>String(n).padStart(2,'0');
+  return `${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/* ── 공감 · 스크랩 · 신고 ──
+   posts 는 클라이언트 쓰기가 열려 있어 여기서 바로 토글한다. 숫자 대신 누른 사람 id 배열을 들고 있어야
+   같은 사람이 두 번 눌러도 부풀지 않는다. */
+function bdLikes(q){return Array.isArray(q.likes)?q.likes:[];}
+function bdScraps(q){return Array.isArray(q.scraps)?q.scraps:[];}
+function bdReports(q){return Array.isArray(q.reports)?q.reports:[];}
+function bdLiked(q){const me=bdMyId();return !!me&&bdLikes(q).includes(me);}
+function bdScrapped(q){const me=bdMyId();return !!me&&bdScraps(q).includes(me);}
+function bdReported(q){const me=bdMyId();return bdReports(q).some(r=>r.byId===me);}
+async function bdToggleArr(id,field,ev){
+  if(ev)ev.stopPropagation();
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  const me=bdMyId();if(!me)return;
+  const has=(field==='likes'?bdLikes(q):bdScraps(q)).includes(me);
+  const fv=firebase.firestore.FieldValue;
+  try{await db.collection('posts').doc(id).update({[field]:has?fv.arrayRemove(me):fv.arrayUnion(me)});}
+  catch(e){toast('처리 실패: '+e.message,'error');}
+}
+function bdToggleLike(id,ev){return bdToggleArr(id,'likes',ev);}
+function bdToggleScrap(id,ev){return bdToggleArr(id,'scraps',ev);}
+async function bdReportPost(id){
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  if(bdReported(q)){toast('이미 신고한 글입니다.','warn');return;}
+  if(!(await confirmDialog({title:'글 신고',message:'이 글을 신고하시겠습니까? 선생님이 확인합니다.',confirmLabel:'신고',kind:'danger'})))return;
+  try{
+    await db.collection('posts').doc(id).update({
+      reports:firebase.firestore.FieldValue.arrayUnion({byId:bdMyId(),byName:bdMyName(),ts:Date.now()})
+    });
+    toast('신고했습니다.','success');
+  }catch(e){toast('신고 실패: '+e.message,'error');}
+}
+async function bdReportComment(id,cid){
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  const me=bdMyId();
+  const target=bdComments(q).find(c=>c._id===cid);if(!target)return;
+  if((target.reports||[]).some(r=>r.byId===me)){toast('이미 신고한 댓글입니다.','warn');return;}
+  if(!(await confirmDialog({title:'댓글 신고',message:'이 댓글을 신고하시겠습니까? 선생님이 확인합니다.',confirmLabel:'신고',kind:'danger'})))return;
+  try{
+    const next=bdNormComments(bdComments(q).map(c=>c._id!==cid?c:{...c,reports:[...(c.reports||[]),{byId:me,byName:bdMyName(),ts:Date.now()}]}));
+    await db.collection('posts').doc(id).update({comments:next});
+    toast('신고했습니다.','success');
+  }catch(e){toast('신고 실패: '+e.message,'error');}
+}
+async function bdToggleCommentLike(id,cid){
+  const q=S.posts.find(x=>x._docId===id);if(!q)return;
+  const me=bdMyId();if(!me)return;
+  const next=bdNormComments(bdComments(q).map(c=>{
+    if(c._id!==cid)return c;
+    const l=Array.isArray(c.likes)?c.likes:[];
+    return {...c,likes:l.includes(me)?l.filter(x=>x!==me):[...l,me]};
+  }));
+  try{await db.collection('posts').doc(id).update({comments:next});}
+  catch(e){toast('처리 실패: '+e.message,'error');}
+}
+function bdStartReply(id,cid){S.bdReplyTo=cid;bdRerender();setTimeout(()=>_('bd-cmt-input-'+id)?.focus(),0);}
+function bdCancelReply(){S.bdReplyTo=null;bdRerender();}
+
 function bdLockedCardHtml(q){
   return `<div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
     <span style="font-size:14px">🔒</span>
@@ -2792,36 +2887,30 @@ function bdLockedCardHtml(q){
     <span style="font-size:11px;color:#d1d5db;margin-left:auto">${bdFmtTs(q.createdAt)}</span>
   </div>`;
 }
+
+/* ── 글 상세 ── */
 function bdPostHtml(q,ctx){
   const id=q._docId;
   const staff=ctx.staff;
   if(!bdCanRead(q))return bdLockedCardHtml(q);
-  const isStudentPost=q.authorRole!=='admin';
-  const bgCol=isStudentPost?'#eff6ff':'#fef2f2';
-  const borderCol=isStudentPost?'#bfdbfe':'#fecaca';
-  const badge=isStudentPost?'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">'+staffWord()+'</span>';
-  /* 익명 글에서 학년까지 보이면 사실상 특정되므로 관리자에게만 남긴다. */
-  const gradeChip=isStudentPost&&q.authorGrade&&(!q.anon||staff)?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:'';
-  const lock=q.secret?'<span title="비밀글" style="font-size:11px">🔒</span>':'';
-  const anonMark=q.anon?'<span title="익명" style="font-size:11px">🙈</span>':'';
-  const pin=q.pinned?'<span style="font-size:11px;color:#b45309;font-weight:700">📌 고정</span>':'';
-  const edited=q.updatedAt&&q.updatedAt>(q.createdAt||0)?'<span style="color:#9ca3af;font-size:11px">· 수정됨</span>':'';
+  const comments=bdComments(q);
+  const liked=bdLiked(q),likeCount=bdLikes(q).length;
+  const scrapped=bdScrapped(q),scrapCount=bdScraps(q).length;
   const isEditing=S.bdPostEditId&&S.bdPostEditId.id===id;
   const mine=bdCanEdit(q);
-  const editBtn=mine?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="bdStartEdit('${id}')">수정</button>`:'';
-  const delBtn=mine?`<button class="btn bd bsm" style="font-size:11px;padding:4px 10px" onclick="bdDelPost('${id}')">삭제</button>`:'';
-  const pinBtn=staff?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="bdTogglePin('${id}')">${q.pinned?'고정 해제':'고정'}</button>`:'';
+  const isStudentPost=q.authorRole!=='admin';
 
   const editScope='edit_'+id;
   let bodyHtml;
   if(isEditing){
     const keep=Array.isArray(S.bdPostEditId.keepPhotos)?S.bdPostEditId.keepPhotos:[];
-    const secretRow=q.authorRole!=='admin'?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-edit-secret-${id}" ${q.secret?'checked':''}> 🔒 비밀글 (나와 선생님만 볼 수 있어요)</label>
+    const opts=isStudentPost?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-edit-secret-${id}" ${q.secret?'checked':''}> 🔒 비밀글 (나와 선생님만 볼 수 있어요)</label>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-edit-anon-${id}" ${q.anon?'checked':''} onchange="_('bd-edit-nick-${id}').style.display=this.checked?'':'none'"> 🙈 익명으로 표시</label>
       <input class="fi" id="bd-edit-nick-${id}" style="margin-top:6px;display:${q.anon?'':'none'}" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(q.authorNick||bdMyNick())}">`:'';
     bodyHtml=`<div>
-      <textarea class="fi ta" id="bd-edit-input-${id}" rows="4">${escapeHtml(q.body||'')}</textarea>
-      ${secretRow}
+      <input class="fi" id="bd-edit-title-${id}" maxlength="60" placeholder="제목" value="${escapeHtml(q.title||'')}" style="margin-bottom:8px;font-weight:700">
+      <textarea class="fi ta" id="bd-edit-input-${id}" rows="6">${escapeHtml(q.body||'')}</textarea>
+      ${opts}
       <div style="margin-top:8px;font-size:11px;color:#6b7280">기존 사진:</div>
       ${keep.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${keep.map((ph,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb"><img src="${ph.url}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="bdRemoveExistingPhoto('${id}',${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('')}</div>`:'<p style="font-size:11px;color:#9ca3af;margin-top:4px">없음</p>'}
       <div style="margin-top:8px">
@@ -2834,66 +2923,119 @@ function bdPostHtml(q,ctx){
       </div>
     </div>`;
   }else{
-    bodyHtml=`<p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6;margin-top:6px">${escapeHtml(q.body||'')}</p>${bdPhotosHtml(q.photos)}`;
+    bodyHtml=`${q.title?`<h2 style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0 10px;word-break:break-word">${escapeHtml(q.title)}</h2>`:''}
+      <p style="font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word">${escapeHtml(q.body||'')}</p>${bdPhotosHtml(q.photos)}`;
   }
 
-  const comments=bdComments(q);
-  const liked=bdLiked(q),likeCount=bdLikes(q).length;
-  const commentsHtml=comments.map(c=>{
-    const isAdminCmt=c.role==='admin';
-    const canDel=staff||(c.authorId&&c.authorId===bdMyId());
-    const cBadge=isAdminCmt?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">'+staffWord()+'</span>':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
-    const cDel=canDel?`<button onclick="bdDelComment('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1" title="삭제">×</button>`:'';
-    const cAccent=isAdminCmt?'#dc2626':'#3b82f6';
-    return `<div style="border-left:3px solid ${cAccent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px">${cBadge}<b>${bdShowName(c)}</b><span style="color:#9ca3af">· ${bdFmtTs(c.ts)}</span></div>
-        ${cDel}
-      </div>
-      <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body||'')}</p>
-      ${bdPhotosHtml(c.photos)}
-    </div>`;
-  }).join('');
+  const editBtn=mine?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="bdStartEdit('${id}')">수정</button>`:'';
+  const delBtn=mine?`<button class="btn bd bsm" style="font-size:11px;padding:4px 10px" onclick="bdDelPost('${id}')">삭제</button>`:'';
+  const pinBtn=staff?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="bdTogglePin('${id}')">${q.pinned?'고정 해제':'고정'}</button>`:'';
+  const reportBtn=mine?'':`<button onclick="bdReportPost('${id}')" style="background:none;border:none;color:#9ca3af;font-size:12px;cursor:pointer;padding:2px 4px">신고</button>`;
+  const reportMark=staff&&bdReports(q).length?`<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">신고 ${bdReports(q).length}</span>`:'';
 
+  const head=`<div style="display:flex;align-items:flex-start;gap:10px">
+    ${BD_AVATAR}
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        ${q.pinned?'<span style="font-size:11px;color:#b45309;font-weight:700">📌 고정</span>':''}
+        <b style="font-size:13px;color:${isStudentPost?'#111827':'#dc2626'}">${bdShowName(q)}</b>
+        ${isStudentPost&&q.authorGrade&&(!q.anon||staff)?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:''}
+        ${q.secret?'<span title="비밀글" style="font-size:11px">🔒</span>':''}
+        ${reportMark}
+      </div>
+      <p style="font-size:11px;color:#9ca3af;margin-top:2px">${bdAbsTs(q.createdAt)}${q.updatedAt&&q.updatedAt>(q.createdAt||0)?' · 수정됨':''}</p>
+    </div>
+    ${isEditing?'':`<div style="display:flex;gap:6px;align-items:center">${reportBtn}${pinBtn}${editBtn}${delBtn}</div>`}
+  </div>`;
+
+  const counters=`<div style="display:flex;align-items:center;gap:14px;margin-top:14px;font-size:13px;font-weight:600">
+    <span style="color:#dc2626">👍 ${likeCount}</span>
+    <span style="color:#1C64F2">💬 ${comments.length}</span>
+    <span style="color:#f59e0b">⭐ ${scrapCount}</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button onclick="bdToggleLike('${id}',event)" style="border:1px solid ${liked?'#fca5a5':'#e5e7eb'};background:${liked?'#fee2e2':'#f9fafb'};color:${liked?'#dc2626':'#6b7280'};border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">👍 공감</button>
+    <button onclick="bdToggleScrap('${id}',event)" style="border:1px solid ${scrapped?'#fcd34d':'#e5e7eb'};background:${scrapped?'#fef3c7':'#f9fafb'};color:${scrapped?'#b45309':'#6b7280'};border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">⭐ 스크랩</button>
+  </div>`;
+
+  return `<div style="padding:4px 2px">
+    ${head}
+    ${bodyHtml}
+    ${isEditing?'':counters}
+    ${isEditing?'':bdCommentsHtml(q,staff)}
+  </div>`;
+}
+
+/* ── 댓글 · 대댓글 ── */
+function bdCommentRowHtml(q,c,staff,depth){
+  const id=q._docId;
+  const me=bdMyId();
+  const canDel=staff||(c.authorId&&c.authorId===me);
+  const mine=c.authorId===me;
+  const likes=Array.isArray(c.likes)?c.likes:[];
+  const liked=likes.includes(me);
+  const reported=(c.reports||[]).some(r=>r.byId===me);
+  const rptMark=staff&&(c.reports||[]).length?`<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">신고 ${c.reports.length}</span>`:'';
+  return `<div style="padding:12px 0 12px ${depth?'34px':'0'};border-top:1px solid #f1f3f5">
+    <div style="display:flex;align-items:flex-start;gap:8px">
+      ${BD_AVATAR_SM}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${depth?'<span style="color:#9ca3af;font-size:12px">↳</span>':''}
+          <b style="font-size:12px">${bdCommentName(q,c)}</b>${rptMark}
+        </div>
+        <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.65;margin-top:5px;word-break:break-word">${escapeHtml(c.body||'')}</p>
+        ${bdPhotosHtml(c.photos)}
+        <p style="font-size:11px;color:#9ca3af;margin-top:6px">${bdAbsTs(c.ts)}</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+        ${depth?'':`<button onclick="bdStartReply('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:12px;cursor:pointer;padding:2px 3px">대댓글</button>`}
+        <button onclick="bdToggleCommentLike('${id}','${c._id}')" style="background:none;border:none;color:${liked?'#dc2626':'#9ca3af'};font-size:12px;cursor:pointer;padding:2px 3px;font-weight:${liked?'700':'400'}">공감${likes.length?' '+likes.length:''}</button>
+        ${mine?'':`<button onclick="bdReportComment('${id}','${c._id}')" style="background:none;border:none;color:${reported?'#dc2626':'#9ca3af'};font-size:12px;cursor:pointer;padding:2px 3px">신고</button>`}
+        ${canDel?`<button onclick="bdDelComment('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 3px" title="삭제">×</button>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+function bdCommentsHtml(q,staff){
+  const id=q._docId;
+  const all=bdComments(q);
+  const roots=all.filter(c=>!c.parentId);
+  const rows=roots.map(c=>bdCommentRowHtml(q,c,staff,0)+all.filter(r=>r.parentId===c._id).map(r=>bdCommentRowHtml(q,r,staff,1)).join('')).join('');
+  const orphan=all.filter(c=>c.parentId&&!roots.some(r=>r._id===c.parentId)).map(c=>bdCommentRowHtml(q,c,staff,0)).join('');
+
+  const replyTo=S.bdReplyTo&&all.find(c=>c._id===S.bdReplyTo);
   const cScope='cmt_'+id;
-  const cPlaceholder=staff?'학생에게 댓글로 답변하기':'추가 질문이나 코멘트 남기기';
-  const cAnonRow=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-cmt-anon-${id}" onchange="_('bd-cmt-nick-${id}').style.display=this.checked?'':'none'"> 🙈 익명으로 작성</label>
-    <input class="fi" id="bd-cmt-nick-${id}" style="margin-top:6px;display:none" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(bdMyNick())}">`;
-  const commentInputHtml=`<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb">
-    <textarea class="fi ta" id="bd-cmt-input-${id}" rows="2" placeholder="${cPlaceholder}"></textarea>
-    ${cAnonRow}
-    <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${cScope}','comment')"></label>
-      <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="bdAddComment('${id}')">댓글 등록</button>
+  const anonRow=staff?'':`<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;cursor:pointer;white-space:nowrap"><input type="checkbox" id="bd-cmt-anon-${id}" checked> 익명</label>`;
+  const input=`<div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:4px">
+    ${replyTo?`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#1C64F2;margin-bottom:6px"><span>↳ ${bdCommentName(q,replyTo)}에게 대댓글</span><button onclick="bdCancelReply()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:12px">취소</button></div>`:''}
+    <textarea class="fi ta" id="bd-cmt-input-${id}" rows="2" placeholder="댓글을 입력하세요."></textarea>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${cScope}','comment')"></label>
+      ${anonRow}
+      <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="bdAddComment('${id}')">등록</button>
     </div>
     <div id="bd-draft-anchor-comment-${cScope}">${bdDraftPreviewHtml(cScope,'comment')}</div>
   </div>`;
 
-  return `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:10px;padding:12px 14px;margin-bottom:14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;flex-wrap:wrap">${pin}${badge}<b>${bdShowName(q)}</b>${gradeChip}${lock}${anonMark}<span style="color:#9ca3af">· ${bdFmtTs(q.createdAt)}</span>${edited}</div>
-      ${isEditing?'':`<div style="display:flex;gap:6px">${pinBtn}${editBtn}${delBtn}</div>`}
-    </div>
-    ${bodyHtml}
-    ${isEditing?'':`<div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(0,0,0,.05)">
-      <button onclick="bdToggleLike('${id}',event)" style="border:1px solid ${liked?'#fca5a5':'#e5e7eb'};background:${liked?'#fee2e2':'#fff'};color:${liked?'#dc2626':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer">♥ 공감 ${likeCount}</button>
-      <span style="font-size:12px;color:#9ca3af">💬 댓글 ${comments.length}</span>
-    </div>`}
-    ${comments.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:12px 0 6px">댓글 (${comments.length})</p>${commentsHtml}`:''}
-    ${commentInputHtml}
+  return `<div style="margin-top:16px">
+    ${all.length?rows+orphan:'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:16px 0;border-top:1px solid #f1f3f5">첫 댓글을 남겨보세요.</p>'}
+    ${input}
   </div>`;
 }
+
 function bdComposerHtml(){
   const staff=bdIsStaff();
   const scope='new';
   if(!S.bdComposerOpen)return '';
-  const secretRow=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-new-secret"> 🔒 비밀글로 올리기 (나와 선생님만 볼 수 있어요)</label>
-    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-new-anon" onchange="_('bd-new-nick').style.display=this.checked?'':'none'"> 🙈 익명으로 올리기</label>
-    <input class="fi" id="bd-new-nick" style="margin-top:6px;display:none" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(bdMyNick())}">`;
+  const opts=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-new-secret"> 🔒 비밀글로 올리기 (나와 선생님만 볼 수 있어요)</label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-new-anon" checked onchange="_('bd-new-nick').style.display=this.checked?'':'none'"> 🙈 익명으로 올리기</label>
+    <input class="fi" id="bd-new-nick" style="margin-top:6px" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(bdMyNick())}">`;
   return `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
     <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 글 작성</p>
-    <textarea class="fi ta" id="bd-new-input" rows="4" placeholder="${staff?'학생들에게 안내할 내용을 입력하세요':'예) 수학 미적분 단원이 어려워요'}"></textarea>
-    ${secretRow}
+    <input class="fi" id="bd-new-title" maxlength="60" placeholder="제목" style="margin-bottom:8px;font-weight:700">
+    <textarea class="fi ta" id="bd-new-input" rows="5" placeholder="${staff?'학생들에게 안내할 내용을 입력하세요':'자유롭게 이야기해 보세요'}"></textarea>
+    ${opts}
     <div style="margin-top:8px">
       <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${scope}','post')"></label>
       <span style="font-size:11px;color:#9ca3af;margin-left:8px">최대 8MB, JPEG/PNG</span>
@@ -2905,10 +3047,11 @@ function bdComposerHtml(){
     </div>
   </div>`;
 }
-const BD_FILTERS=[{id:'all',label:'전체'},{id:'mine',label:'내 글'}];
+
+const BD_FILTERS=[{id:'all',label:'전체'},{id:'mine',label:'내 글'},{id:'scrap',label:'스크랩'},{id:'reported',label:'신고됨',staffOnly:true}];
 function bdFilterBarHtml(){
   const cur=S.bdFilter||'all';
-  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${BD_FILTERS.map(f=>{
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${BD_FILTERS.filter(f=>!f.staffOnly||bdIsStaff()).map(f=>{
     const on=cur===f.id;
     return `<button onclick="bdSetFilter('${f.id}')" style="border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#1C64F2':'#fff'};color:${on?'#fff':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${f.label}</button>`;
   }).join('')}</div>`;
@@ -2918,32 +3061,16 @@ function bdFilteredPosts(){
   let list=S.posts.filter(q=>bdIsStaff()||bdCanRead(q)||q.secret);
   const f=S.bdFilter||'all';
   if(f==='mine')list=list.filter(q=>q.authorId===me);
+  else if(f==='scrap')list=list.filter(q=>bdScraps(q).includes(me));
+  else if(f==='reported')list=list.filter(q=>bdReports(q).length||bdComments(q).some(c=>(c.reports||[]).length));
   if(f!=='all')list=list.filter(q=>bdCanRead(q));
   return bdSorted(list);
 }
 
-/* ── 공감 ──
-   posts 는 클라이언트 쓰기가 열려 있어 여기서 바로 토글한다. 누른 사람 id 를 배열로 들고 있어야
-   같은 사람이 두 번 눌러도 숫자가 부풀지 않는다. */
-function bdLikes(q){return Array.isArray(q.likes)?q.likes:[];}
-function bdLiked(q){const me=bdMyId();return !!me&&bdLikes(q).includes(me);}
-async function bdToggleLike(id,ev){
-  if(ev)ev.stopPropagation();
-  const q=S.posts.find(x=>x._docId===id);if(!q)return;
-  const me=bdMyId();if(!me)return;
-  const fv=firebase.firestore.FieldValue;
-  try{
-    await db.collection('posts').doc(id).update({
-      likes:bdLiked(q)?fv.arrayRemove(me):fv.arrayUnion(me)
-    });
-  }catch(e){toast('처리 실패: '+e.message,'error');}
-}
-
-/* ── 목록(피드) ──
-   에브리타임처럼 한 줄짜리 카드로 훑고, 눌러서 상세로 들어간다. */
+/* ── 목록(피드) ── */
 function bdPreviewText(q){
   const t=(q.body||'').replace(/\s+/g,' ').trim();
-  return t.length>90?t.slice(0,90)+'…':t;
+  return t.length>80?t.slice(0,80)+'…':t;
 }
 function bdFeedRowHtml(q){
   const id=q._docId;
@@ -2952,19 +3079,22 @@ function bdFeedRowHtml(q){
       <span>🔒</span><span>비밀글입니다.</span><span style="margin-left:auto;font-size:11px;color:#d1d5db">${bdFmtTs(q.createdAt)}</span></div>`;
   }
   const cmts=bdComments(q).length;
-  const likes=bdLikes(q).length;
   const thumb=(q.photos||[])[0];
   const isAdminPost=q.authorRole==='admin';
-  const nameLine=`${q.pinned?'<span style="color:#b45309;font-weight:700">📌 </span>':''}${bdShowName(q)}`;
+  const rpt=bdIsStaff()&&(bdReports(q).length||bdComments(q).some(c=>(c.reports||[]).length))
+    ?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">신고</span>':'';
   return `<div onclick="bdOpen('${id}')" style="border-bottom:1px solid #f1f3f5;padding:14px 4px;cursor:pointer;display:flex;gap:12px;align-items:flex-start">
     <div style="flex:1;min-width:0">
-      <p style="font-size:14px;color:#111827;line-height:1.5;margin-bottom:6px;word-break:break-word">${escapeHtml(bdPreviewText(q))||'<span style="color:#9ca3af">(사진)</span>'}</p>
+      ${q.title?`<p style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;word-break:break-word">${q.pinned?'📌 ':''}${escapeHtml(q.title)}${rpt}</p>`:''}
+      <p style="font-size:13px;color:${q.title?'#6b7280':'#111827'};line-height:1.5;margin-bottom:6px;word-break:break-word">${escapeHtml(bdPreviewText(q))||'<span style="color:#9ca3af">(사진)</span>'}</p>
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;flex-wrap:wrap">
-        <span style="color:${isAdminPost?'#dc2626':'#6b7280'};font-weight:600">${nameLine}</span>
+        <span style="color:${isAdminPost?'#dc2626':'#6b7280'};font-weight:600">${q.title?'':(q.pinned?'📌 ':'')}${bdShowName(q)}</span>
         <span>·</span><span>${bdFmtTs(q.createdAt)}</span>
         ${q.secret?'<span title="비밀글">🔒</span>':''}
-        <span style="margin-left:4px;color:#dc2626;font-weight:600">♥ ${likes}</span>
+        ${q.title?'':rpt}
+        <span style="margin-left:4px;color:#dc2626;font-weight:600">👍 ${bdLikes(q).length}</span>
         <span style="color:#1C64F2;font-weight:600">💬 ${cmts}</span>
+        ${bdScraps(q).length?`<span style="color:#f59e0b;font-weight:600">⭐ ${bdScraps(q).length}</span>`:''}
       </div>
     </div>
     ${thumb?`<img src="${thumb.url}" alt="" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;flex-shrink:0">`:''}
@@ -2989,12 +3119,10 @@ function bdListHtml(){
   ${S.bdComposerOpen?'':`<button class="bd-fab" onclick="bdOpenComposer()" aria-label="글쓰기" title="글쓰기">✏️ 글쓰기</button>`}`;
 }
 
-/* ── 상세 ── */
 function bdDetailHtml(q){
   return `<button class="btn bs bsm" style="margin-bottom:12px" onclick="bdCloseDetail()">← 목록</button>
   <div class="card">${bdPostHtml(q,{staff:bdIsStaff(),detail:true})}</div>`;
 }
-
 function bdBoardHtml(){
   if(S.bdOpenId){
     const q=S.posts.find(x=>x._docId===S.bdOpenId);
@@ -3003,14 +3131,14 @@ function bdBoardHtml(){
   }
   return bdListHtml();
 }
-function bdOpen(id){S.bdOpenId=id;S.bdComposerOpen=false;bdRerender();try{window.scrollTo({top:0});}catch(_){}}
-function bdCloseDetail(){S.bdOpenId=null;S.bdPostEditId=null;bdRerender();}
+function bdOpen(id){S.bdOpenId=id;S.bdComposerOpen=false;S.bdReplyTo=null;bdRerender();try{window.scrollTo({top:0});}catch(_){}}
+function bdCloseDetail(){S.bdOpenId=null;S.bdPostEditId=null;S.bdReplyTo=null;bdRerender();}
 
 /* 멘토링 상세·예약 상세·태블릿에 붙는 한 학생 전용 섹션. 작성은 게시판에서만 하고 여기서는 답변만 단다. */
 function bdStudentSectionHtml(studentId,ctx){
   const staff=ctx?.staff??bdIsStaff();
   const list=bdSorted(S.posts.filter(q=>q.authorId===studentId&&q.authorRole!=='admin'));
-  const body=list.length?list.map(q=>bdPostHtml(q,{staff,detail:true})).join('')
+  const body=list.length?list.map(q=>`<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:12px">${bdPostHtml(q,{staff,detail:true})}</div>`).join('')
     :'<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">이 학생이 작성한 글이 없습니다.</div>';
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
@@ -3047,8 +3175,10 @@ function bdRemoveExistingPhoto(id,idx){
    Firestore 에만 쓰고 S.posts 갱신·재렌더는 onSnapshot 리스너에 맡긴다.
    로컬에서 직접 push/filter 하면 리스너의 즉시 발화와 겹쳐 중복 항목이 생긴다. */
 async function bdCreatePost(){
+  const title=(_('bd-new-title')?.value||'').trim();
   const txt=(_('bd-new-input')?.value||'').trim();
   const drafts=S.bdDraftFiles['new']||[];
+  if(!title){toast('제목을 입력하세요.','warn');return;}
   if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const role=bdMyRole();
   const secret=role==='student'&&!!_('bd-new-secret')?.checked;
@@ -3062,7 +3192,8 @@ async function bdCreatePost(){
     for(const f of drafts)photos.push(await bdUploadPhoto(f.file,ref.id,'post'));
     const now=Date.now();
     await ref.set({
-      body:txt,photos,secret,pinned:false,anon,authorNick:nick,
+      title:title.slice(0,60),body:txt,photos,secret,pinned:false,anon,authorNick:nick,
+      likes:[],scraps:[],reports:[],
       authorId:bdMyId(),authorRole:role,authorName:bdMyName(),authorGrade:stu?.grade||'',
       createdAt:now,updatedAt:now,comments:[]
     });
@@ -3076,6 +3207,7 @@ async function bdCreatePost(){
 }
 async function bdSaveEdit(id){
   const q=S.posts.find(x=>x._docId===id);if(!q){toast('글을 찾을 수 없습니다.','error');return;}
+  const title=(_('bd-edit-title-'+id)?.value||'').trim();
   const txt=(_('bd-edit-input-'+id)?.value||'').trim();
   const scope='edit_'+id;
   const drafts=S.bdDraftFiles[scope]||[];
@@ -3092,6 +3224,7 @@ async function bdSaveEdit(id){
     const added=[];
     for(const f of drafts)added.push(await bdUploadPhoto(f.file,id,'post'));
     const upd={body:txt,photos:[...keep,...added],updatedAt:Date.now()};
+    if(_('bd-edit-title-'+id))upd.title=title.slice(0,60);
     if(secretEl)upd.secret=!!secretEl.checked;
     if(anonEl){upd.anon=!!anonEl.checked;upd.authorNick=nick;if(anonEl.checked)await bdSaveNick(nick);}
     await db.collection('posts').doc(id).update(upd);
@@ -3128,15 +3261,17 @@ async function bdAddComment(id){
   if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const cid=uid();
   const cAnon=bdMyRole()==='student'&&!!_('bd-cmt-anon-'+id)?.checked;
-  const cNick=cAnon?((_('bd-cmt-nick-'+id)?.value||'').trim()||'익명'):'';
+  const cNick='';
+  const parentId=S.bdReplyTo&&bdComments(q).some(c=>c._id===S.bdReplyTo)?S.bdReplyTo:'';
+  const anonNo=cAnon?bdAnonNoFor(q,bdMyId()):0;
   showLoad(true);
   try{
     const photos=[];
     for(const f of drafts)photos.push(await bdUploadPhoto(f.file,id,'c_'+cid));
-    const cmt={_id:cid,role:bdMyRole(),name:bdMyName(),authorId:bdMyId(),body:txt,photos,ts:Date.now(),anon:cAnon,nick:cNick};
-    if(cAnon)await bdSaveNick(cNick);
+    const cmt={_id:cid,role:bdMyRole(),name:bdMyName(),authorId:bdMyId(),body:txt,photos,ts:Date.now(),anon:cAnon,nick:cNick,anonNo,parentId,likes:[],reports:[]};
     await db.collection('posts').doc(id).update({comments:bdNormComments([...bdComments(q),cmt])});
     delete S.bdCommentDraftFiles[scope];
+    S.bdReplyTo=null;
     bdRerender();
   }catch(e){toast('등록 실패: '+e.message,'error');}
   showLoad(false);
