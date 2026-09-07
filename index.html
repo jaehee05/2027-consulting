@@ -543,7 +543,7 @@ tr:last-child td{border-bottom:none}
 .po{display:none}
 code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;font-family:monospace}
 .empty{text-align:center;padding:36px 20px;color:var(--gray-400);font-size:13px}
-.home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:24px}
+.home-grid{display:grid;grid-template-columns:repeat(var(--home-cols,3),minmax(0,1fr));gap:16px;margin-top:24px}
 .hc-ico.purple{background:#f5f3ff;color:#7c3aed}
 #vHome{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
 #vHome .page{flex:1;width:100%}
@@ -8676,9 +8676,10 @@ function enterHome(){
     const isStu=S.user?.type==='student';
     const isAdmin=S.user?.type==='admin';
     const bdNew=bdStuNewCount();
-    if(isStu||isAdmin)items.push({ico:'💬',color:'blue',title:'자유게시판'+(bdNew>0?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':''),desc:'학생과 관리자가<br>자유롭게 소통합니다.',onclick:'goBoard()'});
+    if(isStu||isAdmin)items.push({ico:'💬',color:'blue',title:'자유게시판'+(bdNew>0?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':''),desc:'익명으로 자유롭게<br>이야기하는 공간입니다.',onclick:'goBoard()'});
     if(isStu||isAdmin)items.push({ico:'❓',color:'red',title:'질문게시판',desc:'토큰으로 질문하고<br>답변을 받습니다.',onclick:'goQa()'});
     if(isStu)items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
+    cards.style.setProperty('--home-cols',String(items.length===4?2:Math.min(items.length,3)));
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
       <div class="hc-ico ${it.color}">${it.ico}</div>
       <div class="hc-title">${it.title}</div>
