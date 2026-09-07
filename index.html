@@ -3392,7 +3392,7 @@ function goQa(){
 
 const QA_SUBS_STU=[{id:'q',label:'내 질문'},{id:'t',label:'토큰·결제'}];
 const QA_SUBS_ADM=[{id:'q',label:'질문'},{id:'p',label:'결제 요청'},{id:'b',label:'학생 잔액'},{id:'s',label:'토큰 설정'}];
-function qaSetSub(id){S.qa.sub=id;renderQa();try{window.scrollTo({top:0});}catch(_){}}
+function qaSetSub(id){S.qa.sub=id;S.qa.openId=null;renderQa();try{window.scrollTo({top:0});}catch(_){}}
 function renderQa(){
   const el=_('qaC');if(!el)return;
   if(_('vQa').classList.contains('hidden'))return;
@@ -3413,11 +3413,19 @@ function renderQa(){
 /* ── 질문 목록 (학생=내 것만, 관리자=전체) ── */
 const QA_FILTERS=[{id:'all',label:'전체'},{id:'pending',label:'답변대기'},{id:'answered',label:'답변완료'}];
 function qaSetFilter(f){S.qa.filter=f;renderQa();}
-function qaToggleOpen(id){S.qa.openId=S.qa.openId===id?null:id;renderQa();}
-function qaOpenComposer(){S.qa.composerOpen=true;renderQa();}
+function qaOpen(id){S.qa.openId=id;S.qa.composerOpen=false;renderQa();try{window.scrollTo({top:0});}catch(_){}}
+function qaCloseDetail(){S.qa.openId=null;renderQa();}
+function qaOpenComposer(){S.qa.composerOpen=true;S.qa.openId=null;renderQa();}
 function qaCloseComposer(){S.qa.composerOpen=false;delete S.bdDraftFiles['qa_new'];renderQa();}
 
 function qaQuestionsHtml(admin){
+  /* 상세는 자유게시판과 같이 목록을 밀어내고 한 화면을 차지한다. */
+  if(S.qa.openId){
+    const q=S.qa.questions.find(x=>x._docId===S.qa.openId);
+    if(q&&(admin||q.authorId===S.studentDocId))return qaDetailHtml(q,admin);
+    S.qa.openId=null;
+  }
+
   const f=S.qa.filter||'all';
   const list=S.qa.questions
     .filter(q=>admin||q.authorId===S.studentDocId)
@@ -3465,30 +3473,43 @@ function qaQuestionsHtml(admin){
     </div>
   </div>`:'';
 
-  const empty=`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">${
+  const empty=`<div style="padding:40px 18px;text-align:center;color:#9ca3af;font-size:13px">${
     admin?'조건에 맞는 질문이 없습니다.':(f==='all'?'아직 남긴 질문이 없습니다.':'조건에 맞는 질문이 없습니다.')}</div>`;
 
-  return `<div class="card" style="margin-bottom:12px">
+  return `<div class="card" style="margin-bottom:12px;padding-bottom:6px">
     ${head}${filters}${composer}
-    ${list.length?list.map(q=>qaQuestionCardHtml(q,admin)).join(''):empty}
+    ${list.length?list.map(q=>qaFeedRowHtml(q,admin)).join(''):empty}
   </div>`;
 }
 
-function qaQuestionCardHtml(q,admin){
+/* 목록 한 줄 — 제목과 본문 앞부분만. 본문은 CSS 로 두 줄에서 자른다. */
+function qaFeedRowHtml(q,admin){
   const id=q._docId;
-  const open=S.qa.openId===id;
-  const cmts=Array.isArray(q.comments)?q.comments:[];
-  const who=admin?`<b>${escapeHtml(q.authorName||'')}</b>${q.authorGrade?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:''}`:'';
-  const headline=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-    ${qaChip(QA_Q_STATUS,q.status)}${who}
-    <b style="font-size:13px">${escapeHtml(q.title||'')}</b>
-    <span style="font-size:11px;color:#9ca3af;margin-left:auto">${bdFmtTs(q.createdAt)}${cmts.length?` · 댓글 ${cmts.length}`:''}</span>
+  const cmts=(Array.isArray(q.comments)?q.comments:[]).length;
+  const thumb=(q.photos||[])[0];
+  const who=admin?`<span style="font-weight:600;color:#6b7280">${escapeHtml(q.authorName||'')}${q.authorGrade?' '+escapeHtml(q.authorGrade):''}</span><span>·</span>`:'';
+  return `<div onclick="qaOpen('${id}')" style="border-bottom:1px solid #f1f3f5;padding:14px 4px;cursor:pointer;display:flex;gap:12px;align-items:flex-start">
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">
+        ${qaChip(QA_Q_STATUS,q.status)}
+        <b style="font-size:14px;color:#111827;word-break:break-word">${escapeHtml(q.title||'')}</b>
+      </div>
+      <p style="font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word">${escapeHtml(q.body||'')}</p>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;flex-wrap:wrap">
+        ${who}<span>${bdFmtTs(q.createdAt)}</span>
+        ${cmts?`<span style="color:#1C64F2;font-weight:600">💬 ${cmts}</span>`:''}
+      </div>
+    </div>
+    ${thumb?`<img src="${thumb.url}" alt="" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;flex-shrink:0">`:''}
   </div>`;
-  if(!open){
-    return `<div onclick="qaToggleOpen('${id}')" style="cursor:pointer;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff">${headline}</div>`;
-  }
+}
 
+function qaDetailHtml(q,admin){
+  const id=q._docId;
+  const cmts=Array.isArray(q.comments)?q.comments:[];
   const canDel=admin||q.authorId===qaMyId();
+  const who=admin?`<b style="font-size:13px">${escapeHtml(q.authorName||'')}</b>${q.authorGrade?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:''}`:'';
+
   const cmtHtml=cmts.map(c=>{
     const isAdm=c.role==='admin';
     const accent=isAdm?'#dc2626':'#3b82f6';
@@ -3503,12 +3524,18 @@ function qaQuestionCardHtml(q,admin){
     </div>`;
   }).join('');
 
-  return `<div style="border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#f8fbff">
-    <div onclick="qaToggleOpen('${id}')" style="cursor:pointer">${headline}</div>
-    <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.7;margin-top:10px">${escapeHtml(q.body||'')}</p>
+  return `<button class="btn bs bsm" style="margin-bottom:12px" onclick="qaCloseDetail()">← 목록</button>
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      ${qaChip(QA_Q_STATUS,q.status)}${who}
+      <span style="font-size:11px;color:#9ca3af;margin-left:auto">${qaFmtDateTime(q.createdAt)}</span>
+    </div>
+    <h2 style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word">${escapeHtml(q.title||'')}</h2>
+    <p style="font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word">${escapeHtml(q.body||'')}</p>
     ${bdPhotosHtml(q.photos)}
-    ${cmts.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:14px 0 6px">댓글 (${cmts.length})</p>${cmtHtml}`:''}
-    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #d7e6ff">
+    ${cmts.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:18px 0 6px">댓글 (${cmts.length})</p>${cmtHtml}`
+      :'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:18px 0;margin-top:14px;border-top:1px solid #f1f3f5">아직 댓글이 없습니다.</p>'}
+    <div style="margin-top:10px;padding-top:12px;border-top:1px solid #e5e7eb">
       <textarea class="fi ta" id="qa-cmt-${id}" rows="2" placeholder="${admin?'학생에게 답변하기':'추가로 궁금한 점 남기기'}"></textarea>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
         <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_c_${id}','comment')"></label>
