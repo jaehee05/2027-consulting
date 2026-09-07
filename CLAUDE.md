@@ -109,25 +109,26 @@ Popup specifics:
 - `S.popupShown` makes the popup fire once per session; `doLogout` resets it (and `_popupsLoaded`) so the next login shows it again.
 - The sample 팝업 is seeded once by `popupSeedSample()` when an admin first opens the 공지사항 tab, guarded by `config.popupSeeded`. Deleting the sample must not bring it back — that flag is the guard, so don't seed off an empty-collection check.
 
-### 게시판 (`posts`)
+### 자유게시판 (`posts`)
 
-A standalone, always-open board — **not** tied to a booking. Added 2026-09-08, replacing the old 상담 전 질문 & 고민 board that lived inside each `bookings` doc as a `posts` array (that array, and the even older `question`/`comments` fields, are no longer read or written anywhere; the one legacy post left in Firestore was not migrated).
+Reached from the **home hub** as its own view (`#vBoard` / `goBoard()`), the way 상벌점 used to be — it is *not* a tab inside 멘토링. Added 2026-09-08, replacing the old 상담 전 질문 & 고민 board that lived inside each `bookings` doc as a `posts` array (that array, and the older `question`/`comments` fields, are no longer read or written; the one legacy post in Firestore was not migrated).
 
-This is the **general** board. The separate 질문 게시판 (token-gated Q&A) is its own feature with its own collections — keep the two apart: this one's code is prefixed `bd*`, that one's is `qa*`.
+This is the **free-for-all** board. The token-gated 질문 게시판 is a separate feature with its own collections — keep them apart: this one's code is prefixed `bd*`, that one's is `qa*`. Deliberately has **no 답변대기/답변완료 concept**; that belongs to the Q&A board.
 
-- **Doc**: `{body, photos[], secret, pinned, authorId, authorRole:'student'|'admin', authorName, authorGrade, createdAt, updatedAt, comments[]}`. Comments are an inline array `{_id, role, name, authorId, body, photos[], ts}` — one doc per thread, whole array rewritten on every comment.
+- **Doc**: `{body, photos[], secret, pinned, anon, authorNick, authorId, authorRole:'student'|'admin', authorName, authorGrade, createdAt, updatedAt, comments[]}`. Comments are an inline array `{_id, role, name, nick, anon, authorId, body, photos[], ts}` — one doc per thread, whole array rewritten on every comment.
 - **`authorId`** is the student's `_docId` for students and `S.user.id` for staff. Everything that asks "is this mine?" (`bdCanRead`, `bdCanEdit`, comment delete) compares against `bdMyId()`, so don't switch it to `accountId`.
-- **비밀글 is `secret:true`** — visible to the author and any staff account. Non-owners get `bdLockedCardHtml` (a 🔒 stub with only the date), never the body or the author's name. **This is client-side only**; `firestore.rules` still opens the whole collection, so a determined student could read it via the SDK.
-- Kept in sync by `startPostsListener()` (`onSnapshot`), so every CRUD handler writes to Firestore **only** and lets the listener update `S.posts` and re-render — the same rule as `notices`. Writing locally too produces duplicates.
-- `bdRerender()` is the single re-render entry point; it dispatches to the student page, the tablet, the admin tab, the 예약 상세 modal (`S.bdModalBookingId`, set by `openBookDetail` and cleared by `closeModal`), or 멘토링 상세.
-- **Two renderers**: `bdBoardHtml()` is the whole board (composer + 전체/답변대기/내 글 filter), used by both the student 게시판 tab and the admin 게시판 tab. `bdStudentSectionHtml(studentId)` is the one-student, no-composer section embedded in 멘토링 상세, 예약 상세, and the tablet.
-- Photos go to Storage under `board/<postId>/<scope>/`, matched by `storage.rules`. A new post gets its doc id from `db.collection('posts').doc()` *before* uploading so the path is stable.
-- Admin tab badge = `bdUnansweredCount()` (student posts with no admin comment). The student tab shows a red dot from `bdStuNewCount()`, which compares against a `localStorage` `bdSeen` timestamp — per-browser, like the popup dismissals.
-- The 멘토링 목록 **게시글** column and its summary chip come from `S.posts` (`_bdHas`), not from bookings any more.
+- **비밀글 (`secret:true`)** — author + staff only. Non-owners get `bdLockedCardHtml` (a 🔒 stub with only the date). **Client-side only**; `firestore.rules` still opens the collection.
+- **익명 (`anon:true`)** — the nickname is shown instead of the real name, and the 학년 chip is suppressed. `bdShowName` is the single place that decides a display name; **staff always additionally see the real name in parentheses**, same principle as 비밀글. The nickname persists on `students[].nickname` via `bdSaveNick` so it pre-fills next time.
+- Kept in sync by `startPostsListener()` (`onSnapshot`), so every CRUD handler writes to Firestore **only** and lets the listener update `S.posts` and re-render — same rule as `notices`.
+- `bdRerender()` is the single re-render entry point; it checks `#vBoard` first, then the student page, the tablet, the 예약 상세 modal (`S.bdModalBookingId`), or 멘토링 상세.
+- **Two renderers**: `bdBoardHtml()` is the whole board (composer + 전체/내 글 filter), rendered into `#boardC`. `bdStudentSectionHtml(studentId)` is the one-student, no-composer section embedded in 멘토링 상세, 예약 상세, and the tablet.
+- Photos go to Storage under `board/<postId>/<scope>/`, matched by `storage.rules`. A new post takes its doc id from `db.collection('posts').doc()` *before* uploading so the path is stable.
+- The home card shows a red dot from `bdStuNewCount()`, compared against a `localStorage` `bdSeen` timestamp stamped by `goBoard()` — per-browser, like the popup dismissals.
+- The 멘토링 목록 **게시글** column and its summary chip come from `S.posts` (`_bdHas`), not from bookings.
 
-### Student view tabs
+### 학생 화면에서 부르는 호칭
 
-The student page (`#vStu`) gained a two-tab bar (`#stuTabs`: 홈 / 게시판) on 2026-09-08. `renderStu()` renders the tab bar and then branches on `S.stuTab`; `setStuTab` also stamps `bdMarkSeen()`. **The bar is hidden while `S.scoreWizardExamId` is set** — the wizard renders into the same `#stuC`, so leaving it mid-input would discard the answers. `renderScoreWizard` calls `renderStuTabs()` for exactly that reason.
+`staffWord()` returns `'관리자'` for staff sessions and `'선생님'` for students, and every shared string that names the operator goes through it. Student-only strings say 선생님 outright. **Students must never see the word 관리자** — when adding a user-facing string, check which side sees it. Admin posts render to students as `<실명> 선생님` (or plain 선생님 when no name), via `bdShowName`.
 
 ### Printing (예약 현황)
 

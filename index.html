@@ -655,7 +655,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   <footer class="home-footer" style="text-align:center">
     <div class="home-footer-inner">
       케이제이에이치에듀 | 대표 김재희 | 사업자 등록번호 114-96-12259 |
-      주소 경기도 성남시 분당구 수내로 181, 309-101 | 고객지원 우측 하단 서포트봇 |
+      통신판매업 신고번호 2026-성남분당B-0640 | 고객지원 우측 하단 카카오톡 채널 |
       개인정보보호 책임자 김재희 | 호스팅서비스 Google Firebase
     </div>
   </footer>
@@ -711,7 +711,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
     <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="stuChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">멘토링</span></div>
     <div class="tr"><span class="uname" id="stuUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
-  <div class="page" style="max-width:660px"><div class="tabs" id="stuTabs"></div><div id="stuC"></div></div>
+  <div class="page" style="max-width:660px"><div id="stuC"></div></div>
 </div>
 
 <!-- 관리자/뷰어 뷰 -->
@@ -739,7 +739,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   <footer class="home-footer">
     <div class="home-footer-inner">
       케이제이에이치에듀 | 대표 김재희 | 사업자 등록번호 114-96-12259 |
-      주소 경기도 성남시 분당구 수내로 181, 309-101 | 고객지원 우측 하단 서포트봇 |
+      통신판매업 신고번호 2026-성남분당B-0640 | 고객지원 우측 하단 카카오톡 채널 |
       개인정보보호 책임자 김재희 | 호스팅서비스 Google Firebase
     </div>
   </footer>
@@ -763,13 +763,14 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   <div class="page" style="max-width:780px"><div id="classC"></div></div>
 </div>
 
-<!-- 상벌점 관리 -->
-<div id="vPoints" class="hidden">
+
+<!-- 자유게시판 -->
+<div id="vBoard" class="hidden">
   <div class="topbar np">
-    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" style="background:#fef2f2;color:#dc2626">상벌점</span><span class="tname">상벌점 관리</span><span class="trole">ADMIN</span></div>
-    <div class="tr"><span class="uname" id="pointsUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" style="background:#eff6ff;color:#1C64F2">자유게시판</span><span class="tname">자유게시판</span></div>
+    <div class="tr"><span class="uname" id="boardUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
-  <div class="page"><div id="pointsC"></div></div>
+  <div class="page" style="max-width:760px"><div id="boardC"></div></div>
 </div>
 
 <!-- 태블릿 -->
@@ -878,11 +879,13 @@ const S = {
   notices:[], noticeEditId:null, noticeComposerOpen:false,
   popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false, scoreGradeTab:'',
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
-  questions:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
-  bdFilter:'all', bdModalBookingId:null, stuTab:'home'
+  posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
+  bdFilter:'all', bdModalBookingId:null
 };
 
 const _=id=>document.getElementById(id);
+/* 학생 화면에서는 운영진을 '선생님'으로 부른다. 관리자/OP 화면에서만 '관리자'. */
+function staffWord(){return S.user&&S.user.type!=='student'?'관리자':'선생님';}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function fmtPhone(p){const d=p.replace(/\D/g,'');if(d.length===11)return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7);if(d.length===10)return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);return p;}
 function fmtSchool(s){s=s.trim();if(s.endsWith('고')&&!s.endsWith('등학교'))return s+'등학교';return s;}
@@ -1249,7 +1252,6 @@ const ADMIN_TABS=[
   {id:'schedule', label:'일정 관리', group:'예약',  icon:'📅', desc:'날짜·시간대와 예약 기간 설정'},
   {id:'exams',    label:'시험 관리', group:'운영',  icon:'📝', desc:'시험 추가와 등급컷'},
   {id:'notices',  label:'공지사항',  group:'운영',  icon:'📢', desc:'학생에게 보이는 공지'},
-  {id:'board',    label:'게시판',    group:'운영',  icon:'💬', desc:'학생과 함께 쓰는 자유 게시판'},
   {id:'alimtalk', label:'알림톡',    group:'운영',  icon:'📩', desc:'템플릿과 발송 설정'},
   {id:'accounts', label:'계정 관리', group:'운영',  icon:'⚙️', desc:'ADMIN / OP / TEST 계정'},
 ];
@@ -1261,7 +1263,6 @@ function adminTabList(){
 function adminTabBadge(id){
   if(id==='bookings')return pendingReqCountForAdmin();
   if(id==='students')return S.user?.type==='admin'?pendingAddStudentCount():0;
-  if(id==='board')return bdUnansweredCount();
   return 0;
 }
 function adminTabLabel(t){return (S.user?.type==='admin'?t.label:(t.opLabel||t.label));}
@@ -1433,7 +1434,7 @@ function startNoticesListener(){
 }
 function stopNoticesListener(){if(_ntListener){try{_ntListener();}catch(e){}_ntListener=null;}_ntSeedDone=false;}
 
-// 게시판(posts) 실시간 동기화. 학생·관리자 모두 [게시판] 탭에서 본다.
+// 자유게시판(posts) 실시간 동기화. 홈 허브의 [자유게시판] 화면에서 본다.
 let _bdListener=null,_bdSeedDone=false;
 function startPostsListener(){
   if(_bdListener){try{_bdListener();}catch(e){}_bdListener=null;}
@@ -1454,10 +1455,8 @@ function startPostsListener(){
     });
     _bdSeedDone=true;
     if(!changed)return;
-    // 미답변 수가 바뀌면 탭 배지도 따라가야 한다.
-    if(!isStudent)updateAdminTabs();
-    if(isStudent)safeRerenderStu();
-    else if(S.tab==='board')renderAdminBoard();
+    if(!_('vBoard').classList.contains('hidden'))renderBoardView();
+    else if(isStudent)safeRerenderStu();
     else if(S.tab==='consult'&&S.consultStuId)renderConsultDetail();
   },err=>{console.error('posts listener error',err);});
 }
@@ -1617,7 +1616,7 @@ function renderTablet(){
     _('tabletC').innerHTML=`<div class="card np" style="text-align:center;padding:80px 24px;background:linear-gradient(135deg,#f9fafb,#f3f4f6);border:1px solid #e5e7eb">
       <p style="font-size:68px;line-height:1;margin-bottom:18px">🎓</p>
       <p style="font-size:22px;font-weight:800;color:#111827;margin-bottom:10px">멘토링 대기 중</p>
-      <p style="font-size:14px;color:#6b7280;line-height:1.65">관리자가 학생을 선택하면<br>이곳에 학생 정보가 자동으로 표시됩니다.</p>
+      <p style="font-size:14px;color:#6b7280;line-height:1.65">선생님이 학생을 선택하면<br>이곳에 학생 정보가 자동으로 표시됩니다.</p>
     </div>`;
     return;
   }
@@ -1719,7 +1718,7 @@ async function endTabletSession(){
 
 var _skipPush=false;
 function showView(id){
-  ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy','vTablet','vPoints'].forEach(v=>{
+  ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy','vTablet','vBoard'].forEach(v=>{
     const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
     if(['vSetup','vLogin','vPin'].includes(v))el.style.display=v===id?'flex':'none';
   });
@@ -1951,7 +1950,7 @@ function doLogout(){
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];S.posts=[];
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
-  S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;S.stuTab='home';
+  S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   S._pendingAdmin=null;
@@ -1990,30 +1989,7 @@ async function createFirstAdmin(){
 }
 
 /* ── STUDENT ── */
-/* 학생 화면 탭 — 홈(예약·성적·멘토링)과 게시판. 게시판에 새 글/새 답변이 있으면 점을 찍는다. */
-const STU_TABS=[{id:'home',label:'홈'},{id:'board',label:'게시판'}];
-function renderStuTabs(){
-  const el=_('stuTabs');if(!el)return;
-  /* 성적 입력 마법사 중에 탭을 누르면 입력이 날아가므로 아예 숨긴다. */
-  if(S.scoreWizardExamId){el.innerHTML='';el.style.display='none';return;}
-  el.style.display='';
-  const cur=S.stuTab||'home';
-  const newCnt=bdStuNewCount();
-  el.innerHTML=STU_TABS.map(t=>{
-    const dot=t.id==='board'&&newCnt>0&&cur!=='board'
-      ?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':'';
-    return `<button class="tab ${cur===t.id?'on':''}" onclick="setStuTab('${t.id}')">${t.label}${dot}</button>`;
-  }).join('');
-}
-function setStuTab(tab){
-  S.stuTab=tab;
-  if(tab==='board')bdMarkSeen();
-  renderStu();
-  try{window.scrollTo({top:0,behavior:'smooth'});}catch(_){window.scrollTo(0,0);}
-}
 function renderStu(){
-  renderStuTabs();
-  if((S.stuTab||'home')==='board'){clearBookCountdown();_('stuC').innerHTML=bdBoardHtml();return;}
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
   const examCards=examsForStu(myStu).map(ex=>examScoreCardHtml(ex,myStu)).join('');
@@ -2041,7 +2017,7 @@ function renderStu(){
       }else if(st.kind==='after'){
         bodyHtml=`<p style="color:#6b7280;font-size:13px">예약 기간이 종료되었습니다.</p>${pl?`<p style="color:#9ca3af;font-size:12px;margin-top:4px">종료: ${pl}</p>`:''}`;
       }else{
-        bodyHtml=`<p style="color:#6b7280;font-size:13px">관리자가 예약 기간을 설정하면 예약할 수 있어요.</p>`;
+        bodyHtml=`<p style="color:#6b7280;font-size:13px">선생님이 예약 기간을 설정하면 예약할 수 있어요.</p>`;
       }
       emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간일 경우, 아래에서 입력 가능합니다.</p></div>`;
     }
@@ -2247,7 +2223,6 @@ function startScoreWizard(examId){
 
 function renderScoreWizard(){
   const exam=getExam(S.scoreWizardExamId);if(!exam)return;
-  renderStuTabs();
   const steps=getScoreSteps(exam);const step=S.scoreStep;const c=_('stuC');
   if(step>=steps.length){
     c.innerHTML=`<div class="card sw-done">
@@ -2578,7 +2553,7 @@ function examScoreCardHtml(exam,stu){
   const pNote=exam.scoreStart?`<p style="font-size:11px;color:#6b7280;margin-bottom:10px">입력 기간: ${exam.scoreStart}${exam.scoreEnd?' ~ '+exam.scoreEnd:' ~ 무기한'}</p>`:'';
   let body='';
   if(hasSc)body=examScoreTblHtml(exam,sc);
-  else if(!open)body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${exam.scoreStart?`<br><span style="font-size:12px">기간: ${exam.scoreStart} ~ ${exam.scoreEnd||'무기한'}</span>`:'<br><span style="font-size:12px">관리자가 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
+  else if(!open)body=`<div style="text-align:center;padding:14px;color:#9ca3af;font-size:13px">성적 입력 기간이 아닙니다.${exam.scoreStart?`<br><span style="font-size:12px">기간: ${exam.scoreStart} ~ ${exam.scoreEnd||'무기한'}</span>`:'<br><span style="font-size:12px">선생님이 입력 기간을 설정하면 이용할 수 있습니다.</span>'}</div>`;
   const provChip=exam.provisional?'<span class="bx bpk">가채점</span>':'';
   return `<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${badge}<p style="font-size:15px;font-weight:700">${exam.name} 성적</p>${provChip}</div>${editBtn||startBtn}</div>${pNote}${body}</div>`;}
 
@@ -2616,7 +2591,7 @@ function stuConsultNotesCardHtml(stu){
   </div>`;
 }
 
-/* ── 게시판 (collection: posts) ──
+/* ── 자유게시판 (collection: posts) ──
    학생·관리자 모두 글을 쓰고 댓글로 답변하는 상시 게시판. 예약과 무관하게 항상 열려 있다.
    기본은 전체 공개이고, 학생이 '비밀글'로 올리면 본인과 관리자에게만 본문이 보인다
    (목록에는 잠금 표시만 남겨 글이 사라진 것처럼 보이지 않게 한다).
@@ -2651,18 +2626,35 @@ function bdCanRead(q){
   return q.authorId&&q.authorId===bdMyId();
 }
 function bdCanEdit(q){return bdIsStaff()||(q.authorId&&q.authorId===bdMyId());}
+function bdMyNick(){
+  const stu=S.students.find(x=>x._docId===S.studentDocId);
+  return (stu&&stu.nickname)||'';
+}
+/* 익명 글은 닉네임으로 보이되, 관리자에게는 실명을 괄호로 함께 보여 준다(비밀글과 같은 원칙). */
+function bdShowName(entry){
+  const real=entry.authorName||entry.name||'';
+  if((entry.authorRole||entry.role)==='admin'){
+    if(bdIsStaff())return escapeHtml(real||'관리자');
+    return real&&real!=='관리자'?escapeHtml(real)+' 선생님':'선생님';
+  }
+  if(!entry.anon)return escapeHtml(real);
+  const nick=entry.authorNick||entry.nick||'익명';
+  return escapeHtml(nick)+(bdIsStaff()&&real?`<span style="color:#9ca3af;font-weight:400"> (${escapeHtml(real)})</span>`:'');
+}
+/* 닉네임은 학생 문서에 남겨 다음 글에서도 그대로 쓰이게 한다. */
+async function bdSaveNick(nick){
+  const stu=S.students.find(x=>x._docId===S.studentDocId);
+  if(!stu||(stu.nickname||'')===nick)return;
+  stu.nickname=nick;
+  try{await db.collection('students').doc(stu._docId).update({nickname:nick});}catch(_){}
+}
 function bdComments(q){return Array.isArray(q.comments)?q.comments:[];}
-function bdAnswered(q){return bdComments(q).some(c=>c.role==='admin');}
 function bdSorted(list){
   return [...list].sort((a,b)=>{
     const ap=a.pinned?1:0,bp=b.pinned?1:0;
     if(ap!==bp)return bp-ap;
     return (b.createdAt||0)-(a.createdAt||0);
   });
-}
-// 관리자 탭 배지 — 관리자 댓글이 아직 없는 학생 질문 수.
-function bdUnansweredCount(){
-  return S.posts.filter(q=>q.authorRole!=='admin'&&!bdAnswered(q)).length;
 }
 /* 학생용 '새 글' 표시. 마지막으로 게시판을 연 시각 이후에 올라온 남의 글/내 글의 답변을 센다. */
 function bdSeenTs(){try{return Number(localStorage.getItem('bdSeen')||0)||0;}catch(_){return 0;}}
@@ -2708,10 +2700,10 @@ async function bdUploadPhoto(file,qid,scopeId){
     /* Firebase Storage 미설정/권한 오류를 원인 코드까지 보여줘야 진단이 된다. */
     console.error('bdUploadPhoto failed',e);
     const code=e&&e.code?String(e.code):'';
-    if(code==='storage/unauthorized')throw new Error('사진 업로드 권한이 없습니다. 관리자에게 문의해 주세요. ('+code+')');
+    if(code==='storage/unauthorized')throw new Error('사진 업로드 권한이 없습니다. '+staffWord()+'에게 문의해 주세요. ('+code+')');
     if(code==='storage/unauthenticated')throw new Error('로그인이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요. ('+code+')');
-    if(code==='storage/quota-exceeded')throw new Error('사진 저장 공간이 가득 찼습니다. 관리자에게 문의해 주세요. ('+code+')');
-    throw new Error('사진 업로드에 실패했습니다. 관리자에게 문의해 주세요.'+(code?' ('+code+')':(e&&e.message?' ('+e.message+')':'')));
+    if(code==='storage/quota-exceeded')throw new Error('사진 저장 공간이 가득 찼습니다. '+staffWord()+'에게 문의해 주세요. ('+code+')');
+    throw new Error('사진 업로드에 실패했습니다. '+staffWord()+'에게 문의해 주세요.'+(code?' ('+code+')':(e&&e.message?' ('+e.message+')':'')));
   }
 }
 async function bdDeletePhotos(photos){
@@ -2729,7 +2721,9 @@ function bdNormComments(list){
     authorId:c.authorId||'',
     body:c.body||'',
     photos:bdNormPhotos(c.photos),
-    ts:c.ts||Date.now()
+    ts:c.ts||Date.now(),
+    anon:!!c.anon,
+    nick:c.nick||''
   }));
 }
 function bdPhotosHtml(photos){
@@ -2784,13 +2778,12 @@ function bdPostHtml(q,ctx){
   const isStudentPost=q.authorRole!=='admin';
   const bgCol=isStudentPost?'#eff6ff':'#fef2f2';
   const borderCol=isStudentPost?'#bfdbfe':'#fecaca';
-  const badge=isStudentPost?'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>';
-  const gradeChip=isStudentPost&&q.authorGrade?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:'';
+  const badge=isStudentPost?'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>':'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">'+staffWord()+'</span>';
+  /* 익명 글에서 학년까지 보이면 사실상 특정되므로 관리자에게만 남긴다. */
+  const gradeChip=isStudentPost&&q.authorGrade&&(!q.anon||staff)?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:'';
   const lock=q.secret?'<span title="비밀글" style="font-size:11px">🔒</span>':'';
+  const anonMark=q.anon?'<span title="익명" style="font-size:11px">🙈</span>':'';
   const pin=q.pinned?'<span style="font-size:11px;color:#b45309;font-weight:700">📌 고정</span>':'';
-  const answered=isStudentPost?(bdAnswered(q)
-    ?'<span class="bx" style="font-size:10px;font-weight:700;background:#dcfce7;color:#15803d">답변완료</span>'
-    :'<span class="bx" style="font-size:10px;font-weight:700;background:#fef3c7;color:#92400e">답변대기</span>'):'';
   const edited=q.updatedAt&&q.updatedAt>(q.createdAt||0)?'<span style="color:#9ca3af;font-size:11px">· 수정됨</span>':'';
   const isEditing=S.bdPostEditId&&S.bdPostEditId.id===id;
   const mine=bdCanEdit(q);
@@ -2802,7 +2795,9 @@ function bdPostHtml(q,ctx){
   let bodyHtml;
   if(isEditing){
     const keep=Array.isArray(S.bdPostEditId.keepPhotos)?S.bdPostEditId.keepPhotos:[];
-    const secretRow=q.authorRole!=='admin'?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-edit-secret-${id}" ${q.secret?'checked':''}> 🔒 비밀글 (나와 관리자만 볼 수 있어요)</label>`:'';
+    const secretRow=q.authorRole!=='admin'?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-edit-secret-${id}" ${q.secret?'checked':''}> 🔒 비밀글 (나와 선생님만 볼 수 있어요)</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-edit-anon-${id}" ${q.anon?'checked':''} onchange="_('bd-edit-nick-${id}').style.display=this.checked?'':'none'"> 🙈 익명으로 표시</label>
+      <input class="fi" id="bd-edit-nick-${id}" style="margin-top:6px;display:${q.anon?'':'none'}" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(q.authorNick||bdMyNick())}">`:'';
     bodyHtml=`<div>
       <textarea class="fi ta" id="bd-edit-input-${id}" rows="4">${escapeHtml(q.body||'')}</textarea>
       ${secretRow}
@@ -2825,12 +2820,12 @@ function bdPostHtml(q,ctx){
   const commentsHtml=comments.map(c=>{
     const isAdminCmt=c.role==='admin';
     const canDel=staff||(c.authorId&&c.authorId===bdMyId());
-    const cBadge=isAdminCmt?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">관리자</span>':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
+    const cBadge=isAdminCmt?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">'+staffWord()+'</span>':'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
     const cDel=canDel?`<button onclick="bdDelComment('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1" title="삭제">×</button>`:'';
     const cAccent=isAdminCmt?'#dc2626':'#3b82f6';
     return `<div style="border-left:3px solid ${cAccent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px">${cBadge}<b>${escapeHtml(c.name||'')}</b><span style="color:#9ca3af">· ${bdFmtTs(c.ts)}</span></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px">${cBadge}<b>${bdShowName(c)}</b><span style="color:#9ca3af">· ${bdFmtTs(c.ts)}</span></div>
         ${cDel}
       </div>
       <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body||'')}</p>
@@ -2840,8 +2835,11 @@ function bdPostHtml(q,ctx){
 
   const cScope='cmt_'+id;
   const cPlaceholder=staff?'학생에게 댓글로 답변하기':'추가 질문이나 코멘트 남기기';
+  const cAnonRow=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-cmt-anon-${id}" onchange="_('bd-cmt-nick-${id}').style.display=this.checked?'':'none'"> 🙈 익명으로 작성</label>
+    <input class="fi" id="bd-cmt-nick-${id}" style="margin-top:6px;display:none" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(bdMyNick())}">`;
   const commentInputHtml=`<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb">
     <textarea class="fi ta" id="bd-cmt-input-${id}" rows="2" placeholder="${cPlaceholder}"></textarea>
+    ${cAnonRow}
     <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
       <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${cScope}','comment')"></label>
       <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="bdAddComment('${id}')">댓글 등록</button>
@@ -2851,7 +2849,7 @@ function bdPostHtml(q,ctx){
 
   return `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:10px;padding:12px 14px;margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;flex-wrap:wrap">${pin}${badge}<b>${escapeHtml(q.authorName||'')}</b>${gradeChip}${lock}${answered}<span style="color:#9ca3af">· ${bdFmtTs(q.createdAt)}</span>${edited}</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;flex-wrap:wrap">${pin}${badge}<b>${bdShowName(q)}</b>${gradeChip}${lock}${anonMark}<span style="color:#9ca3af">· ${bdFmtTs(q.createdAt)}</span>${edited}</div>
       ${isEditing?'':`<div style="display:flex;gap:6px">${pinBtn}${editBtn}${delBtn}</div>`}
     </div>
     ${bodyHtml}
@@ -2863,7 +2861,9 @@ function bdComposerHtml(){
   const staff=bdIsStaff();
   const scope='new';
   if(!S.bdComposerOpen)return '';
-  const secretRow=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-new-secret"> 🔒 비밀글로 올리기 (나와 관리자만 볼 수 있어요)</label>`;
+  const secretRow=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-new-secret"> 🔒 비밀글로 올리기 (나와 선생님만 볼 수 있어요)</label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-new-anon" onchange="_('bd-new-nick').style.display=this.checked?'':'none'"> 🙈 익명으로 올리기</label>
+    <input class="fi" id="bd-new-nick" style="margin-top:6px;display:none" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(bdMyNick())}">`;
   return `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
     <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 글 작성</p>
     <textarea class="fi ta" id="bd-new-input" rows="4" placeholder="${staff?'학생들에게 안내할 내용을 입력하세요':'예) 수학 미적분 단원이 어려워요'}"></textarea>
@@ -2879,7 +2879,7 @@ function bdComposerHtml(){
     </div>
   </div>`;
 }
-const BD_FILTERS=[{id:'all',label:'전체'},{id:'unanswered',label:'답변대기'},{id:'mine',label:'내 글'}];
+const BD_FILTERS=[{id:'all',label:'전체'},{id:'mine',label:'내 글'}];
 function bdFilterBarHtml(){
   const cur=S.bdFilter||'all';
   return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${BD_FILTERS.map(f=>{
@@ -2891,8 +2891,7 @@ function bdFilteredPosts(){
   const me=bdMyId();
   let list=S.posts.filter(q=>bdIsStaff()||bdCanRead(q)||q.secret);
   const f=S.bdFilter||'all';
-  if(f==='unanswered')list=list.filter(q=>q.authorRole!=='admin'&&!bdAnswered(q));
-  else if(f==='mine')list=list.filter(q=>q.authorId===me);
+  if(f==='mine')list=list.filter(q=>q.authorId===me);
   if(f!=='all')list=list.filter(q=>bdCanRead(q));
   return bdSorted(list);
 }
@@ -2901,8 +2900,6 @@ function bdBoardHtml(){
   const staff=bdIsStaff();
   const posts=bdFilteredPosts();
   const total=S.posts.filter(q=>bdCanRead(q)).length;
-  /* 학생에게 전체 미답변 수를 보여주면 못 읽는 비밀글의 존재까지 드러나므로 관리자에게만 표시한다. */
-  const pending=staff?bdUnansweredCount():0;
   const btn=S.bdComposerOpen?'':`<button class="btn bp bsm" style="font-size:12px;padding:6px 12px" onclick="bdOpenComposer()">+ ${staff?'새 글':'글쓰기'}</button>`;
   const emptyMsg=(S.bdFilter||'all')==='all'
     ?(staff?'아직 등록된 글이 없습니다.':'아직 등록된 글이 없습니다. 위 [+ 글쓰기] 버튼으로 첫 글을 남겨보세요.')
@@ -2911,8 +2908,8 @@ function bdBoardHtml(){
     :`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px;margin-bottom:14px">${emptyMsg}</div>`;
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <p style="font-size:15px;font-weight:700">게시판</p>
-      <span style="font-size:11px;color:#6b7280">글 ${total}${pending?` · 답변대기 ${pending}`:''}</span>
+      <p style="font-size:15px;font-weight:700">자유게시판</p>
+      <span style="font-size:11px;color:#6b7280">글 ${total}</span>
       <div style="margin-left:auto">${btn}</div>
     </div>
     ${staff?'':'<p style="font-size:11px;color:#9ca3af;margin-bottom:10px">모든 학생이 볼 수 있는 공개 게시판입니다. 개인적인 내용은 🔒 비밀글로 올려주세요.</p>'}
@@ -2927,11 +2924,10 @@ function bdStudentSectionHtml(studentId,ctx){
   const list=bdSorted(S.posts.filter(q=>q.authorId===studentId&&q.authorRole!=='admin'));
   const body=list.length?list.map(q=>bdPostHtml(q,{staff})).join('')
     :'<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">이 학생이 작성한 질문이 없습니다.</div>';
-  const pending=list.filter(q=>!bdAnswered(q)).length;
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-      <p style="font-size:15px;font-weight:700">게시판 · 이 학생의 글</p>
-      <span style="font-size:11px;color:#6b7280">글 ${list.length}${pending?` · 답변대기 ${pending}`:''}</span>
+      <p style="font-size:15px;font-weight:700">자유게시판 · 이 학생의 글</p>
+      <span style="font-size:11px;color:#6b7280">글 ${list.length}</span>
     </div>
     ${body}
   </div>`;
@@ -2968,6 +2964,8 @@ async function bdCreatePost(){
   if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const role=bdMyRole();
   const secret=role==='student'&&!!_('bd-new-secret')?.checked;
+  const anon=role==='student'&&!!_('bd-new-anon')?.checked;
+  const nick=anon?((_('bd-new-nick')?.value||'').trim()||'익명'):'';
   const stu=role==='student'?S.students.find(s=>s._docId===S.studentDocId):null;
   const ref=db.collection('posts').doc();
   showLoad(true);
@@ -2976,10 +2974,11 @@ async function bdCreatePost(){
     for(const f of drafts)photos.push(await bdUploadPhoto(f.file,ref.id,'post'));
     const now=Date.now();
     await ref.set({
-      body:txt,photos,secret,pinned:false,
+      body:txt,photos,secret,pinned:false,anon,authorNick:nick,
       authorId:bdMyId(),authorRole:role,authorName:bdMyName(),authorGrade:stu?.grade||'',
       createdAt:now,updatedAt:now,comments:[]
     });
+    if(anon)await bdSaveNick(nick);
     delete S.bdDraftFiles['new'];
     S.bdComposerOpen=false;
     toast('등록되었습니다.','success');
@@ -2996,6 +2995,8 @@ async function bdSaveEdit(id){
   const keep=e&&e.id===id&&Array.isArray(e.keepPhotos)?e.keepPhotos:bdNormPhotos(q.photos);
   if(!txt&&!drafts.length&&!keep.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const secretEl=_('bd-edit-secret-'+id);
+  const anonEl=_('bd-edit-anon-'+id);
+  const nick=anonEl&&anonEl.checked?((_('bd-edit-nick-'+id)?.value||'').trim()||'익명'):'';
   showLoad(true);
   try{
     const removed=bdNormPhotos(q.photos).filter(o=>!keep.some(k=>k.path===o.path));
@@ -3004,6 +3005,7 @@ async function bdSaveEdit(id){
     for(const f of drafts)added.push(await bdUploadPhoto(f.file,id,'post'));
     const upd={body:txt,photos:[...keep,...added],updatedAt:Date.now()};
     if(secretEl)upd.secret=!!secretEl.checked;
+    if(anonEl){upd.anon=!!anonEl.checked;upd.authorNick=nick;if(anonEl.checked)await bdSaveNick(nick);}
     await db.collection('posts').doc(id).update(upd);
     delete S.bdDraftFiles[scope];
     S.bdPostEditId=null;
@@ -3037,11 +3039,14 @@ async function bdAddComment(id){
   const drafts=S.bdCommentDraftFiles[scope]||[];
   if(!txt&&!drafts.length){toast('내용 또는 사진을 입력하세요.','warn');return;}
   const cid=uid();
+  const cAnon=bdMyRole()==='student'&&!!_('bd-cmt-anon-'+id)?.checked;
+  const cNick=cAnon?((_('bd-cmt-nick-'+id)?.value||'').trim()||'익명'):'';
   showLoad(true);
   try{
     const photos=[];
     for(const f of drafts)photos.push(await bdUploadPhoto(f.file,id,'c_'+cid));
-    const cmt={_id:cid,role:bdMyRole(),name:bdMyName(),authorId:bdMyId(),body:txt,photos,ts:Date.now()};
+    const cmt={_id:cid,role:bdMyRole(),name:bdMyName(),authorId:bdMyId(),body:txt,photos,ts:Date.now(),anon:cAnon,nick:cNick};
+    if(cAnon)await bdSaveNick(cNick);
     await db.collection('posts').doc(id).update({comments:bdNormComments([...bdComments(q),cmt])});
     delete S.bdCommentDraftFiles[scope];
     bdRerender();
@@ -3062,15 +3067,12 @@ async function bdDelComment(id,cid){
 }
 /* 게시판이 떠 있을 수 있는 모든 자리를 한 번에 갱신한다. */
 function bdRerender(){
+  if(!_('vBoard').classList.contains('hidden')){renderBoardView();return;}
   if(S.user?.type==='student'){renderStu();return;}
   if(S.user?.type==='tablet'){if(typeof renderTablet==='function')renderTablet();return;}
-  if(S.tab==='board'){renderAdminBoard();return;}
   const modal=_('mOv');
   if(modal&&!modal.classList.contains('hidden')&&S.bdModalBookingId)openBookDetail(S.bdModalBookingId);
   if(S.tab==='consult'&&S.consultStuId)renderConsultDetail();
-}
-function renderAdminBoard(){
-  _('adminC').innerHTML=bdBoardHtml();
 }
 
 // 공지사항 게시판. 정렬: 고정(pinned) → 최신 createdAt 순. 작성/수정/삭제/고정은 관리자(ADMIN/OP)만.
@@ -3500,9 +3502,9 @@ async function saveExamScore(examId){
 
 function showBookForm(isChange){
   const c=_('stuC');
-  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'':(pl?'예약 가능 기간: '+pl:'관리자가 예약 기간을 설정하면 예약할 수 있어요.');c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p>${sub?`<p style="color:#6b7280;font-size:13px">${sub}</p>`:''}${isChange?'<div style="margin-top:16px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}</div>`;return;}
+  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'':(pl?'예약 가능 기간: '+pl:'선생님이 예약 기간을 설정하면 예약할 수 있어요.');c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p>${sub?`<p style="color:#6b7280;font-size:13px">${sub}</p>`:''}${isChange?'<div style="margin-top:16px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}</div>`;return;}
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
-  if(!avail.length){c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 가능한 일정이 없습니다</p><p style="color:#6b7280;font-size:13px">관리자가 일정을 등록하면 예약할 수 있어요.</p></div>`;return;}
+  if(!avail.length){c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 가능한 일정이 없습니다</p><p style="color:#6b7280;font-size:13px">선생님이 일정을 등록하면 예약할 수 있어요.</p></div>`;return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
   const sel=avail.find(d=>d.id===S.selDate),taken=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).map(b=>b.slot),myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const dtabs=avail.map(d=>`<button class="dt ${d.id===S.selDate?'on':''}" onclick="selDate('${d.id}')">${d.label}</button>`).join('');
@@ -3512,7 +3514,7 @@ function showBookForm(isChange){
   <p style="font-size:13px;color:#6b7280;margin-bottom:6px">날짜를 선택하고 원하는 시간을 클릭하세요.</p>
   <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:3px">
     <svg viewBox="0 0 512 512" fill="#f87171" style="width:12px;height:12px;flex-shrink:0;margin-top:3px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
-    <p style="font-size:12px;color:#9ca3af;line-height:1.45">예약된 시간은 관리자와의 조율에 따라 변경될 수 있습니다.</p>
+    <p style="font-size:12px;color:#9ca3af;line-height:1.45">예약된 시간은 선생님과의 조율에 따라 변경될 수 있습니다.</p>
   </div>
   <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:12px">
     <svg viewBox="0 0 512 512" fill="#f87171" style="width:12px;height:12px;flex-shrink:0;margin-top:3px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
@@ -3608,7 +3610,7 @@ function requestCancelBook(){
   const c=_('stuC');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx br">예약 취소 요청</span><p style="font-size:15px;font-weight:700">예약 취소</p></div>
   <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px"><b>${myB.dateLabel} ${myB.slot}</b> 예약을 취소 요청합니다.</p></div>
-  <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">⚠️ 예약 취소는 관리자의 승인이 필요합니다.</p></div>
+  <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">⚠️ 예약 취소는 선생님의 승인이 필요합니다.</p></div>
   <div class="fg"><label class="fl">취소 사유 <span style="color:#dc2626">*</span></label><textarea class="fi ta" id="cancelReason" rows="3" placeholder="취소 사유를 입력해주세요."></textarea></div>
   <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="renderStu()">← 돌아가기</button><button class="btn bd" style="flex:1" onclick="submitCancelRequest()">취소 요청</button></div></div>`;}
 
@@ -3643,7 +3645,7 @@ function renderChangeForm(){
   const slots=sel.slots.map(slot=>{const isMine=myB.date===sel.date&&myB.slot===slot;const isTaken=taken.includes(slot)||(!isMine&&!isSlotActive(sel.id,slot));const isSel=S.adminSel===sel.id+'|'+slot;return `<button class="sb ${isTaken?(isMine?'mn':'bk'):isSel?'sl':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'pickChangeSlot(\''+sel.id+'\',\''+slot+'\',this)'}">${slot}${isMine?' (현재)':''}</button>`;}).join('');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bb">예약 변경 요청</span><p style="font-size:15px;font-weight:700">예약 변경</p></div>
   <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px">현재 예약: <b>${myB.dateLabel} ${myB.slot}</b></p></div>
-  <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">⚠️ 예약 변경은 관리자의 승인이 필요합니다.</p></div>
+  <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">⚠️ 예약 변경은 선생님의 승인이 필요합니다.</p></div>
   <p style="font-size:13px;color:#6b7280;margin-bottom:12px">변경 희망 날짜/시간을 선택하세요.</p>
   <div class="dtabs">${dtabs}</div>
   <div style="background:#f9fafb;border-radius:10px;padding:14px;margin-bottom:14px"><p style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">${sel.label} 예약 가능 시간</p><div class="sg" id="changeSlots">${slots||'<p style="font-size:13px;color:#9ca3af">예약 가능한 시간이 없습니다.</p>'}</div></div>
@@ -3678,7 +3680,6 @@ async function setTab(tab){
   else if(tab==='schedule')renderAdminSchedule();
   else if(tab==='bookings')renderAdminBookings();
   else if(tab==='notices')renderAdminNotices();
-  else if(tab==='board')renderAdminBoard();
   else if(tab==='logins')renderAdminLogins();
   else if(tab==='accounts'){await loadAdmins();if(S.tab!=='accounts')return;renderAdminAccounts();}
   else if(tab==='alimtalk')renderAdminAlimtalk();
@@ -7403,506 +7404,6 @@ async function setBookAttendance(docId,status){
   showLoad(false);
 }
 
-/* ── 상벌점 관리 (별도 view) ── */
-function defaultPointGroups(){return ['출결','학습 태도','과제','기타'];}
-function getPointGroups(){
-  const cfg=S.config?.pointGroups;
-  if(Array.isArray(cfg)&&cfg.length)return cfg;
-  return defaultPointGroups();
-}
-function defaultPointItems(){
-  return {
-    penalty:[
-      {id:'p_late',group:'출결',label:'지각',points:1,description:'정해진 입실 시간보다 늦게 도착'},
-      {id:'p_absent',group:'출결',label:'무단 결석',points:5,description:'사전 통보 없이 결석'},
-      {id:'p_attitude',group:'학습 태도',label:'수업 태도 불량',points:1,description:'잡담·졸음·휴대폰 사용 등'},
-      {id:'p_etc',group:'기타',label:'기타',points:1,free:true,description:''}
-    ],
-    merit:[
-      {id:'m_active',group:'학습 태도',label:'적극 참여',points:1,description:'질문이나 발표가 적극적'},
-      {id:'m_homework',group:'과제',label:'우수 과제',points:1,description:'과제 완성도 우수'},
-      {id:'m_etc',group:'기타',label:'기타',points:1,free:true,description:''}
-    ]
-  };
-}
-function getPointItems(){
-  const cfg=S.config?.pointItems;
-  if(cfg&&Array.isArray(cfg.penalty)&&Array.isArray(cfg.merit))return cfg;
-  return defaultPointItems();
-}
-function kindLabel(k){return k==='penalty'?'벌점':'상점';}
-function fmtPointTs(ts){
-  if(!ts)return '';
-  const d=new Date(ts),pad=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function tsToLocalInput(ts){
-  const d=new Date(ts),pad=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function collectAllPointRecords(){
-  const out=[];
-  S.students.forEach(s=>{(s.pointLog||[]).forEach(r=>out.push({...r,_stu:s}));});
-  return out.sort((a,b)=>(b.ts||0)-(a.ts||0));
-}
-function renderAdminPoints(){
-  const allRecs=collectAllPointRecords();
-  const filterKind=S.pointFilterKind||'all';
-  const filterStu=S.pointFilterStu||'';
-  const recs=allRecs.filter(r=>{
-    if(filterKind!=='all'&&r.kind!==filterKind)return false;
-    if(filterStu&&r._stu._docId!==filterStu)return false;
-    return true;
-  });
-  let totalPen=0,totalMer=0;
-  allRecs.forEach(r=>{
-    if(r.kind==='penalty')totalPen+=Number(r.points)||0;
-    else if(r.kind==='merit')totalMer+=Number(r.points)||0;
-  });
-  const statsCard=`<div class="np" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
-    <div style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fecaca;border-radius:14px;padding:14px 14px 12px">
-      <p style="font-size:11px;font-weight:700;color:#991b1b;margin-bottom:4px;letter-spacing:-.2px">누적 벌점</p>
-      <p style="font-size:22px;font-weight:800;color:#7f1d1d;line-height:1.1">${totalPen}<span style="font-size:13px;font-weight:600;color:#dc2626;margin-left:3px">점</span></p>
-    </div>
-    <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:14px;padding:14px 14px 12px">
-      <p style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:4px;letter-spacing:-.2px">누적 상점</p>
-      <p style="font-size:22px;font-weight:800;color:#14532d;line-height:1.1">${totalMer}<span style="font-size:13px;font-weight:600;color:#16a34a;margin-left:3px">점</span></p>
-    </div>
-    <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:14px;padding:14px 14px 12px">
-      <p style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px;letter-spacing:-.2px">총 기록</p>
-      <p style="font-size:22px;font-weight:800;color:#1e3a8a;line-height:1.1">${allRecs.length}<span style="font-size:13px;font-weight:600;color:#3b82f6;margin-left:3px">건</span></p>
-    </div>
-  </div>`;
-  const stuOpts=[...S.students].sort((a,b)=>(a.seat||999)-(b.seat||999)||(a.name||'').localeCompare(b.name||''))
-    .map(s=>`<option value="${s._docId}" ${filterStu===s._docId?'selected':''}>${escapeHtml(s.seat?`${s.seat}. ${s.name}`:s.name)}</option>`).join('');
-  const filterBar=`<div class="card" style="margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px">
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn ${filterKind==='all'?'bp':'bs'} bsm" onclick="setPointFilter('kind','all')">전체</button>
-      <button class="btn ${filterKind==='penalty'?'bp':'bs'} bsm" onclick="setPointFilter('kind','penalty')">벌점</button>
-      <button class="btn ${filterKind==='merit'?'bp':'bs'} bsm" onclick="setPointFilter('kind','merit')">상점</button>
-    </div>
-    <select class="fi fsel" style="max-width:220px;min-width:160px" onchange="setPointFilter('stu',this.value)">
-      <option value="">전체 학생</option>${stuOpts}
-    </select>
-    ${filterStu?`<button class="btn bs bsm" onclick="setPointFilter('stu','')">학생 필터 해제</button>`:''}
-  </div>`;
-  const rows=recs.length?recs.map(r=>{
-    const kindBx=r.kind==='penalty'
-      ?'<span class="bx" style="background:#fee2e2;color:#991b1b;font-size:10px">벌점</span>'
-      :'<span class="bx" style="background:#dcfce7;color:#166534;font-size:10px">상점</span>';
-    const ptsColor=r.kind==='penalty'?'#dc2626':'#16a34a';
-    const ptsSign=r.kind==='penalty'?'-':'+';
-    return `<tr>
-      <td data-label="" class="cell-head"><span>${escapeHtml(r._stu.name||'')}</span><span class="head-meta">${kindBx}</span></td>
-      <td data-label="종류" class="cell-hide">${kindBx}</td>
-      <td data-label="항목"><div style="display:flex;flex-direction:column;gap:1px"><span>${escapeHtml(r.label||'')}</span>${r.group?`<span style="font-size:10px;color:#9ca3af">${escapeHtml(r.group)}</span>`:''}</div></td>
-      <td data-label="점수" style="color:${ptsColor};font-weight:700">${ptsSign}${r.points||0}</td>
-      <td data-label="메모" style="font-size:12px;color:#6b7280;max-width:260px;white-space:pre-wrap">${escapeHtml(r.memo||'')}</td>
-      <td data-label="일시" style="font-size:12px;color:#6b7280;white-space:nowrap">${fmtPointTs(r.ts)}</td>
-      <td data-label="부여자" style="font-size:12px;color:#6b7280">${escapeHtml(r.by?.name||'')}</td>
-      <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:5px;justify-content:flex-end">
-        <button class="btn bs bsm" onclick="openGrantPoints('${r._stu._docId}','${r._id}')">수정</button>
-        <button class="btn bd bsm" onclick="deletePointRecord('${r._stu._docId}','${r._id}')">삭제</button>
-      </div></td>
-    </tr>`;
-  }).join(''):'';
-  const tableCard=`<div class="card" style="padding:0"><div class="tw tw-cards"><table>
-    <thead><tr><th>학생</th><th>종류</th><th>항목</th><th>점수</th><th>메모</th><th>일시</th><th>부여자</th><th>관리</th></tr></thead>
-    <tbody>${rows||'<tr class="empty-row"><td colspan="8" class="empty">기록이 없습니다.</td></tr>'}</tbody>
-  </table></div></div>`;
-  _('pointsC').innerHTML=`<div class="sh"><span class="shtitle">상벌점 기록 <span style="font-size:13px;font-weight:400;color:#6b7280">(${recs.length}건${filterKind!=='all'||filterStu?` / 전체 ${allRecs.length}건`:''})</span></span>
-    <div style="display:flex;gap:6px">
-      <button class="btn bs bsm" onclick="openPointItemsEdit()">항목 편집</button>
-      <button class="btn bp bsm" onclick="openGrantPoints()">+ 부여하기</button>
-    </div></div>
-    ${statsCard}${filterBar}${tableCard}`;
-}
-function setPointFilter(key,val){
-  if(key==='kind')S.pointFilterKind=val;
-  else if(key==='stu')S.pointFilterStu=val;
-  renderAdminPoints();
-}
-function openGrantPoints(stuId,editId){
-  let rec=null;
-  if(stuId&&editId){
-    const stu=S.students.find(s=>s._docId===stuId);
-    rec=stu?.pointLog?.find(r=>r._id===editId)||null;
-  }
-  const curKind=rec?.kind||'penalty';
-  const curStuId=stuId||S.pointFilterStu||'';
-  const curItemId=rec?.itemId||'';
-  const curLabel=rec?.label||'';
-  const curPoints=rec?.points!=null?rec.points:1;
-  const curMemo=rec?.memo||'';
-  const curTs=rec?.ts||Date.now();
-  const stuOpts=[...S.students].sort((a,b)=>(a.seat||999)-(b.seat||999)||(a.name||'').localeCompare(b.name||''))
-    .map(s=>`<option value="${s._docId}" ${curStuId===s._docId?'selected':''}>${escapeHtml(s.seat?`${s.seat}. ${s.name}`:s.name)}</option>`).join('');
-  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${rec?'기록 수정':'상벌점 부여'}</p>
-    <div class="fg"><label class="fl">학생 ${rec?'':'<span style="font-size:11px;color:#9ca3af;font-weight:400">(여러 명 선택 시 일괄 부여)</span>'}</label>
-      <div id="gp-stu-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:32px;padding:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px"></div>
-      ${rec?'':`<select class="fi fsel" id="gp-stu-picker" onchange="addStudentToGrant(this)">
-        <option value="">+ 학생 추가</option>${stuOpts}
-      </select>`}
-    </div>
-    <div class="fg"><label class="fl">종류</label>
-      <div id="gp-kind-toggle" style="display:flex;gap:8px"></div>
-    </div>
-    <div class="fg"><label class="fl">사유 선택 <span id="gp-free-hint" style="font-size:11px;color:#9ca3af;font-weight:400;display:none">(기타 — 사유와 점수를 직접 입력하세요)</span></label>
-      <div id="gp-item-groups" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb;max-height:300px;overflow-y:auto"></div>
-      <input type="hidden" id="gp-item" value="">
-    </div>
-    <div class="fg" id="gp-label-wrap" style="display:none"><label class="fl">사유 직접 입력</label>
-      <input class="fi" id="gp-label" value="${escapeHtml(curLabel)}" placeholder="기타 사유">
-    </div>
-    <div class="fg"><label class="fl">메모 <span style="font-size:11px;color:#9ca3af;font-weight:400">(선택 · 비고 사항)</span></label>
-      <input class="fi" id="gp-detail" value="${escapeHtml(curMemo)}" placeholder="이 기록에 대한 비고 (선택)">
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <div class="fg" style="flex:1 1 120px;min-width:100px"><label class="fl">점수</label>
-        <input class="fi" id="gp-points" type="number" min="0" step="1" value="${curPoints}">
-      </div>
-      <div class="fg" style="flex:2 1 200px;min-width:160px"><label class="fl">부여 일시</label>
-        <input class="fi" id="gp-ts" type="datetime-local" value="${tsToLocalInput(curTs)}">
-      </div>
-    </div>
-    <input type="hidden" id="gp-edit-id" value="${editId||''}">
-    <div class="ferr" id="mErr"></div>
-    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="submitGrantPoints()">${rec?'저장':'부여'}</button></div>`;
-  openModal();
-  S.gpSelected=new Set();
-  if(curStuId)S.gpSelected.add(curStuId);
-  renderStuChips(!!rec);
-  renderKindToggle(curKind);
-  populatePointItemSelect(curKind,curItemId,curLabel,curPoints,!!rec);
-}
-function renderStuChips(isEdit){
-  const wrap=_('gp-stu-chips');if(!wrap)return;
-  const ids=[...(S.gpSelected||[])];
-  if(ids.length===0){
-    wrap.innerHTML='<span style="font-size:12px;color:#9ca3af;padding:4px 4px">학생을 1명 이상 추가하세요.</span>';
-    return;
-  }
-  wrap.innerHTML=ids.map(id=>{
-    const stu=S.students.find(s=>s._docId===id);
-    if(!stu)return '';
-    const label=stu.seat?`${stu.seat}. ${stu.name}`:(stu.name||'');
-    const removeBtn=isEdit?'':`<button type="button" onclick="removeStudentFromGrant('${id}')" style="background:none;border:none;color:#1e40af;cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 4px;font-weight:700">×</button>`;
-    return `<span style="display:inline-flex;align-items:center;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600">${escapeHtml(label)}${removeBtn}</span>`;
-  }).join('');
-}
-function addStudentToGrant(sel){
-  const id=sel.value;
-  if(!id)return;
-  if(!S.gpSelected)S.gpSelected=new Set();
-  S.gpSelected.add(id);
-  sel.value='';
-  renderStuChips(false);
-}
-function removeStudentFromGrant(id){
-  if(S.gpSelected)S.gpSelected.delete(id);
-  renderStuChips(false);
-}
-function renderKindToggle(curKind){
-  const wrap=_('gp-kind-toggle');if(!wrap)return;
-  const radio=(val,label,color,bg)=>{
-    const on=curKind===val;
-    return `<label style="flex:1;display:flex;align-items:center;justify-content:center;padding:10px;border:1.5px solid ${on?color:'#e5e7eb'};border-radius:8px;background:${on?bg:'#fff'};color:${on?color:'#6b7280'};font-weight:700;cursor:pointer">
-      <input type="radio" name="gp-kind" value="${val}" ${on?'checked':''} onchange="onPointKindChange()" style="margin-right:6px">${label}
-    </label>`;
-  };
-  wrap.innerHTML=radio('penalty','벌점','#991b1b','#fee2e2')+radio('merit','상점','#166534','#dcfce7');
-}
-function onPointKindChange(){
-  const kind=document.querySelector('input[name=gp-kind]:checked')?.value||'penalty';
-  renderKindToggle(kind);
-  populatePointItemSelect(kind);
-}
-function populatePointItemSelect(kind,selectedId,curLabel,curPoints,isEdit){
-  const items=getPointItems()[kind]||[];
-  let initial=selectedId&&items.find(it=>it.id===selectedId)?selectedId:'';
-  if(!initial&&curLabel){
-    const m=items.find(it=>!it.free&&it.label===curLabel);
-    if(m)initial=m.id;
-  }
-  if(!initial){const first=items.find(it=>!it.free);initial=first?.id||items[0]?.id||'';}
-  setItemSelection(kind,initial,isEdit?curLabel:null,isEdit?curPoints:null);
-}
-function sortItemGroupOrder(groups,order){
-  return order.slice().sort((a,b)=>{
-    const aAllFree=groups[a].every(it=>it.free)||a==='기타';
-    const bAllFree=groups[b].every(it=>it.free)||b==='기타';
-    if(aAllFree&&!bAllFree)return 1;
-    if(!aAllFree&&bAllFree)return -1;
-    return 0;
-  });
-}
-function renderItemGroups(kind,selectedId){
-  const items=getPointItems()[kind]||[];
-  const groups={};const order=[];
-  items.forEach(it=>{
-    const g=it.group||'(미분류)';
-    if(!groups[g]){groups[g]=[];order.push(g);}
-    groups[g].push(it);
-  });
-  const sortedOrder=sortItemGroupOrder(groups,order);
-  return sortedOrder.map(g=>{
-    const its=[...groups[g]].sort((a,b)=>(a.free?1:0)-(b.free?1:0));
-    const chips=its.map(it=>{
-      const active=it.id===selectedId;
-      const free=!!it.free;
-      const baseBg=free?'#fef3c7':'#fff';
-      const baseFg=free?'#92400e':'#374151';
-      const baseBd=free?'#fde68a':'#e5e7eb';
-      const bg=active?(free?'#f59e0b':'#1C64F2'):baseBg;
-      const fg=active?'#fff':baseFg;
-      const bd=active?(free?'#f59e0b':'#1C64F2'):baseBd;
-      const tail=free?'<span style="opacity:.75;font-weight:400;margin-left:4px">직접 입력</span>':`<span style="opacity:.75;font-weight:400;margin-left:4px">${it.points||0}점</span>`;
-      const tip=it.description?escapeHtml(it.description):escapeHtml(it.label);
-      return `<button type="button" data-id="${it.id}" title="${tip}" onclick="pickItemChip(this)" style="background:${bg};color:${fg};border:1.5px solid ${bd};padding:8px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin:0 6px 6px 0">${escapeHtml(it.label)}${tail}</button>`;
-    }).join('');
-    return `<div style="margin-bottom:10px">
-      <p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px;padding-left:2px">${escapeHtml(g)}</p>
-      <div style="display:flex;flex-wrap:wrap">${chips}</div>
-    </div>`;
-  }).join('');
-}
-function setItemSelection(kind,itemId,presetLabel,presetPoints){
-  const items=getPointItems()[kind]||[];
-  const item=items.find(it=>it.id===itemId);
-  const sel=_('gp-item');if(!sel)return;
-  if(item){
-    sel.value=item.id;
-    sel.dataset.free=item.free?'1':'0';
-    sel.dataset.group=item.group||'';
-    sel.dataset.label=item.label||'';
-    sel.dataset.points=String(item.points||0);
-    sel.dataset.description=item.description||'';
-  }else{
-    sel.value='';
-    sel.dataset.free='0';sel.dataset.group='';sel.dataset.label='';sel.dataset.points='0';sel.dataset.description='';
-  }
-  const wrap=_('gp-item-groups');
-  if(wrap)wrap.innerHTML=renderItemGroups(kind,itemId);
-  applyPointItemSelection(presetLabel,presetPoints);
-}
-function pickItemChip(btn){
-  const id=btn.dataset.id;
-  const kind=document.querySelector('input[name=gp-kind]:checked')?.value||'penalty';
-  setItemSelection(kind,id);
-}
-function applyPointItemSelection(presetLabel,presetPoints){
-  const sel=_('gp-item');if(!sel||!sel.value)return;
-  const free=sel.dataset.free==='1';
-  const labelInput=_('gp-label'),pointsInput=_('gp-points'),hint=_('gp-free-hint'),labelWrap=_('gp-label-wrap');
-  if(free){
-    labelInput.value=presetLabel||'';
-    labelInput.removeAttribute('readonly');
-    labelInput.style.background='';
-    labelInput.placeholder='기타 사유 (직접 입력)';
-    if(hint)hint.style.display='';
-    if(labelWrap)labelWrap.style.display='';
-  }else{
-    labelInput.value=sel.dataset.label||'';
-    labelInput.setAttribute('readonly','readonly');
-    if(hint)hint.style.display='none';
-    if(labelWrap)labelWrap.style.display='none';
-  }
-  const isEdit=presetPoints!=null;
-  pointsInput.value=isEdit?presetPoints:(sel.dataset.points||'0');
-}
-function onPointItemChange(){applyPointItemSelection();}
-async function submitGrantPoints(){
-  const selectedIds=[...(S.gpSelected||[])];
-  const kind=document.querySelector('input[name=gp-kind]:checked')?.value;
-  const itemSel=_('gp-item');
-  const itemId=itemSel.value;
-  const group=itemSel.dataset.group||'';
-  const label=(_('gp-label').value||'').trim();
-  const points=Number(_('gp-points').value)||0;
-  const memo=(_('gp-detail').value||'').trim();
-  const tsStr=_('gp-ts').value;
-  const ts=tsStr?new Date(tsStr).getTime():Date.now();
-  const editId=_('gp-edit-id').value;
-  if(selectedIds.length===0){showErr('mErr','학생을 1명 이상 선택하세요.');return;}
-  if(!kind){showErr('mErr','종류를 선택하세요.');return;}
-  if(!itemId){showErr('mErr','항목을 선택하세요.');return;}
-  if(!label){showErr('mErr','항목명을 입력하세요.');return;}
-  if(!(points>0)){
-    const basePoints=Number(itemSel.dataset.points)||0;
-    let hasDetails=false;
-    try{hasDetails=JSON.parse(itemSel.dataset.details||'[]').some(d=>d.label);}catch(e){}
-    if(basePoints===0&&hasDetails)showErr('mErr','이 사유는 기본 점수가 비어 있어 세부 내용을 반드시 선택해야 합니다.');
-    else showErr('mErr','점수는 1 이상이어야 합니다.');
-    return;
-  }
-  const byInfo={id:S.user?.id||'',name:S.user?.name||'관리자'};
-  showLoad(true);
-  try{
-    if(editId){
-      const stuId=selectedIds[0];
-      const stu=S.students.find(s=>s._docId===stuId);
-      if(!stu){showErr('mErr','학생을 찾을 수 없습니다.');showLoad(false);return;}
-      const rec={_id:editId,kind,itemId,group,label,points,memo,ts,by:byInfo};
-      const list=Array.isArray(stu.pointLog)?stu.pointLog:[];
-      const next=list.map(r=>r._id===editId?{...r,...rec}:r);
-      await db.collection('students').doc(stuId).update({pointLog:next});
-      stu.pointLog=next;
-      closeModal();renderAdminPoints();
-      toast('기록을 수정했습니다.','success');
-    }else{
-      const batch=db.batch();
-      const updates=[];
-      selectedIds.forEach(stuId=>{
-        const stu=S.students.find(s=>s._docId===stuId);
-        if(!stu)return;
-        const list=Array.isArray(stu.pointLog)?stu.pointLog:[];
-        const rec={_id:uid(),kind,itemId,group,label,points,memo,ts,by:byInfo};
-        const next=[...list,rec];
-        batch.update(db.collection('students').doc(stuId),{pointLog:next});
-        updates.push({stu,next});
-      });
-      await batch.commit();
-      updates.forEach(u=>{u.stu.pointLog=u.next;});
-      closeModal();renderAdminPoints();
-      const names=selectedIds.length<=2
-        ? selectedIds.map(id=>S.students.find(s=>s._docId===id)?.name||'').filter(Boolean).join(', ')
-        : `${selectedIds.length}명`;
-      toast(`${names} 학생에게 ${kindLabel(kind)} ${points}점을 부여했습니다.`,'success');
-    }
-  }catch(e){showErr('mErr','저장 실패: '+e.message);}
-  showLoad(false);
-}
-async function deletePointRecord(stuId,recId){
-  if(!(await confirmDialog({title:'기록 삭제',message:'이 기록을 삭제하시겠습니까?',confirmLabel:'삭제',kind:'danger'})))return;
-  const stu=S.students.find(s=>s._docId===stuId);if(!stu)return;
-  const next=(stu.pointLog||[]).filter(r=>r._id!==recId);
-  showLoad(true);
-  try{
-    await db.collection('students').doc(stuId).update({pointLog:next});
-    stu.pointLog=next;
-    renderAdminPoints();
-    toast('삭제되었습니다.','success');
-  }catch(e){toast('삭제 실패: '+e.message,'error');}
-  showLoad(false);
-}
-function openPointItemsEdit(){
-  S.pointItemsDraft=JSON.parse(JSON.stringify(getPointItems()));
-  S.pointGroupsDraft=[...getPointGroups()];
-  renderPointItemsEditor();
-  openModal();
-}
-function renderPointItemsEditor(){
-  const items=S.pointItemsDraft;
-  const groups=S.pointGroupsDraft||[];
-  const groupOptHtml=(curG)=>{
-    const opts=groups.map(g=>`<option value="${escapeHtml(g)}" ${curG===g?'selected':''}>${escapeHtml(g)}</option>`).join('');
-    // include current value even if not in master (preserve stale data)
-    const orphan=curG&&!groups.includes(curG)?`<option value="${escapeHtml(curG)}" selected>${escapeHtml(curG)} (미정의)</option>`:'';
-    return `<option value="">구분 미선택</option>${orphan}${opts}`;
-  };
-  const renderList=(kind)=>[...(items[kind]||[])].sort((a,b)=>(a.free?1:0)-(b.free?1:0)).map(it=>{
-    const isEtc=!!it.free;
-    const topRow=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px">
-      <select class="fi fsel pi-group" style="flex:0 1 130px;min-width:100px;font-size:12px${isEtc?';background:#f9fafb;color:#6b7280':''}" ${isEtc?'disabled':''}>${groupOptHtml(it.group||'')}</select>
-      <input class="fi pi-label" value="${escapeHtml(it.label)}" placeholder="사유" style="flex:1 1 120px;min-width:100px${isEtc?';background:#f9fafb;color:#6b7280':''}" ${isEtc?'readonly title="기타 항목은 사유를 변경할 수 없습니다"':''}>
-      <input class="fi pi-points" type="number" min="0" step="1" value="${it.points||0}" style="width:74px" placeholder="점수">
-      ${isEtc?'<span class="bx" style="background:#fef3c7;color:#92400e;font-size:10px;width:48px;text-align:center">기타</span>':`<button class="btn bd bsm" style="width:48px" onclick="removePointItem('${kind}','${it.id}')">삭제</button>`}
-    </div>
-    <input class="fi pi-desc" value="${escapeHtml(it.description||'')}" placeholder="세부 내용 — 부여 화면에서 chip에 커서 올릴 때 표시" style="font-size:12px;margin-top:4px">`;
-    return `<div class="pi-row" data-id="${it.id}" data-free="${isEtc?'1':'0'}" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:8px">${topRow}</div>`;
-  }).join('');
-  const groupsListHtml=groups.length
-    ? groups.map((g,i)=>`<span class="pi-group-chip" data-name="${escapeHtml(g)}" style="display:inline-flex;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:999px;padding:4px 10px 4px 12px;font-size:12px;font-weight:600;color:#374151">${escapeHtml(g)}<button type="button" onclick="removePointGroup(${i})" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 6px;font-weight:700">×</button></span>`).join('')
-    : '<span style="font-size:12px;color:#9ca3af">구분을 추가해주세요.</span>';
-  _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:6px">상벌점 항목 편집</p>
-    <p style="font-size:12px;color:#6b7280;margin-bottom:14px">먼저 구분(그룹)을 정의한 뒤 각 항목에 구분을 지정하세요. 세부 내용은 부여 시 항목 chip에 커서를 올리면 표시됩니다.</p>
-    <div style="margin-bottom:16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px">
-      <p style="font-size:13px;font-weight:700;color:#374151;margin-bottom:8px">구분 (그룹) 관리</p>
-      <div id="pi-groups-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${groupsListHtml}</div>
-      <div style="display:flex;gap:6px">
-        <input class="fi" id="pi-new-group" placeholder="새 구분명 (예: 출결)" style="flex:1;font-size:12px" onkeydown="if(event.key==='Enter'){event.preventDefault();addPointGroup();}">
-        <button class="btn bs bsm" onclick="addPointGroup()">+ 추가</button>
-      </div>
-    </div>
-    <div style="margin-bottom:16px">
-      <p style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:8px">벌점 항목</p>
-      <div id="pi-list-penalty">${renderList('penalty')}</div>
-      <button class="btn bs bsm" onclick="addPointItem('penalty')" style="margin-top:6px">+ 벌점 항목 추가</button>
-    </div>
-    <div style="margin-bottom:16px">
-      <p style="font-size:13px;font-weight:700;color:#166534;margin-bottom:8px">상점 항목</p>
-      <div id="pi-list-merit">${renderList('merit')}</div>
-      <button class="btn bs bsm" onclick="addPointItem('merit')" style="margin-top:6px">+ 상점 항목 추가</button>
-    </div>
-    <div class="ferr" id="mErr"></div>
-    <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="savePointItemsFromModal()">저장</button></div>`;
-}
-function syncPointItemsDraftFromDom(){
-  ['penalty','merit'].forEach(kind=>{
-    const rows=document.querySelectorAll('#pi-list-'+kind+' .pi-row');
-    const list=[];
-    rows.forEach(row=>{
-      const id=row.dataset.id;
-      const free=row.dataset.free==='1';
-      const group=(row.querySelector('.pi-group')?.value||'').trim();
-      const label=(row.querySelector('.pi-label')?.value||'').trim();
-      const points=Number(row.querySelector('.pi-points')?.value)||0;
-      const description=(row.querySelector('.pi-desc')?.value||'').trim();
-      const orig=(S.pointItemsDraft[kind]||[]).find(x=>x.id===id);
-      const item={id,group:group||(orig?.group||''),label:label||(orig?.label||''),points,description};
-      if(free)item.free=true;
-      list.push(item);
-    });
-    S.pointItemsDraft[kind]=list;
-  });
-}
-function addPointItem(kind){
-  syncPointItemsDraftFromDom();
-  S.pointItemsDraft[kind].push({id:'i_'+uid(),group:'',label:'',points:1,description:''});
-  renderPointItemsEditor();
-}
-function removePointItem(kind,id){
-  syncPointItemsDraftFromDom();
-  S.pointItemsDraft[kind]=S.pointItemsDraft[kind].filter(it=>it.id!==id);
-  renderPointItemsEditor();
-}
-function addPointGroup(){
-  syncPointItemsDraftFromDom();
-  const inp=_('pi-new-group');
-  const name=(inp?.value||'').trim();
-  if(!name)return;
-  if(!S.pointGroupsDraft.includes(name))S.pointGroupsDraft.push(name);
-  renderPointItemsEditor();
-}
-function removePointGroup(idx){
-  syncPointItemsDraftFromDom();
-  S.pointGroupsDraft.splice(idx,1);
-  renderPointItemsEditor();
-}
-async function savePointItemsFromModal(){
-  syncPointItemsDraftFromDom();
-  const items=S.pointItemsDraft;
-  if(!items.penalty.some(it=>it.free))items.penalty.push({id:'p_etc',group:'기타',label:'기타',points:1,free:true,description:''});
-  if(!items.merit.some(it=>it.free))items.merit.push({id:'m_etc',group:'기타',label:'기타',points:1,free:true,description:''});
-  for(const kind of ['penalty','merit']){
-    for(const it of items[kind]){
-      if(!it.label){showErr('mErr',`${kindLabel(kind)} 항목명을 모두 입력하세요.`);return;}
-    }
-  }
-  const groups=[...(S.pointGroupsDraft||[])];
-  showLoad(true);
-  try{
-    await db.collection('config').doc('main').set({pointItems:items,pointGroups:groups},{merge:true});
-    if(!S.config)S.config={};
-    S.config.pointItems=items;
-    S.config.pointGroups=groups;
-    closeModal();
-    renderAdminPoints();
-    toast('저장되었습니다.','success');
-  }catch(e){showErr('mErr','저장 실패: '+e.message);}
-  showLoad(false);
-}
-
 /* ── ADMIN: 계정 관리 ── */
 function roleLabel(r){return r==='admin'?'ADMIN':r==='test'?'TEST':r==='tablet'?'태블릿':'OP';}
 function roleBadgeClass(r){return r==='admin'?'br':r==='test'?'bg':r==='tablet'?'bpk':'bb';}
@@ -8383,7 +7884,8 @@ function enterHome(){
     ];
     const isStu=S.user?.type==='student';
     const isAdmin=S.user?.type==='admin';
-    if(isAdmin)items.push({ico:'⚖️',color:'red',title:'상벌점 관리',desc:'학생별 상점·벌점을<br>부여·조회합니다.',onclick:'goPoints()'});
+    const bdNew=bdStuNewCount();
+    items.push({ico:'💬',color:'blue',title:'자유게시판'+(bdNew>0?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':''),desc:'학생과 관리자가<br>자유롭게 소통합니다.',onclick:'goBoard()'});
     if(isStu)items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
       <div class="hc-ico ${it.color}">${it.ico}</div>
@@ -8407,7 +7909,7 @@ function previewAsStudent(stuDocId){
   S.adminPreviewSnapshot={user:S.user,studentDocId:S.studentDocId,tab:S.tab,consultStuId:S.consultStuId,opScoreStuId:S.opScoreStuId};
   S.user={type:'student',id:stu.accountId||stuDocId,name:stu.name,isPreview:true,_adminName:S.adminPreviewSnapshot.user.name||'관리자'};
   S.studentDocId=stuDocId;
-  S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.stuTab='home';
+  S.consultStuId=null;S.opScoreStuId=null;S.tab=null;
   _('stuUname').textContent=stu.name+' 학생 (관리자 미리보기)';
   showView('vStu');applyChips();renderStu();
   applyAdminPreviewBanner();
@@ -8451,14 +7953,18 @@ function goConsulting(){
     setTab(S.user.type==='admin'?'students':'bookings');
   }
 }
-function goPoints(){
+/* 자유게시판은 홈 허브에서 들어가는 별도 화면이다(멘토링 탭 안에 있지 않다). */
+function goBoard(){
   if(!S.user){goLoginView();return;}
-  if(S.user.type!=='admin'){toast('ADMIN 전용 기능입니다.','warn');goHome();return;}
-  _('pointsUname').textContent=S.user.name;
-  showView('vPoints');applyChips();
-  renderAdminPoints();
-  if(!_skipPush)navPush({v:'vPoints'});
+  _('boardUname').textContent=S.user.type==='student'
+    ?(S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생')
+    :S.user.name;
+  bdMarkSeen();
+  showView('vBoard');applyChips();
+  renderBoardView();
+  if(!_skipPush)navPush({v:'vBoard'});
 }
+function renderBoardView(){_('boardC').innerHTML=bdBoardHtml();}
 function goMyPage(){
   if(S.user?.type!=='student'){goHome();return;}
   _('myUname').textContent=S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생';
@@ -8491,7 +7997,7 @@ function renderMyPage(){
       </div>
       <div style="display:flex;gap:6px;align-items:flex-start;margin-top:10px">
         <svg viewBox="0 0 512 512" fill="#f87171" style="width:12px;height:12px;flex-shrink:0;margin-top:2px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
-        <p style="font-size:11px;color:#9ca3af;line-height:1.45">연락처 변경은 관리자에게 문의해주세요.</p>
+        <p style="font-size:11px;color:#9ca3af;line-height:1.45">연락처 변경은 선생님에게 문의해주세요.</p>
       </div>
     </div>
     <div class="card" style="margin-bottom:12px">
@@ -8995,8 +8501,8 @@ window.addEventListener('popstate',function(e){
     if(st.v==='vHome'){enterHome();}
     else if(!S.user){enterHome();}
     else if(st.v==='vMy'){goMyPage();}
+    else if(st.v==='vBoard'){goBoard();}
     else if(st.v==='vClass'){goClassroom();}
-    else if(st.v==='vPoints'){goPoints();}
     else if(st.v==='vStu'){
       if(S.user.type!=='student'){enterHome();return;}
       if(st.p==='main'){S.scoreWizardExamId=null;showView('vStu');_origRenderStu();}
