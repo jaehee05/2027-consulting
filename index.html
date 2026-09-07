@@ -8704,7 +8704,7 @@ function enterHome(){
     const isAdmin=S.user?.type==='admin';
     const bdNew=bdStuNewCount();
     if(isStu||isAdmin)items.push({ico:'💬',color:'blue',title:'자유게시판'+(bdNew>0?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':''),desc:'익명으로 자유롭게<br>이야기하는 공간입니다.',onclick:'goBoard()'});
-    if(isStu||isAdmin)items.push({ico:'❓',color:'red',title:'질문게시판',desc:'토큰으로 질문하고<br>답변을 받습니다.',onclick:'goQa()'});
+    if(isStu||isAdmin)items.push({ico:'❓',color:'red',title:'질문게시판',desc:'1:1로 질문하고<br>답변을 주고받습니다.',onclick:'goQa()'});
     if(isStu)items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
     cards.style.setProperty('--home-cols',String(items.length===4?2:Math.min(items.length,3)));
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
