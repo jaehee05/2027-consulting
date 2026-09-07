@@ -150,6 +150,12 @@ Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see
 
 **Tests**: `functions/test/`. `npm test` runs the pure pricing tests; `npm run test:emu` boots the Firestore emulator and runs everything (31 tests), including concurrency and double-grant. The emulator needs a Java runtime — this Mac has Temurin 21 at `~/.local/java/jdk-21.0.12.1+1/Contents/Home`; export `JAVA_HOME` to that and put its `bin` on `PATH` before running.
 
+### 새로고침하면 보던 화면으로 돌아온다
+
+The SPA has one URL, so a reload re-runs `init()` and used to land everyone on the home hub. `history.state` survives the reload (same URL), so `bootLand()` — called at each of `init()`'s three landing points instead of `enterHome()` — replays it through `navApply(st)`, the same dispatcher `popstate` uses. Extracting that dispatcher is the point: back-navigation and reload must not drift apart.
+
+Two guards matter. Transient student screens (`p:'book'|'cancel'|'change'|'wizard'`) degrade to `p:'main'` — the form contents are gone, so restoring the shell would show an empty wizard. And `navApply` returns `false` on a role mismatch (a student session with an `vAdmin` state, an OP with `vBoard`), which drops through to `enterHome()`.
+
 ### 자유게시판 이용 서약 · 제재 (`boardPledges` / `boardBans`)
 
 Both are **server-only writes** through `tokenApi` (`functions/moderation.js`), for the same reason: a record the subject can edit is worthless. A pledge the student could delete becomes "I never agreed"; a ban they could clear enforces nothing. Reads stay open so the client can `onSnapshot` them.

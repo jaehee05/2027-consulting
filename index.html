@@ -9485,7 +9485,7 @@ async function init(){
           if(c.role==='tablet'){showLoad(false);enterTablet();return;}
           _('adminUname').textContent=c.name||'';
           _('adminRoleLabel').textContent=c.role==='admin'?'ADMIN':'OP';
-          showLoad(false);enterHome();return;
+          showLoad(false);bootLand();return;
         }
         if(c.role==='student'){
           const stuId=c.studentId||'';
@@ -9499,7 +9499,7 @@ async function init(){
               await loadAll();
               if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
               _('stuUname').textContent=(c.isTest||stu.isTest)?stu.name+' (테스트)':stu.name+' 학생';
-              showLoad(false);enterHome();return;
+              showLoad(false);bootLand();return;
             }
           }
         }
@@ -9519,7 +9519,7 @@ async function init(){
           const stu=stuQ.docs[0].data();
           if(stu.isFirstLogin){showLoad(false);showView('vCpw');return;}
           _('stuUname').textContent=(sess.isTest||stu.isTest)?sess.name+' (테스트)':sess.name+' 학생';
-          showLoad(false);enterHome();return;
+          showLoad(false);bootLand();return;
         }
       }
       clearSession();
@@ -9573,8 +9573,9 @@ renderAdminConsult=function(){_origRenderAdminConsult();if(!_skipPush&&S.consult
 var _origRenderAdminScores=renderAdminScores;
 renderAdminScores=function(){_origRenderAdminScores();if(!_skipPush&&S.user?.type!=='admin'&&S.opScoreStuId)navPush({v:'vAdmin',tab:'scores',opScoreStuId:S.opScoreStuId});};
 
-window.addEventListener('popstate',function(e){
-  var st=e.state;if(!st)return;
+/* 뒤로가기와 새로고침이 같은 복원 경로를 쓴다. 처리했으면 true. */
+function navApply(st){
+  if(!st||!st.v)return false;
   _skipPush=true;
   try{
     if(st.v==='vHome'){enterHome();}
@@ -9595,9 +9596,23 @@ window.addEventListener('popstate',function(e){
       if(st.consultStuId){S.consultStuId=st.consultStuId;S.tab='consult';_origSetTab('consult');}
       else if(st.opScoreStuId){S.opScoreStuId=st.opScoreStuId;S.tab='scores';_origSetTab('scores');}
       else if(st.tab){if(st.tab==='consult')S.consultStuId=null;if(st.tab==='scores')S.opScoreStuId=null;_origSetTab(st.tab);}
-    }
+    }else return false;
   }finally{_skipPush=false;}
-});
+  return true;
+}
+window.addEventListener('popstate',function(e){navApply(e.state);});
+
+/* 새로고침하면 SPA 가 처음부터 뜨면서 홈으로 떨어진다. URL 은 그대로라 history.state 에
+   마지막으로 보던 화면이 남아 있으므로, 부팅이 끝나면 그리로 되돌려 준다.
+   단 예약 폼·성적 마법사처럼 입력 중이던 화면은 내용이 남아 있지 않으니 학생 홈으로 내린다. */
+function bootLand(){
+  var st=history.state;
+  if(st&&st.v&&st.v!=='vHome'){
+    if(st.v==='vStu'&&st.p!=='main')st={v:'vStu',p:'main'};
+    try{if(navApply(st))return;}catch(e){console.error('복원 실패',e);}
+  }
+  enterHome();
+}
 
 // 새 버전 자동 감지 — 페이지의 ETag/Last-Modified 가 바뀌면 새로고침 안내 배너 표시.
 // CDN(Vercel) 이 ETag 헤더를 내려주는 정적 호스팅에서만 동작; 헤더 없으면 조용히 무동작.
