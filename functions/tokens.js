@@ -202,7 +202,7 @@ async function createQuestion(fs, { student, title, body, photos }) {
 }
 
 /**
- * 댓글은 토큰을 쓰지 않는다. 학생은 자기 질문에만 달 수 있고, 그 판정은 여기(서버)서 한다.
+ * 토큰은 질문 스레드를 열 때 한 번만 부과되므로 댓글은 무료다. 학생은 자기 질문에만 달 수 있고, 그 판정은 여기(서버)서 한다.
  * 관리자가 댓글을 달면 질문이 답변완료로 넘어간다.
  */
 async function addQuestionComment(fs, { questionId, actor, body, photos }) {

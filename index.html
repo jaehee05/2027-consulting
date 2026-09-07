@@ -773,6 +773,15 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
   <div class="page" style="max-width:760px"><div id="boardC"></div></div>
 </div>
 
+<!-- 질문게시판 (토큰) -->
+<div id="vQa" class="hidden">
+  <div class="topbar np">
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" style="background:#fff7ed;color:#c2410c">질문게시판</span><span class="tname">질문게시판</span></div>
+    <div class="tr"><span class="uname" id="qaUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
+  </div>
+  <div class="page" style="max-width:900px"><div id="qaC"></div></div>
+</div>
+
 <!-- 태블릿 -->
 <div id="vTablet" class="hidden">
   <div class="topbar">
@@ -840,6 +849,7 @@ const LOGIN_URL = 'https://logintoken-tymdeyhn3q-du.a.run.app';
 const ADMIN_API_URL = 'https://asia-northeast3-consulting-dd53f.cloudfunctions.net/adminApi';
 /* 멘토링 기록 AI 초안. Anthropic 키는 이 함수만 갖고 있고 브라우저로 내려오지 않는다. */
 const MENTOR_AI_URL = 'https://asia-northeast3-consulting-dd53f.cloudfunctions.net/mentorAi';
+const TOKEN_API_URL = 'https://asia-northeast3-consulting-dd53f.cloudfunctions.net/tokenApi';
 
 const DEFAULT_INACTIVE_SLOTS = ['12:00','12:30','18:00','18:30'];
 function isDefaultInactiveSlot(slot){return DEFAULT_INACTIVE_SLOTS.includes(slot);}
@@ -880,7 +890,9 @@ const S = {
   popups:[], popupEditId:null, popupComposerOpen:false, popupShown:false, scoreGradeTab:'',
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
   posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
-  bdFilter:'all', bdModalBookingId:null
+  bdFilter:'all', bdModalBookingId:null,
+  qa:{policy:null,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',
+      composerOpen:false,openId:null,stuQuery:'',draft:null,loaded:false}
 };
 
 const _=id=>document.getElementById(id);
@@ -1718,10 +1730,12 @@ async function endTabletSession(){
 
 var _skipPush=false;
 function showView(id){
-  ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy','vTablet','vBoard'].forEach(v=>{
+  ['vSetup','vLogin','vPin','vCpw','vStu','vAdmin','vHome','vClass','vMy','vTablet','vBoard','vQa'].forEach(v=>{
     const el=_(v);if(!el)return;el.classList.toggle('hidden',v!==id);
     if(['vSetup','vLogin','vPin'].includes(v))el.style.display=v===id?'flex':'none';
   });
+  /* 질문게시판 구독은 그 화면에서만 유지한다 — 원장·결제 내역은 전교생 분량이다. */
+  if(id!=='vQa')qaStopListeners();
   applyChannelIOVisibility();
 }
 
@@ -1944,6 +1958,7 @@ function doLogout(){
   stopBookingsListener();
   stopNoticesListener();
   stopPostsListener();
+  qaStopListeners();
   stopCallsListener();
   stopTabletSessionListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
@@ -1951,6 +1966,7 @@ function doLogout(){
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
   S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;
+  S.qa={policy:null,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',composerOpen:false,openId:null,stuQuery:'',draft:null,loaded:false};
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   S._pendingAdmin=null;
@@ -3073,6 +3089,572 @@ function bdRerender(){
   const modal=_('mOv');
   if(modal&&!modal.classList.contains('hidden')&&S.bdModalBookingId)openBookDetail(S.bdModalBookingId);
   if(S.tab==='consult'&&S.consultStuId)renderConsultDetail();
+}
+
+/* ── 질문게시판 · 토큰 (collection: questions / tokenBalances / tokenLedger / paymentRequests) ──
+   자유게시판(bd*)과 완전히 별개다. 여기는 토큰을 써서 질문하고 관리자가 답변하는 1:1 게시판이라
+   학생은 자기 질문만 본다.
+   쓰기는 전부 tokenApi Cloud Function 을 거친다 — firestore.rules 가 클라이언트 쓰기를 막아 두었고,
+   잔액 차감·지급은 서버 트랜잭션 안에서만 일어나야 하기 때문이다. 읽기는 열려 있어 onSnapshot 을 쓴다. */
+
+const QA_Q_STATUS={pending:{label:'답변대기',bg:'#fef3c7',fg:'#92400e'},answered:{label:'답변완료',bg:'#dcfce7',fg:'#15803d'}};
+const QA_P_STATUS={
+  requested:{label:'요청됨',bg:'#fef3c7',fg:'#92400e'},
+  sent:{label:'발송완료',bg:'#dbeafe',fg:'#1d4ed8'},
+  paid:{label:'결제완료',bg:'#dcfce7',fg:'#15803d'},
+  canceled:{label:'취소',bg:'#f3f4f6',fg:'#6b7280'}
+};
+const QA_P_ORDER={requested:0,sent:1,paid:2,canceled:3};
+
+function fmtWon(n){return (Math.round(Number(n)||0)).toLocaleString('ko-KR')+'원';}
+function qaFmtDateTime(ts){
+  if(!ts)return '—';
+  const d=new Date(ts),p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function qaChip(map,key){
+  const s=map[key]||{label:key||'—',bg:'#f3f4f6',fg:'#6b7280'};
+  return `<span class="bx" style="font-size:10px;font-weight:700;background:${s.bg};color:${s.fg}">${s.label}</span>`;
+}
+function qaIsAdmin(){return S.user?.type==='admin';}
+function qaMyId(){return qaIsAdmin()?(S.user?.id||''):(S.studentDocId||'');}
+function qaMyBalance(){return S.qa.balances[S.studentDocId]||0;}
+function qaPolicy(){return S.qa.policy||{signupGrant:1,questionCost:1,unitPrice:1000,packages:[]};}
+function qaCost(){return qaPolicy().questionCost;}
+/* 관리자가 등록한 판매 옵션에 금액을 붙여 정렬한다. 서버의 normalizePackages 와 같은 규칙. */
+function qaPackages(activeOnly){
+  const pol=qaPolicy();
+  return (pol.packages||[]).map((p,i)=>{
+    const tokens=Math.max(0,Math.floor(Number(p.tokens)||0));
+    const list=tokens*(Number(pol.unitPrice)||0);
+    let discount=0;
+    if(p.discountType==='percent')discount=Math.floor(list*Math.min(Number(p.discountValue)||0,100)/100);
+    else if(p.discountType==='amount')discount=Math.floor(Number(p.discountValue)||0);
+    discount=Math.min(discount,list);
+    return {...p,id:p.id||('pkg_'+i),tokens,order:Number(p.order)||i,active:p.active!==false,listPrice:list,discount,amount:Math.max(0,list-discount)};
+  }).filter(p=>!activeOnly||p.active).sort((a,b)=>a.order-b.order);
+}
+
+async function qaCall(action,payload){return callFn(TOKEN_API_URL,{action,payload},true);}
+
+/* ── 실시간 구독 ──
+   화면에 들어올 때만 붙인다. 원장·결제 내역은 전교생 분량이라 부팅 때 통째로 받을 이유가 없다. */
+let _qaUnsubs=[];
+function qaStopListeners(){_qaUnsubs.forEach(u=>{try{u();}catch(e){}});_qaUnsubs=[];}
+function qaStartListeners(){
+  qaStopListeners();
+  const admin=qaIsAdmin(),me=S.studentDocId;
+  const on=(q,fn)=>_qaUnsubs.push(q.onSnapshot(fn,err=>console.error('qa listener error',err)));
+
+  on(db.doc('config/tokens'),snap=>{
+    S.qa.policy=snap.exists?snap.data():{};
+    renderQa();
+  });
+  const qCol=db.collection('questions');
+  on(admin?qCol:qCol.where('authorId','==',me),snap=>{
+    S.qa.questions=snap.docs.map(d=>({_docId:d.id,...d.data()}));
+    S.qa.loaded=true;renderQa();
+  });
+  const pCol=db.collection('paymentRequests');
+  on(admin?pCol:pCol.where('studentId','==',me),snap=>{
+    S.qa.payments=snap.docs.map(d=>({_docId:d.id,...d.data()}));
+    renderQa();
+  });
+  const bCol=db.collection('tokenBalances');
+  on(admin?bCol:bCol.where(firebase.firestore.FieldPath.documentId(),'==',me||'_none'),snap=>{
+    const out={};snap.docs.forEach(d=>{out[d.id]=Math.floor(Number(d.data().balance)||0);});
+    S.qa.balances=out;renderQa();
+  });
+}
+
+/* ── 진입 ── */
+function goQa(){
+  if(!S.user){goLoginView();return;}
+  if(S.user.type!=='student'&&S.user.type!=='admin'){toast('이용 권한이 없습니다.','warn');goHome();return;}
+  _('qaUname').textContent=S.user.type==='student'
+    ?(S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생')
+    :S.user.name;
+  S.qa.sub=qaIsAdmin()?'q':'q';
+  showView('vQa');applyChips();
+  qaStartListeners();
+  renderQa();
+  if(!_skipPush)navPush({v:'vQa'});
+}
+
+const QA_SUBS_STU=[{id:'q',label:'내 질문'},{id:'t',label:'토큰·결제'}];
+const QA_SUBS_ADM=[{id:'q',label:'질문'},{id:'p',label:'결제 요청'},{id:'b',label:'학생 잔액'},{id:'s',label:'토큰 설정'}];
+function qaSetSub(id){S.qa.sub=id;renderQa();try{window.scrollTo({top:0});}catch(_){}}
+function renderQa(){
+  const el=_('qaC');if(!el)return;
+  if(_('vQa').classList.contains('hidden'))return;
+  const admin=qaIsAdmin();
+  const subs=admin?QA_SUBS_ADM:QA_SUBS_STU;
+  const cur=S.qa.sub||'q';
+  const pend=admin?S.qa.payments.filter(p=>p.status==='requested'||p.status==='sent').length:0;
+  const tabs=`<div class="tabs">${subs.map(t=>{
+    const badge=admin&&t.id==='p'&&pend?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700">${pend}</span>`:'';
+    return `<button class="tab ${cur===t.id?'on':''}" onclick="qaSetSub('${t.id}')">${t.label}${badge}</button>`;
+  }).join('')}</div>`;
+  let body;
+  if(admin)body=cur==='p'?qaAdminPaymentsHtml():cur==='b'?qaAdminBalancesHtml():cur==='s'?qaAdminPolicyHtml():qaQuestionsHtml(true);
+  else body=cur==='t'?qaStuTokensHtml():qaQuestionsHtml(false);
+  el.innerHTML=tabs+body;
+}
+
+/* ── 질문 목록 (학생=내 것만, 관리자=전체) ── */
+const QA_FILTERS=[{id:'all',label:'전체'},{id:'pending',label:'답변대기'},{id:'answered',label:'답변완료'}];
+function qaSetFilter(f){S.qa.filter=f;renderQa();}
+function qaToggleOpen(id){S.qa.openId=S.qa.openId===id?null:id;renderQa();}
+function qaOpenComposer(){S.qa.composerOpen=true;renderQa();}
+function qaCloseComposer(){S.qa.composerOpen=false;delete S.bdDraftFiles['qa_new'];renderQa();}
+
+function qaQuestionsHtml(admin){
+  const f=S.qa.filter||'all';
+  const list=S.qa.questions
+    .filter(q=>admin||q.authorId===S.studentDocId)
+    .filter(q=>f==='all'||q.status===f)
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const cost=qaCost();
+  const bal=qaMyBalance();
+
+  let head;
+  if(admin){
+    const pend=S.qa.questions.filter(q=>q.status!=='answered').length;
+    head=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">질문 게시판</p>
+      <span style="font-size:11px;color:#6b7280">전체 ${S.qa.questions.length}${pend?` · 답변대기 ${pend}`:''}</span>
+    </div>`;
+  }else{
+    const canAsk=bal>=cost;
+    head=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">내 질문</p>
+      <span style="font-size:11px;color:#6b7280">보유 <b style="color:#1C64F2">${bal}토큰</b> · 질문 스레드 1개에 ${cost}토큰</span>
+      <div style="margin-left:auto">${S.qa.composerOpen?'':(canAsk
+        ?`<button class="btn bp bsm" style="font-size:12px;padding:6px 12px" onclick="qaOpenComposer()">+ 질문하기</button>`
+        :`<button class="btn bs bsm" style="font-size:12px;padding:6px 12px" onclick="qaSetSub('t')">토큰 구매하기</button>`)}</div>
+    </div>
+    ${canAsk?'':`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">토큰이 부족해 질문을 작성할 수 없습니다. (보유 ${bal}개 / 필요 ${cost}개)</p><p style="font-size:11px;color:#92400e;margin-top:4px">[토큰·결제] 탭에서 토큰을 구매할 수 있습니다.</p></div>`}`;
+  }
+
+  const filters=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${QA_FILTERS.map(x=>{
+    const on=f===x.id;
+    return `<button onclick="qaSetFilter('${x.id}')" style="border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#1C64F2':'#fff'};color:${on?'#fff':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${x.label}</button>`;
+  }).join('')}</div>`;
+
+  const composer=(!admin&&S.qa.composerOpen)?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
+    <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 질문 · 스레드를 열 때 ${cost}토큰이 차감됩니다</p>
+    <input class="fi" id="qa-new-title" maxlength="120" placeholder="제목 (예: 미적분 29번 풀이 질문)" style="margin-bottom:8px">
+    <textarea class="fi ta" id="qa-new-body" rows="5" placeholder="궁금한 내용을 자세히 적어 주세요."></textarea>
+    <div style="margin-top:8px">
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_new','post')"></label>
+      <span style="font-size:11px;color:#9ca3af;margin-left:8px">최대 8MB, JPEG/PNG</span>
+    </div>
+    <div id="bd-draft-anchor-post-qa_new">${bdDraftPreviewHtml('qa_new','post')}</div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn bs bsm" style="flex:1" onclick="qaCloseComposer()">취소</button>
+      <button class="btn bp bsm" style="flex:1" onclick="qaCreateQuestion()">${cost}토큰 쓰고 등록</button>
+    </div>
+  </div>`:'';
+
+  const empty=`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">${
+    admin?'조건에 맞는 질문이 없습니다.':(f==='all'?'아직 남긴 질문이 없습니다.':'조건에 맞는 질문이 없습니다.')}</div>`;
+
+  return `<div class="card" style="margin-bottom:12px">
+    ${head}${filters}${composer}
+    ${list.length?list.map(q=>qaQuestionCardHtml(q,admin)).join(''):empty}
+  </div>`;
+}
+
+function qaQuestionCardHtml(q,admin){
+  const id=q._docId;
+  const open=S.qa.openId===id;
+  const cmts=Array.isArray(q.comments)?q.comments:[];
+  const who=admin?`<b>${escapeHtml(q.authorName||'')}</b>${q.authorGrade?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:''}`:'';
+  const headline=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    ${qaChip(QA_Q_STATUS,q.status)}${who}
+    <b style="font-size:13px">${escapeHtml(q.title||'')}</b>
+    <span style="font-size:11px;color:#9ca3af;margin-left:auto">${bdFmtTs(q.createdAt)}${cmts.length?` · 댓글 ${cmts.length}`:''}</span>
+  </div>`;
+  if(!open){
+    return `<div onclick="qaToggleOpen('${id}')" style="cursor:pointer;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff">${headline}</div>`;
+  }
+
+  const canDel=admin||q.authorId===qaMyId();
+  const cmtHtml=cmts.map(c=>{
+    const isAdm=c.role==='admin';
+    const accent=isAdm?'#dc2626':'#3b82f6';
+    const badge=isAdm
+      ?`<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">${staffWord()}</span>`
+      :'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
+    const nm=isAdm&&!qaIsAdmin()?(c.name&&c.name!=='관리자'?escapeHtml(c.name)+' 선생님':'선생님'):escapeHtml(c.name||'');
+    return `<div style="border-left:3px solid ${accent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px">${badge}<b>${nm}</b><span style="color:#9ca3af">· ${bdFmtTs(c.ts)}</span></div>
+      <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body||'')}</p>
+      ${bdPhotosHtml(c.photos)}
+    </div>`;
+  }).join('');
+
+  return `<div style="border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#f8fbff">
+    <div onclick="qaToggleOpen('${id}')" style="cursor:pointer">${headline}</div>
+    <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.7;margin-top:10px">${escapeHtml(q.body||'')}</p>
+    ${bdPhotosHtml(q.photos)}
+    ${cmts.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:14px 0 6px">댓글 (${cmts.length})</p>${cmtHtml}`:''}
+    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #d7e6ff">
+      <textarea class="fi ta" id="qa-cmt-${id}" rows="2" placeholder="${admin?'학생에게 답변하기':'추가로 궁금한 점 남기기'}"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_c_${id}','comment')"></label>
+        ${canDel?`<button class="btn bd bsm" style="font-size:11px;padding:6px 10px" onclick="qaDelQuestion('${id}')">질문 삭제</button>`:''}
+        <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="qaAddComment('${id}')">${admin?'답변 등록':'댓글 등록'}</button>
+      </div>
+      <div id="bd-draft-anchor-comment-qa_c_${id}">${bdDraftPreviewHtml('qa_c_'+id,'comment')}</div>
+      <p style="font-size:11px;color:#9ca3af;margin-top:6px">토큰은 질문 스레드를 열 때 한 번만 부과됩니다. 이 스레드 안에서 주고받는 댓글에는 더 들지 않습니다.</p>
+    </div>
+  </div>`;
+}
+
+/* ── 학생: 토큰 · 결제 ── */
+function qaStuTokensHtml(){
+  const bal=qaMyBalance(),cost=qaCost(),pol=qaPolicy();
+  const pkgs=qaPackages(true);
+  const mine=S.qa.payments.filter(p=>p.studentId===S.studentDocId).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  const pkgHtml=pkgs.length?`<div class="stgrid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">${pkgs.map(p=>{
+    const off=p.discount>0;
+    return `<div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:6px">
+      <p style="font-size:18px;font-weight:800;color:#1C64F2">${p.tokens}<span style="font-size:12px;font-weight:600;color:#6b7280"> 토큰</span></p>
+      ${off?`<p style="font-size:12px;color:#9ca3af;text-decoration:line-through">${fmtWon(p.listPrice)}</p>
+        <p style="font-size:11px;color:#dc2626;font-weight:700">${p.discountType==='percent'?`${p.discountValue}% 할인`:`${fmtWon(p.discountValue)} 할인`}</p>`:''}
+      <p style="font-size:16px;font-weight:800">${fmtWon(p.amount)}</p>
+      <button class="btn bp bsm" style="margin-top:4px" onclick="qaRequestPayment('${p.id}')">결제 요청</button>
+    </div>`;}).join('')}</div>`
+    :`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">지금은 판매 중인 토큰 상품이 없습니다.</div>`;
+
+  const rows=mine.length?mine.map(p=>{
+    const canCancel=p.status==='requested'||p.status==='sent';
+    return `<tr>
+      <td data-label="상품">${p.tokens}토큰</td>
+      <td data-label="금액">${fmtWon(p.amount)}</td>
+      <td data-label="요청일시" style="font-size:12px;color:#6b7280">${qaFmtDateTime(p.createdAt)}</td>
+      <td data-label="상태">${qaChip(QA_P_STATUS,p.status)}</td>
+      <td data-label="" style="text-align:right">${canCancel?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`:''}</td>
+    </tr>`;}).join(''):`<tr><td colspan="5" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">결제 요청 내역이 없습니다.</td></tr>`;
+
+  return `<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <p style="font-size:15px;font-weight:700">내 토큰</p>
+      <span style="font-size:24px;font-weight:800;color:#1C64F2;margin-left:auto">${bal}<span style="font-size:13px;color:#6b7280;font-weight:600"> 토큰</span></span>
+    </div>
+    <p style="font-size:12px;color:#6b7280">토큰은 질문 스레드 1개당 ${cost}토큰이 부과됩니다. 한 번 열어 둔 스레드 안에서는 댓글을 몇 번 주고받아도 더 들지 않습니다.</p>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">토큰 구매</p>
+      <span style="font-size:11px;color:#6b7280">1토큰 ${fmtWon(pol.unitPrice)}</span>
+    </div>
+    ${pkgHtml}
+    <div class="info" style="margin-top:12px"><p>결제 요청을 보내면 선생님이 확인 후 <b>결제선생</b>으로 결제 링크를 보내드립니다. 결제가 확인되면 토큰이 자동으로 들어옵니다.</p></div>
+  </div>
+
+  <div class="card">
+    <p style="font-size:15px;font-weight:700;margin-bottom:12px">내 결제 요청</p>
+    <div class="tw"><table class="tw-cards">
+      <thead><tr><th>상품</th><th>금액</th><th>요청일시</th><th>상태</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+/* ── 관리자: 결제 요청 ──
+   기본은 미완료(요청됨·발송완료) 먼저, 그 안에서 최신순. */
+function qaSetPayFilter(f){S.qa.payFilter=f;renderQa();}
+function qaAdminPaymentsHtml(){
+  const f=S.qa.payFilter||'open';
+  const all=S.qa.payments;
+  const list=all.filter(p=>f==='all'?true:f==='open'?(p.status==='requested'||p.status==='sent'):p.status===f)
+    .sort((a,b)=>(QA_P_ORDER[a.status]??9)-(QA_P_ORDER[b.status]??9)||(b.createdAt||0)-(a.createdAt||0));
+
+  const filters=[{id:'open',label:'미완료'},{id:'requested',label:'요청됨'},{id:'sent',label:'발송완료'},{id:'paid',label:'결제완료'},{id:'canceled',label:'취소'},{id:'all',label:'전체'}];
+  const filterBar=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${filters.map(x=>{
+    const on=f===x.id,n=x.id==='all'?all.length:x.id==='open'?all.filter(p=>p.status==='requested'||p.status==='sent').length:all.filter(p=>p.status===x.id).length;
+    return `<button onclick="qaSetPayFilter('${x.id}')" style="border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#1C64F2':'#fff'};color:${on?'#fff':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${x.label} ${n}</button>`;
+  }).join('')}</div>`;
+
+  const rows=list.length?list.map(p=>{
+    const stu=S.students.find(s=>s._docId===p.studentId);
+    const phone=fmtPhone(p.studentPhone||effectivePhone(stu))||'—';
+    let actions='';
+    if(p.status==='requested')actions=`<button class="btn bp bsm" style="font-size:11px;padding:4px 10px" onclick="qaMarkSent('${p._docId}')">발송 완료</button>
+      <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`;
+    else if(p.status==='sent')actions=`<button class="btn bp bsm" style="font-size:11px;padding:4px 10px;background:#15803d;border-color:#15803d" onclick="qaMarkPaid('${p._docId}')">결제 완료</button>
+      <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`;
+    const trail=[
+      p.sentAt?`발송 ${qaFmtDateTime(p.sentAt)}${p.sentByName?` · ${escapeHtml(p.sentByName)}`:''}`:'',
+      p.paidAt?`결제확인 ${qaFmtDateTime(p.paidAt)}${p.paidByName?` · ${escapeHtml(p.paidByName)}`:''}`:'',
+      p.canceledAt?`취소 ${qaFmtDateTime(p.canceledAt)}${p.canceledByName?` · ${escapeHtml(p.canceledByName)}`:''}`:''
+    ].filter(Boolean).join(' / ');
+    return `<tr>
+      <td data-label="학생"><b>${escapeHtml(p.studentName||stu?.name||'')}</b></td>
+      <td data-label="연락처" style="font-size:12px">${phone}</td>
+      <td data-label="토큰" style="text-align:center">${p.tokens}</td>
+      <td data-label="금액" style="font-weight:700">${fmtWon(p.amount)}</td>
+      <td data-label="요청일시" style="font-size:12px;color:#6b7280">${qaFmtDateTime(p.createdAt)}</td>
+      <td data-label="상태">${qaChip(QA_P_STATUS,p.status)}${trail?`<div style="font-size:10px;color:#9ca3af;margin-top:3px">${trail}</div>`:''}</td>
+      <td data-label="" style="text-align:right;white-space:nowrap">${actions}</td>
+    </tr>`;}).join(''):`<tr><td colspan="7" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">해당하는 결제 요청이 없습니다.</td></tr>`;
+
+  return `<div class="card">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">결제 요청</p>
+      <span style="font-size:11px;color:#6b7280">결제선생 알림톡을 보낸 뒤 [발송 완료], 입금이 확인되면 [결제 완료]를 누르면 토큰이 지급됩니다.</span>
+    </div>
+    ${filterBar}
+    <div class="tw"><table class="tw-cards tw-wide">
+      <thead><tr><th>학생</th><th>연락처</th><th>토큰</th><th>금액</th><th>요청일시</th><th>상태</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+/* ── 관리자: 학생 잔액 · 수동 증감 ── */
+function qaSetStuQuery(v){S.qa.stuQuery=v;renderQa();}
+function qaAdminBalancesHtml(){
+  const q=(S.qa.stuQuery||'').trim();
+  const list=bookableStu()
+    .filter(s=>!q||s.name.includes(q)||(s.school||'').includes(q))
+    .sort((a,b)=>(a.seat||999)-(b.seat||999));
+  const total=Object.values(S.qa.balances).reduce((n,v)=>n+v,0);
+  const missing=list.filter(s=>S.qa.balances[s._docId]===undefined).length;
+
+  const rows=list.map(s=>{
+    const bal=S.qa.balances[s._docId];
+    const used=S.qa.questions.filter(x=>x.authorId===s._docId).length;
+    return `<tr>
+      <td data-label="좌석" style="text-align:center">${s.seat||'—'}</td>
+      <td data-label="이름"><b>${escapeHtml(s.name)}</b></td>
+      <td data-label="학년">${escapeHtml(s.grade||'—')}</td>
+      <td data-label="잔액" style="text-align:center;font-weight:700;color:${bal?'#1C64F2':'#9ca3af'}">${bal===undefined?'—':bal}</td>
+      <td data-label="질문" style="text-align:center;color:#6b7280">${used}</td>
+      <td data-label="" style="text-align:right;white-space:nowrap">
+        <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaOpenAdjust('${s._docId}')">증감</button>
+      </td>
+    </tr>`;}).join('');
+
+  return `<div class="card">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">학생 잔액</p>
+      <span style="font-size:11px;color:#6b7280">발행 합계 ${total}토큰</span>
+      ${missing?`<button class="btn bs bsm" style="font-size:11px;padding:6px 10px" onclick="qaBackfill()">잔액 없는 ${missing}명에게 기본 지급</button>`:''}
+      <input class="fi" style="max-width:200px;margin-left:auto" placeholder="이름·학교 검색" value="${escapeHtml(q)}" oninput="qaSetStuQuery(this.value)">
+    </div>
+    <div class="tw"><table class="tw-cards">
+      <thead><tr><th>좌석</th><th>이름</th><th>학년</th><th>잔액</th><th>질문</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">학생이 없습니다.</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function qaOpenAdjust(stuId){
+  const stu=S.students.find(s=>s._docId===stuId);if(!stu)return;
+  const bal=S.qa.balances[stuId]||0;
+  _('mCt').innerHTML=`<p class="mtitle">토큰 수동 증감</p>
+    <p class="msub">${escapeHtml(stu.name)} · 현재 <b>${bal}토큰</b></p>
+    <div class="fg"><label class="fl">증감량 (음수면 차감)</label><input class="fi" id="qa-adj-delta" type="number" step="1" placeholder="예) 5 또는 -2"></div>
+    <div class="fg"><label class="fl">사유 (선택)</label><input class="fi" id="qa-adj-note" maxlength="60" placeholder="예) 이벤트 지급"></div>
+    <p class="ferr" id="mErr"></p>
+    <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">취소</button><button class="btn bp bfw" onclick="qaAdjust('${stuId}')">적용</button></div>`;
+  openModal();
+}
+
+/* ── 관리자: 토큰 정책 · 판매 옵션 ── */
+function qaPolicyDraft(){
+  if(!S.qa.draft){
+    const pol=qaPolicy();
+    S.qa.draft={
+      signupGrant:pol.signupGrant,questionCost:pol.questionCost,unitPrice:pol.unitPrice,
+      packages:qaPackages(false).map(p=>({id:p.id,tokens:p.tokens,active:p.active,order:p.order,discountType:p.discountType||'none',discountValue:p.discountValue||0}))
+    };
+  }
+  return S.qa.draft;
+}
+function qaSyncDraftFromDom(){
+  const d=qaPolicyDraft();
+  const g=id=>Number(_(id)?.value)||0;
+  d.signupGrant=Math.max(0,Math.floor(g('qa-p-signup')));
+  d.questionCost=Math.max(0,Math.floor(g('qa-p-cost')));
+  d.unitPrice=Math.max(0,Math.floor(g('qa-p-unit')));
+  d.packages=d.packages.map((p,i)=>({
+    id:p.id,
+    tokens:Math.max(0,Math.floor(Number(_(`qa-pk-tokens-${i}`)?.value)||0)),
+    active:!!_(`qa-pk-active-${i}`)?.checked,
+    order:Math.floor(Number(_(`qa-pk-order-${i}`)?.value)||i),
+    discountType:_(`qa-pk-dtype-${i}`)?.value||'none',
+    discountValue:Math.max(0,Number(_(`qa-pk-dval-${i}`)?.value)||0)
+  }));
+  return d;
+}
+function qaAddPackage(){qaSyncDraftFromDom().packages.push({id:'pkg_'+uid(),tokens:5,active:true,order:S.qa.draft.packages.length,discountType:'none',discountValue:0});renderQa();}
+function qaRemovePackage(i){const d=qaSyncDraftFromDom();d.packages.splice(i,1);renderQa();}
+function qaResetPolicy(){S.qa.draft=null;renderQa();}
+
+function qaAdminPolicyHtml(){
+  const d=qaPolicyDraft();
+  const pkgRows=d.packages.map((p,i)=>{
+    const list=p.tokens*d.unitPrice;
+    let disc=0;
+    if(p.discountType==='percent')disc=Math.floor(list*Math.min(p.discountValue,100)/100);
+    else if(p.discountType==='amount')disc=Math.floor(p.discountValue);
+    disc=Math.min(disc,list);
+    return `<div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;align-items:end">
+        <div class="fg" style="margin:0"><label class="fl">토큰 수</label><input class="fi" id="qa-pk-tokens-${i}" type="number" min="1" value="${p.tokens}" oninput="qaSyncDraftFromDom();renderQa()"></div>
+        <div class="fg" style="margin:0"><label class="fl">할인 방식</label>
+          <select class="fi fsel" id="qa-pk-dtype-${i}" onchange="qaSyncDraftFromDom();renderQa()">
+            <option value="none" ${p.discountType==='none'?'selected':''}>없음</option>
+            <option value="percent" ${p.discountType==='percent'?'selected':''}>정률(%)</option>
+            <option value="amount" ${p.discountType==='amount'?'selected':''}>정액(원)</option>
+          </select></div>
+        <div class="fg" style="margin:0"><label class="fl">할인 값</label><input class="fi" id="qa-pk-dval-${i}" type="number" min="0" value="${p.discountValue}" ${p.discountType==='none'?'disabled':''} oninput="qaSyncDraftFromDom();renderQa()"></div>
+        <div class="fg" style="margin:0"><label class="fl">정렬</label><input class="fi" id="qa-pk-order-${i}" type="number" value="${p.order}" oninput="qaSyncDraftFromDom()"></div>
+        <div class="fg" style="margin:0"><label class="fl">노출</label>
+          <label style="display:flex;align-items:center;gap:6px;height:40px;font-size:13px"><input type="checkbox" id="qa-pk-active-${i}" ${p.active?'checked':''} onchange="qaSyncDraftFromDom();renderQa()"> 활성</label></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:#6b7280">정가 ${fmtWon(list)}${disc?` − 할인 ${fmtWon(disc)}`:''} =</span>
+        <b style="font-size:14px">${fmtWon(Math.max(0,list-disc))}</b>
+        <button class="btn bd bsm" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="qaRemovePackage(${i})">삭제</button>
+      </div>
+    </div>`;}).join('');
+
+  return `<div class="card" style="margin-bottom:12px">
+    <p style="font-size:15px;font-weight:700;margin-bottom:12px">토큰 정책</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">
+      <div class="fg" style="margin:0"><label class="fl">신규 학생 기본 지급 (개)</label><input class="fi" id="qa-p-signup" type="number" min="0" value="${d.signupGrant}" oninput="qaSyncDraftFromDom()"></div>
+      <div class="fg" style="margin:0"><label class="fl">질문 스레드 1개 차감 (개)</label><input class="fi" id="qa-p-cost" type="number" min="0" value="${d.questionCost}" oninput="qaSyncDraftFromDom()"></div>
+      <div class="fg" style="margin:0"><label class="fl">1토큰 단가 (원)</label><input class="fi" id="qa-p-unit" type="number" min="0" value="${d.unitPrice}" oninput="qaSyncDraftFromDom();renderQa()"></div>
+    </div>
+    <p style="font-size:11px;color:#9ca3af">기본 지급량은 앞으로 등록되는 학생부터 적용됩니다. 이미 등록된 학생은 [학생 잔액] 탭에서 일괄 지급하세요.</p>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">판매 옵션</p>
+      <span style="font-size:11px;color:#6b7280">최종 금액 = 토큰 수 × 단가 − 할인 (0원 미만 불가)</span>
+      <button class="btn bs bsm" style="font-size:11px;padding:6px 10px;margin-left:auto" onclick="qaAddPackage()">+ 옵션 추가</button>
+    </div>
+    ${pkgRows||'<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">등록된 판매 옵션이 없습니다.</div>'}
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn bs" style="flex:1" onclick="qaResetPolicy()">되돌리기</button>
+      <button class="btn bp" style="flex:1" onclick="qaSavePolicy()">저장</button>
+    </div>
+  </div>`;
+}
+
+/* ── 액션 ──
+   전부 tokenApi 를 거친다. 성공하면 onSnapshot 이 알아서 화면을 갱신하므로 로컬 상태를 손대지 않는다. */
+async function qaUploadDrafts(scope,kind){
+  const bucket=kind==='comment'?S.bdCommentDraftFiles:S.bdDraftFiles;
+  const drafts=bucket[scope]||[];
+  if(!drafts.length)return [];
+  const batchId='u_'+uid();
+  const out=[];
+  for(const f of drafts)out.push(await bdUploadPhoto(f.file,batchId,'qa'));
+  return out;
+}
+async function qaCreateQuestion(){
+  const title=(_('qa-new-title')?.value||'').trim();
+  const body=(_('qa-new-body')?.value||'').trim();
+  if(!title){toast('제목을 입력하세요.','warn');return;}
+  if(!body){toast('내용을 입력하세요.','warn');return;}
+  showLoad(true);
+  try{
+    const photos=await qaUploadDrafts('qa_new','post');
+    const r=await qaCall('createQuestion',{title,body,photos});
+    delete S.bdDraftFiles['qa_new'];
+    S.qa.composerOpen=false;S.qa.openId=r.id;
+    toast(`질문이 등록되었습니다. (남은 토큰 ${r.balance}개)`,'success');
+    renderQa();
+  }catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaAddComment(id){
+  const body=(_('qa-cmt-'+id)?.value||'').trim();
+  const scope='qa_c_'+id;
+  const has=(S.bdCommentDraftFiles[scope]||[]).length;
+  if(!body&&!has){toast('내용 또는 사진을 입력하세요.','warn');return;}
+  showLoad(true);
+  try{
+    const photos=await qaUploadDrafts(scope,'comment');
+    await qaCall('addComment',{questionId:id,body,photos});
+    delete S.bdCommentDraftFiles[scope];
+    renderQa();
+  }catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaDelQuestion(id){
+  if(!(await confirmDialog({title:'질문 삭제',message:'이 질문을 삭제하시겠습니까? 이미 차감된 토큰은 돌려드리지 않습니다.',confirmLabel:'삭제',kind:'danger'})))return;
+  showLoad(true);
+  try{await qaCall('deleteQuestion',{questionId:id});S.qa.openId=null;renderQa();}
+  catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaRequestPayment(pkgId){
+  const p=qaPackages(true).find(x=>x.id===pkgId);if(!p)return;
+  if(!(await confirmDialog({title:'결제 요청',message:`${p.tokens}토큰을 ${fmtWon(p.amount)}에 요청합니다.\n선생님이 확인 후 결제선생으로 결제 링크를 보내드립니다.`,confirmLabel:'요청하기'})))return;
+  showLoad(true);
+  try{await qaCall('requestPayment',{packageId:pkgId});toast('결제 요청을 보냈습니다.','success');}
+  catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaCancelPayment(id){
+  if(!(await confirmDialog({title:'결제 요청 취소',message:'이 결제 요청을 취소하시겠습니까?',confirmLabel:'취소하기',kind:'danger'})))return;
+  showLoad(true);
+  try{await qaCall('cancelPayment',{requestId:id});}
+  catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaMarkSent(id){
+  showLoad(true);
+  try{await qaCall('markPaymentSent',{requestId:id});toast('발송 완료로 바꿨습니다.','success');}
+  catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaMarkPaid(id){
+  const p=S.qa.payments.find(x=>x._docId===id);if(!p)return;
+  if(!(await confirmDialog({title:'결제 완료',message:`${p.studentName} 학생에게 ${p.tokens}토큰을 지급합니다. (${fmtWon(p.amount)})`,confirmLabel:'지급'})))return;
+  showLoad(true);
+  try{const r=await qaCall('markPaymentPaid',{requestId:id});toast(`토큰을 지급했습니다. (잔액 ${r.balance}개)`,'success');}
+  catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaAdjust(stuId){
+  const delta=Number(_('qa-adj-delta')?.value);
+  const note=(_('qa-adj-note')?.value||'').trim();
+  if(!delta){showErr('mErr','증감량을 입력해 주세요.');return;}
+  showLoad(true);
+  try{
+    const r=await qaCall('adjustTokens',{studentId:stuId,delta,note});
+    closeModal();toast(`잔액이 ${r.balance}토큰이 되었습니다.`,'success');
+  }catch(e){showErr('mErr',e.message);}
+  showLoad(false);
+}
+async function qaSavePolicy(){
+  const d=qaSyncDraftFromDom();
+  showLoad(true);
+  try{
+    await qaCall('savePolicy',d);
+    S.qa.draft=null;
+    toast('저장되었습니다.','success');
+    renderQa();
+  }catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaBackfill(){
+  if(!(await confirmDialog({title:'기본 토큰 일괄 지급',message:'잔액 기록이 없는 학생에게 기본 지급량만큼 채워 줍니다. 이미 잔액이 있는 학생은 건드리지 않습니다.',confirmLabel:'지급'})))return;
+  showLoad(true);
+  try{const r=await qaCall('backfillGrants',{});toast(`${r.granted}명에게 지급했습니다.`,'success');}
+  catch(e){toast(e.message,'error');}
+  showLoad(false);
 }
 
 // 공지사항 게시판. 정렬: 고정(pinned) → 최신 createdAt 순. 작성/수정/삭제/고정은 관리자(ADMIN/OP)만.
@@ -7886,6 +8468,7 @@ function enterHome(){
     const isAdmin=S.user?.type==='admin';
     const bdNew=bdStuNewCount();
     if(isStu||isAdmin)items.push({ico:'💬',color:'blue',title:'자유게시판'+(bdNew>0?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':''),desc:'학생과 관리자가<br>자유롭게 소통합니다.',onclick:'goBoard()'});
+    if(isStu||isAdmin)items.push({ico:'❓',color:'red',title:'질문게시판',desc:'토큰으로 질문하고<br>답변을 받습니다.',onclick:'goQa()'});
     if(isStu)items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
       <div class="hc-ico ${it.color}">${it.ico}</div>
@@ -8503,6 +9086,7 @@ window.addEventListener('popstate',function(e){
     else if(!S.user){enterHome();}
     else if(st.v==='vMy'){goMyPage();}
     else if(st.v==='vBoard'){goBoard();}
+    else if(st.v==='vQa'){goQa();}
     else if(st.v==='vClass'){goClassroom();}
     else if(st.v==='vStu'){
       if(S.user.type!=='student'){enterHome();return;}
