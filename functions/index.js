@@ -6,6 +6,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
 const { sendAlimtalk, sendAlimtalkToAdmins } = require("./ppurio");
+const tokens = require("./tokens");
 
 setGlobalOptions({ region: "asia-northeast3", retry: false, maxInstances: 10 });
 
@@ -899,3 +900,135 @@ exports.mentorAi = onRequest(
     }
   }
 );
+
+/* ── 토큰 · 질문게시판 · 결제 요청 ──
+   firestore.rules 가 tokenBalances/tokenLedger/questions/paymentRequests/config-tokens 의
+   클라이언트 쓰기를 막아 두었으므로, 이 엔드포인트가 유일한 쓰기 경로다.
+   인증: Authorization: Bearer <Firebase ID Token>. 학생은 자기 것만, 관리자 액션은 admin 만. */
+
+// 학생/관리자 공용 인증. 반환값의 role 은 'student' | 'admin' | 'viewer'.
+async function verifyAnyAuth(req) {
+  const auth = req.headers.authorization || "";
+  if (!auth.startsWith("Bearer ")) return null;
+  const idToken = auth.slice(7).trim();
+  if (!idToken) return null;
+  try {
+    return await admin.auth().verifyIdToken(idToken);
+  } catch (e) {
+    return null;
+  }
+}
+
+// 신규 학생 기본 지급. 트리거는 재시도될 수 있으므로 grantSignupTokens 가 멱등하다.
+exports.onStudentCreate = onDocumentCreated("students/{id}", async (e) => {
+  try {
+    await tokens.grantSignupTokens(admin.firestore(), e.params.id, {
+      by: { id: "system", name: "자동 지급" },
+    });
+  } catch (err) {
+    console.error("onStudentCreate 기본 토큰 지급 실패:", e.params.id, err);
+  }
+});
+
+exports.tokenApi = onRequest(async (req, res) => {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  const fs = admin.firestore();
+  const { action, payload } = req.body || {};
+  const p = payload || {};
+
+  const decoded = await verifyAnyAuth(req);
+  if (!decoded) return res.status(401).json({ error: "로그인이 필요합니다." });
+
+  const isAdmin = decoded.role === "admin";
+  // OP(viewer)는 멘토링 화면만 쓴다. 질문게시판·토큰·결제는 학생과 ADMIN 만.
+  if (!isAdmin && decoded.role !== "student") {
+    return res.status(403).json({ error: "이용 권한이 없습니다." });
+  }
+  const actor = {
+    id: isAdmin ? decoded.loginId || decoded.uid : decoded.studentId || "",
+    name: decoded.name || "",
+    role: isAdmin ? "admin" : "student",
+  };
+  const by = { id: actor.id, name: actor.name };
+
+  // 학생이 자기 학생 문서를 실제로 갖고 있는지 확인한 뒤에만 학생 액션을 태운다.
+  async function requireStudent() {
+    if (isAdmin) throw new tokens.ApiError(403, "학생 계정만 이용할 수 있습니다.");
+    if (!decoded.studentId) throw new tokens.ApiError(403, "학생 정보가 연결되지 않은 계정입니다.");
+    const snap = await fs.doc(`students/${decoded.studentId}`).get();
+    if (!snap.exists) throw new tokens.ApiError(403, "학생 정보를 찾을 수 없습니다.");
+    const s = snap.data();
+    if (s.withdrawn === true) throw new tokens.ApiError(403, "퇴원 처리된 계정입니다.");
+    return {
+      id: decoded.studentId,
+      name: s.name || decoded.name || "",
+      grade: s.grade || "",
+      phone: s.noStudentPhone ? s.guardianPhone || "" : s.studentPhone || "",
+    };
+  }
+  function requireAdmin() {
+    if (!isAdmin) throw new tokens.ApiError(403, "ADMIN 권한이 필요합니다.");
+  }
+
+  try {
+    switch (action) {
+      /* 조회 — 학생·관리자 모두 */
+      case "policy":
+        return res.json(await tokens.getPolicy(fs));
+
+      /* 학생 */
+      case "createQuestion": {
+        const student = await requireStudent();
+        return res.json(await tokens.createQuestion(fs, {
+          student, title: p.title, body: p.body, photos: p.photos,
+        }));
+      }
+      case "requestPayment": {
+        const student = await requireStudent();
+        return res.json(await tokens.createPaymentRequest(fs, { student, packageId: p.packageId }));
+      }
+
+      /* 학생·관리자 공용 — 권한 판정은 tokens.js 안에서 한다 */
+      case "addComment":
+        if (!isAdmin) await requireStudent();
+        return res.json(await tokens.addQuestionComment(fs, {
+          questionId: p.questionId, actor, body: p.body, photos: p.photos,
+        }));
+      case "deleteQuestion":
+        if (!isAdmin) await requireStudent();
+        return res.json(await tokens.deleteQuestion(fs, { questionId: p.questionId, actor }));
+      case "cancelPayment":
+        if (!isAdmin) await requireStudent();
+        return res.json(await tokens.cancelPaymentRequest(fs, { requestId: p.requestId, by, actor }));
+
+      /* 관리자 */
+      case "savePolicy":
+        requireAdmin();
+        return res.json(await tokens.savePolicy(fs, p));
+      case "adjustTokens":
+        requireAdmin();
+        return res.json(await tokens.adjustTokens(fs, {
+          studentId: p.studentId, delta: p.delta, note: p.note, by,
+        }));
+      case "markPaymentSent":
+        requireAdmin();
+        return res.json(await tokens.markPaymentSent(fs, { requestId: p.requestId, by }));
+      case "markPaymentPaid":
+        requireAdmin();
+        return res.json(await tokens.markPaymentPaid(fs, { requestId: p.requestId, by }));
+      case "backfillGrants":
+        requireAdmin();
+        return res.json(await tokens.backfillSignupGrants(fs, { by }));
+
+      default:
+        return res.status(400).json({ error: `알 수 없는 action: ${action}` });
+    }
+  } catch (err) {
+    if (err instanceof tokens.ApiError) return res.status(err.status).json({ error: err.message });
+    console.error("tokenApi 오류:", action, err);
+    return res.status(500).json({ error: String((err && err.message) || err) });
+  }
+});

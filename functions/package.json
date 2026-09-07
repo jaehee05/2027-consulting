@@ -2,14 +2,25 @@
   "name": "functions",
   "description": "뿌리오 알림톡 자동화 Cloud Functions",
   "main": "index.js",
-  "engines": { "node": "22" },
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test": "jest --testPathIgnorePatterns emulator",
+    "test:emu": "firebase emulators:exec --only firestore --project consulting-token-test \"jest\""
   },
   "dependencies": {
     "firebase-admin": "^12.7.0",
     "firebase-functions": "^6.0.1"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000
+  }
 }

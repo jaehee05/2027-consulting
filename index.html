@@ -7885,7 +7885,7 @@ function enterHome(){
     const isStu=S.user?.type==='student';
     const isAdmin=S.user?.type==='admin';
     const bdNew=bdStuNewCount();
-    items.push({ico:'💬',color:'blue',title:'자유게시판'+(bdNew>0?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':''),desc:'학생과 관리자가<br>자유롭게 소통합니다.',onclick:'goBoard()'});
+    if(isStu||isAdmin)items.push({ico:'💬',color:'blue',title:'자유게시판'+(bdNew>0?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':''),desc:'학생과 관리자가<br>자유롭게 소통합니다.',onclick:'goBoard()'});
     if(isStu)items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
       <div class="hc-ico ${it.color}">${it.ico}</div>
@@ -7956,6 +7956,7 @@ function goConsulting(){
 /* 자유게시판은 홈 허브에서 들어가는 별도 화면이다(멘토링 탭 안에 있지 않다). */
 function goBoard(){
   if(!S.user){goLoginView();return;}
+  if(S.user.type!=='student'&&S.user.type!=='admin'){toast('이용 권한이 없습니다.','warn');goHome();return;}
   _('boardUname').textContent=S.user.type==='student'
     ?(S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생')
     :S.user.name;
