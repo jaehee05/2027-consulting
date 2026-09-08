@@ -249,6 +249,13 @@ cd mobile && npm run android
 
 There are **no automated tests, linters, or build steps** for the web app. `index.html` is served as-is by Vercel.
 
+## 모바일 (표와 아래쪽 버튼)
+
+- **카드 모드 클래스는 감싸는 `div` 에 붙인다**: `<div class="tw tw-cards tw-wide"><table>`. CSS 가 전부 `.tw-cards>table…` 이라 `<table class="tw-cards">` 로 달면 규칙이 하나도 먹지 않고, 모바일에서 `<thead>` 가 그대로 남은 날것의 표가 나온다.
+- 카드 모드에서 쓰는 도구: 첫 칸에 `cell-head`(이름+상태칩), 버튼 칸에 `cell-actions`, 카드 머리에 이미 들어간 칸은 `cell-hide`, 보조 문구는 `.only-mobile` span. **행마다 칸 수가 달라지면 안 된다** — 조건부로 `<td>` 를 넣고 빼면 데스크톱 표의 열이 어긋난다. 넣고 빼는 건 셀 안의 span 으로.
+- `#kakaoCh` 런처는 화면 오른쪽 아래에 떠 있어 게시판의 [글쓰기]·[등록] 버튼과 겹친다. `showView` 가 `body.has-fab` 를 붙여 그 화면에서만 런처를 접는다.
+- 댓글 액션(대댓글·공감·신고·삭제)은 좁은 화면에서 본문 옆에 두면 본문 폭이 반으로 준다. `.bd-cmt-acts` 가 640px 이하에서 아래 줄로 내려간다.
+
 ## Conventions and quirks
 
 - **UI language is Korean.** User-facing strings, comments, and commit messages are in Korean. Don't translate them.

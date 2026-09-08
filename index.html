@@ -116,6 +116,16 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 #kakaoCh:active{transform:translateY(0)}
 #kakaoCh svg{width:27px;height:27px;display:block;fill:#1C64F2}
 @media(max-width:640px){#kakaoCh{right:14px;bottom:14px;width:52px;height:52px}#kakaoCh svg{width:25px;height:25px}}
+/* 게시판 화면은 아래쪽에 버튼이 몰려 있어 카카오 런처와 겹친다. 그 화면에서만 런처를 접어 둔다. */
+body.has-fab #kakaoCh{display:none}
+@media(max-width:640px){
+  /* 댓글 액션(대댓글·공감·신고·삭제)을 옆에 두면 본문 폭이 절반으로 줄어든다. 아래로 내린다. */
+  .bd-cmt-row{flex-wrap:wrap}
+  .bd-cmt-acts{width:100%;justify-content:flex-end;margin-top:2px;gap:12px}
+  /* 1열에서는 할인 자리를 비워 둘 필요가 없다 */
+  .qa-pkg-mid{min-height:0!important;flex:none!important}
+  .qa-pkg-mid:empty{display:none}
+}
 /* 정오표(멘토링) */
 .wa-sec{padding:12px 0;border-top:1px solid var(--gray-100);page-break-inside:avoid;break-inside:avoid}
 .wa-sec .wa-h,.wa-sec .wa-part{page-break-after:avoid;break-after:avoid}
@@ -200,6 +210,8 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .tw-wide>table th:nth-child(2),.tw-wide>table td:nth-child(2){left:56px;min-width:58px}
 .tw-wide>table th:nth-child(3),.tw-wide>table td:nth-child(3){left:114px;min-width:92px;box-shadow:1px 0 0 var(--gray-200)}
 .tw-wide>table tbody tr:hover td:nth-child(-n+3){background:var(--gray-50)}
+/* 카드 모드에서만 보이는 보조 문구 — 표로 볼 때는 이미 다른 열에 들어 있다. */
+.only-mobile{display:none}
 /* 요약 타일 — 시험 수만큼 세로로 쌓이지 않도록 한 줄 가로 스크롤 */
 .sum-row{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
 .sum-row>div{flex:0 0 auto;min-width:112px;background:var(--gray-50,#f9fafb);border:1px solid var(--gray-100,#f3f4f6);border-radius:10px;padding:8px 12px}
@@ -402,6 +414,7 @@ tr:last-child td{border-bottom:none}
   .tw-cards td.cell-actions{margin-top:6px;padding:6px 0 0!important;border-top:1px solid var(--gray-100)!important;justify-content:flex-end}
   .tw-cards td.cell-actions .btn{height:28px;padding:0 10px;font-size:11px}
   .tw-cards td.cell-hide{display:none!important}
+  .only-mobile{display:inline}
   .tw-cards td.cell-full{display:block;text-align:left!important;padding:4px 0!important}
   .tw-cards td.cell-full::before{display:block;margin-bottom:2px}
   .mtitle{font-size:16px}
@@ -1760,6 +1773,8 @@ function showView(id){
   });
   /* 질문게시판 구독은 그 화면에서만 유지한다 — 원장·결제 내역은 전교생 분량이다. */
   if(id!=='vQa')qaStopListeners();
+  /* 게시판 화면은 화면 아래에 버튼이 몰려 카카오 런처와 겹친다. */
+  document.body.classList.toggle('has-fab',id==='vBoard'||id==='vQa');
   applyChannelIOVisibility();
 }
 
@@ -3148,8 +3163,8 @@ function bdCommentRowHtml(q,c,staff,depth){
   const liked=likes.includes(me);
   const reported=(c.reports||[]).some(r=>r.byId===me);
   const rptMark=staff&&(c.reports||[]).length?`<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">신고 ${c.reports.length}</span>`:'';
-  return `<div style="padding:12px 0 12px ${depth?'34px':'0'};border-top:1px solid #f1f3f5">
-    <div style="display:flex;align-items:flex-start;gap:8px">
+  return `<div class="bd-cmt" style="padding:12px 0 12px ${depth?'22px':'0'};border-top:1px solid #f1f3f5">
+    <div class="bd-cmt-row" style="display:flex;align-items:flex-start;gap:8px">
       ${BD_AVATAR_SM}
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -3160,7 +3175,7 @@ function bdCommentRowHtml(q,c,staff,depth){
         ${bdPhotosHtml(c.photos)}
         <p style="font-size:11px;color:#9ca3af;margin-top:6px">${bdAbsTs(c.ts)}</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+      <div class="bd-cmt-acts" style="display:flex;gap:8px;align-items:center;flex-shrink:0">
         ${depth?'':`<button onclick="bdStartReply('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:12px;cursor:pointer;padding:2px 3px">대댓글</button>`}
         <button onclick="bdToggleCommentLike('${id}','${c._id}')" style="background:none;border:none;color:${liked?'#dc2626':'#9ca3af'};font-size:12px;cursor:pointer;padding:2px 3px;font-weight:${liked?'700':'400'}">공감${likes.length?' '+likes.length:''}</button>
         ${mine?'':`<button onclick="bdOpenReport('${id}','${c._id}')" style="background:none;border:none;color:${reported?'#dc2626':'#9ca3af'};font-size:12px;cursor:pointer;padding:2px 3px">신고</button>`}
@@ -3783,7 +3798,7 @@ function qaStuTokensHtml(){
     const off=p.discount>0;
     return `<div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px;background:#fff;display:flex;flex-direction:column">
       <p style="font-size:18px;font-weight:800;color:#1C64F2">${p.tokens}<span style="font-size:12px;font-weight:600;color:#6b7280"> 토큰</span>${p.bonus?`<span style="font-size:14px;color:#15803d;font-weight:800"> + ${p.bonus}</span>`:''}</p>
-      <div style="flex:1;min-height:34px;margin-top:6px">
+      <div class="qa-pkg-mid" style="flex:1;min-height:34px;margin-top:6px">
         ${p.bonus?`<p style="font-size:11px;color:#15803d;font-weight:700">보너스 ${p.bonus}토큰</p>`:''}
         ${off?`<p style="font-size:12px;color:#9ca3af;text-decoration:line-through">${fmtWon(p.listPrice)}</p>
         <p style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">${p.discountType==='percent'?`${p.discountValue}% 할인`:`${fmtWon(p.discountValue)} 할인`}</p>`:''}</div>
@@ -3795,11 +3810,11 @@ function qaStuTokensHtml(){
   const rows=mine.length?mine.map(p=>{
     const canCancel=p.status==='requested'||p.status==='sent';
     return `<tr>
-      <td data-label="상품">${p.tokens}토큰${p.bonus?`<span style="font-size:11px;color:#15803d;font-weight:700"> +${p.bonus}</span>`:''}</td>
+      <td data-label="" class="cell-head"><b>${p.tokens}토큰${p.bonus?`<span style="font-size:11px;color:#15803d;font-weight:700"> +${p.bonus}</span>`:''}</b><span class="head-meta">${qaChip(QA_P_STATUS,p.status)}</span></td>
       <td data-label="금액">${fmtWon(p.amount)}</td>
       <td data-label="요청일시" style="font-size:12px;color:#6b7280">${qaFmtDateTime(p.createdAt)}</td>
-      <td data-label="상태">${qaChip(QA_P_STATUS,p.status)}</td>
-      <td data-label="" style="text-align:right">${canCancel?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`:''}</td>
+      <td data-label="상태" class="cell-hide">${qaChip(QA_P_STATUS,p.status)}</td>
+      <td data-label="" class="cell-actions">${canCancel?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`:''}</td>
     </tr>`;}).join(''):`<tr><td colspan="5" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">결제 요청 내역이 없습니다.</td></tr>`;
 
   return `<div class="card" style="margin-bottom:12px">
@@ -3822,7 +3837,7 @@ function qaStuTokensHtml(){
 
   <div class="card">
     <p style="font-size:15px;font-weight:700;margin-bottom:12px">내 결제 요청</p>
-    <div class="tw"><table class="tw-cards">
+    <div class="tw tw-cards"><table>
       <thead><tr><th>상품</th><th>금액</th><th>요청일시</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
@@ -3858,13 +3873,13 @@ function qaAdminPaymentsHtml(){
       p.canceledAt?`취소 ${qaFmtDateTime(p.canceledAt)}${p.canceledByName?` · ${escapeHtml(p.canceledByName)}`:''}`:''
     ].filter(Boolean).join(' / ');
     return `<tr>
-      <td data-label="학생"><b>${escapeHtml(p.studentName||stu?.name||'')}</b></td>
+      <td data-label="" class="cell-head"><b>${escapeHtml(p.studentName||stu?.name||'')}</b><span class="head-meta">${qaChip(QA_P_STATUS,p.status)}${trail?`<span class="only-mobile" style="color:#9ca3af">${trail}</span>`:''}</span></td>
       <td data-label="연락처" style="font-size:12px">${phone}</td>
-      <td data-label="토큰" style="text-align:center">${p.totalTokens||p.tokens}${p.bonus?`<span style="font-size:10px;color:#15803d;font-weight:700"> (+${p.bonus})</span>`:''}</td>
+      <td data-label="토큰" style="text-align:center"><span>${p.totalTokens||p.tokens}${p.bonus?`<span style="font-size:10px;color:#15803d;font-weight:700"> (+${p.bonus})</span>`:''}</span></td>
       <td data-label="금액" style="font-weight:700">${fmtWon(p.amount)}</td>
       <td data-label="요청일시" style="font-size:12px;color:#6b7280">${qaFmtDateTime(p.createdAt)}</td>
-      <td data-label="상태">${qaChip(QA_P_STATUS,p.status)}${trail?`<div style="font-size:10px;color:#9ca3af;margin-top:3px">${trail}</div>`:''}</td>
-      <td data-label="" style="text-align:right;white-space:nowrap">${actions}</td>
+      <td data-label="상태" class="cell-hide">${qaChip(QA_P_STATUS,p.status)}${trail?`<div style="font-size:10px;color:#9ca3af;margin-top:3px">${trail}</div>`:''}</td>
+      <td data-label="" class="cell-actions" style="white-space:nowrap">${actions}</td>
     </tr>`;}).join(''):`<tr><td colspan="7" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">해당하는 결제 요청이 없습니다.</td></tr>`;
 
   return `<div class="card">
@@ -3873,7 +3888,7 @@ function qaAdminPaymentsHtml(){
       <span style="font-size:11px;color:#6b7280">결제선생 알림톡을 보낸 뒤 [발송 완료], 입금이 확인되면 [결제 완료]를 누르면 토큰이 지급됩니다.</span>
     </div>
     ${filterBar}
-    <div class="tw"><table class="tw-cards tw-wide">
+    <div class="tw tw-cards tw-wide"><table>
       <thead><tr><th>학생</th><th>연락처</th><th>토큰</th><th>금액</th><th>요청일시</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
@@ -3894,12 +3909,12 @@ function qaAdminBalancesHtml(){
     const bal=S.qa.balances[s._docId];
     const used=S.qa.questions.filter(x=>x.authorId===s._docId).length;
     return `<tr>
-      <td data-label="좌석" style="text-align:center">${s.seat||'—'}</td>
-      <td data-label="이름"><b>${escapeHtml(s.name)}</b></td>
-      <td data-label="학년">${escapeHtml(s.grade||'—')}</td>
+      <td data-label="" class="cell-head"><b>${escapeHtml(s.name)}</b><span class="head-meta">${s.seat?'좌석 '+s.seat:''} ${escapeHtml(s.grade||'')}</span></td>
+      <td data-label="좌석" class="cell-hide" style="text-align:center">${s.seat||'—'}</td>
+      <td data-label="학년" class="cell-hide">${escapeHtml(s.grade||'—')}</td>
       <td data-label="잔액" style="text-align:center;font-weight:700;color:${bal?'#1C64F2':'#9ca3af'}">${bal===undefined?'—':bal}</td>
       <td data-label="질문" style="text-align:center;color:#6b7280">${used}</td>
-      <td data-label="" style="text-align:right;white-space:nowrap">
+      <td data-label="" class="cell-actions" style="white-space:nowrap">
         <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaOpenAdjust('${s._docId}')">증감</button>
       </td>
     </tr>`;}).join('');
@@ -3911,8 +3926,8 @@ function qaAdminBalancesHtml(){
       ${missing?`<button class="btn bs bsm" style="font-size:11px;padding:6px 10px" onclick="qaBackfill()">잔액 없는 ${missing}명에게 기본 지급</button>`:''}
       <input class="fi" style="max-width:200px;margin-left:auto" placeholder="이름·학교 검색" value="${escapeHtml(q)}" oninput="qaSetStuQuery(this.value)">
     </div>
-    <div class="tw"><table class="tw-cards">
-      <thead><tr><th>좌석</th><th>이름</th><th>학년</th><th>잔액</th><th>질문</th><th></th></tr></thead>
+    <div class="tw tw-cards"><table>
+      <thead><tr><th>이름</th><th>좌석</th><th>학년</th><th>잔액</th><th>질문</th><th></th></tr></thead>
       <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">학생이 없습니다.</td></tr>'}</tbody>
     </table></div>
   </div>`;
