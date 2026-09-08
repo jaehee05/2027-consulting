@@ -266,6 +266,39 @@ async function addQuestionComment(fs, { questionId, actor, body, photos }) {
   });
 }
 
+/**
+ * 댓글 수정. 사진까지 통째로 갈아 끼우므로 클라이언트가 남길 사진 + 새로 올린 사진을 합쳐 보낸다.
+ * 삭제와 달리 관리자에게도 남의 댓글 수정 권한을 주지 않는다 — 지우는 건 조치지만
+ * 고치는 건 남의 이름 아래 다른 말을 남기는 것이라 성격이 다르다.
+ * 상태는 건드리지 않는다. 관리자가 자기 답변을 고쳤다고 답변대기로 돌아가면 안 된다.
+ */
+async function editQuestionComment(fs, { questionId, commentId, actor, body, photos }) {
+  const b = String(body || "").trim();
+  const ph = normPhotos(photos);
+  if (!b && !ph.length) throw new ApiError(400, "내용 또는 사진을 입력해 주세요.");
+  const now = Date.now();
+
+  return fs.runTransaction(async (tx) => {
+    const qRef = fs.doc(`questions/${questionId}`);
+    const snap = await tx.get(qRef);
+    if (!snap.exists) throw new ApiError(404, "질문을 찾을 수 없습니다.");
+    const q = snap.data();
+    if (q.status === "closed") {
+      throw new ApiError(409, "종료된 스레드의 댓글은 수정할 수 없습니다.");
+    }
+    const list = Array.isArray(q.comments) ? q.comments : [];
+    const i = list.findIndex((c) => c._id === commentId);
+    if (i < 0) throw new ApiError(404, "댓글을 찾을 수 없습니다.");
+    if (list[i].authorId !== actor.id) {
+      throw new ApiError(403, "본인 댓글만 수정할 수 있습니다.");
+    }
+    const next = list.slice();
+    next[i] = { ...list[i], body: b, photos: ph, editedAt: now };
+    tx.update(qRef, { comments: next, updatedAt: now });
+    return { comment: next[i] };
+  });
+}
+
 /** 댓글 삭제. 학생은 자기 댓글만, 관리자는 전부. 토큰은 돌려주지 않는다(애초에 댓글은 무료다). */
 async function deleteQuestionComment(fs, { questionId, commentId, actor }) {
   const now = Date.now();
@@ -512,6 +545,7 @@ module.exports = {
   adjustTokens,
   createQuestion,
   addQuestionComment,
+  editQuestionComment,
   deleteQuestionComment,
   setQuestionClosed,
   deleteQuestion,

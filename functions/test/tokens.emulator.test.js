@@ -228,6 +228,47 @@ describe("질문 댓글 권한", () => {
     expect(q.answeredAt).toBeNull();
   });
 
+  test("본인 댓글만 수정할 수 있고, 관리자도 남의 댓글은 못 고친다", async () => {
+    const id = await makeQuestion();
+    const me = { id: student.id, name: student.name, role: "student" };
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "처음 쓴 글" });
+    const cid = (await fs.doc(`questions/${id}`).get()).data().comments[0]._id;
+
+    await expect(tokens.editQuestionComment(fs, {
+      questionId: id, commentId: cid, actor: adminActor, body: "관리자가 고침",
+    })).rejects.toMatchObject({ status: 403 });
+
+    await tokens.editQuestionComment(fs, {
+      questionId: id, commentId: cid, actor: me, body: "고쳐 쓴 글",
+    });
+    const c = (await fs.doc(`questions/${id}`).get()).data().comments[0];
+    expect(c.body).toBe("고쳐 쓴 글");
+    expect(typeof c.editedAt).toBe("number");
+    expect(c.ts).toBeLessThanOrEqual(c.editedAt);
+  });
+
+  test("관리자가 자기 답변을 고쳐도 답변완료 상태는 그대로다", async () => {
+    const id = await makeQuestion();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답변" });
+    const cid = (await fs.doc(`questions/${id}`).get()).data().comments[0]._id;
+    await tokens.editQuestionComment(fs, {
+      questionId: id, commentId: cid, actor: adminActor, body: "다시 쓴 답변",
+    });
+    const q = (await fs.doc(`questions/${id}`).get()).data();
+    expect(q.status).toBe("answered");
+    expect(q.comments).toHaveLength(1);
+  });
+
+  test("내용과 사진이 모두 비면 400", async () => {
+    const id = await makeQuestion();
+    const me = { id: student.id, name: student.name, role: "student" };
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "내용" });
+    const cid = (await fs.doc(`questions/${id}`).get()).data().comments[0]._id;
+    await expect(tokens.editQuestionComment(fs, {
+      questionId: id, commentId: cid, actor: me, body: "   ", photos: [],
+    })).rejects.toMatchObject({ status: 400 });
+  });
+
   test("없는 댓글을 지우려 하면 404", async () => {
     const id = await makeQuestion();
     await expect(tokens.deleteQuestionComment(fs, {
@@ -269,6 +310,17 @@ describe("스레드 닫기", () => {
     })).rejects.toMatchObject({ status: 409 });
     await expect(tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답변" }))
       .rejects.toMatchObject({ status: 409 });
+  });
+
+  test("종료된 스레드에서는 이미 달린 댓글도 고칠 수 없다", async () => {
+    const id = await makeQuestion();
+    const me = { id: student.id, name: student.name, role: "student" };
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "원래 글" });
+    const cid = (await q(id)).comments[0]._id;
+    await tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor });
+    await expect(tokens.editQuestionComment(fs, {
+      questionId: id, commentId: cid, actor: me, body: "몰래 고치기",
+    })).rejects.toMatchObject({ status: 409 });
   });
 
   test("두 번 닫거나, 열려 있는 걸 열려 하면 거부한다", async () => {

@@ -1010,6 +1010,11 @@ exports.tokenApi = onRequest(async (req, res) => {
         return res.json(await tokens.addQuestionComment(fs, {
           questionId: p.questionId, actor, body: p.body, photos: p.photos,
         }));
+      case "editComment":
+        if (!isAdmin) await requireStudent();
+        return res.json(await tokens.editQuestionComment(fs, {
+          questionId: p.questionId, commentId: p.commentId, actor, body: p.body, photos: p.photos,
+        }));
       case "deleteComment":
         if (!isAdmin) await requireStudent();
         return res.json(await tokens.deleteQuestionComment(fs, {
