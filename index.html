@@ -8694,7 +8694,10 @@ const ALIMTALK_EVENTS=[
   ['adminNotifyChangeRequest','[관리자] 학생 변경 요청','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot} (사유: ${reason})'],
   ['adminNotifyCancelRequest','[관리자] 학생 취소 요청','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} (사유: ${reason})'],
   ['adminNotifyAdminChangeApproved','[관리자] 관리자 변경 요청 학생 승인','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot} → ${newDateLabel} ${newSlot}'],
-  ['adminNotifyAdminChangeRejected','[관리자] 관리자 변경 요청 학생 거절','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot}']
+  ['adminNotifyAdminChangeRejected','[관리자] 관리자 변경 요청 학생 거절','${name}(${grade}/${school}) ${currentDateLabel} ${currentSlot}'],
+  ['tokenCharged','[학생] 토큰 충전 완료','${name} 충전 ${var1} / 보유 ${var2}'],
+  ['adminNotifyTokenRequest','[관리자] 토큰 결제 요청 접수','${var1}(${var3}/${var2}) ${var4} ${var5} ${var6}'],
+  ['adminNotifyQuestionCreated','[관리자] 새 질문 등록','${var1} ${var2} 미답변 ${var3}건 / 전체 ${var4}건']
 ];
 const ALIMTALK_TOKENS='${name} ${school} ${grade} ${seat} ${dateLabel} ${slot} ${currentDateLabel} ${currentSlot} ${newDateLabel} ${newSlot} ${reason} ${offeredSlots} ${accountId} ${accountPw} ${examName} ${scoreDeadline} ${daysLeft} ${consultingName} ${bookingDeadline} ${footer}';
 // Cloud Function 호출 시 사용할 인증 헤더. Firebase Auth ID 토큰을 Bearer로 넘김.

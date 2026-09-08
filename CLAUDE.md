@@ -249,6 +249,21 @@ cd mobile && npm run android
 
 There are **no automated tests, linters, or build steps** for the web app. `index.html` is served as-is by Vercel.
 
+## 알림톡 서비스 레이어 (`functions/notify.js`)
+
+`ppurio.js` 는 "한 건 보낸다"만 하고, 업무 규칙은 전부 `notify.js` 에 있다. 새 알림을 붙일 때는 `ppurio` 를 직접 부르지 말고 여기에 진입점을 추가한다.
+
+- **트랜잭션이 커밋된 뒤에 부르고, `await` 하지 않는다.** 알림톡 실패가 토큰 충전이나 질문 등록을 되돌리면 안 된다. `notify()` 는 어떤 경우에도 throw 하지 않는다.
+- **빈 변수가 하나라도 있으면 보내지 않는다** (`findEmptyVars`). 빈 값으로 나가면 카카오 심사 위반이다. 학교나 학년이 비어 있는 학생에서 실제로 걸린다. **숫자 `0` 은 유효한 값** — "보유 토큰 0개"를 빈 값으로 보면 안 된다.
+- 학생 발송은 연락처가 없으면 보내지 않고 `skipped` 로그만 남긴다.
+- 재시도 최대 3회, 500ms→1s→2s 지수 백오프. 성공·실패·스킵 전부 `alimtalkLogs` 에 남고, **번호는 `010****5678` 로 가려서** 저장한다. 이 컬렉션은 `firestore.rules` 에서 읽기까지 막혀 있다(수신자·이름이 들어간다).
+- `ALIMTALK_DRY_RUN=1` 이면 실제 발송 없이 로그만 남긴다. 개발·스테이징용.
+- Cloud Functions 는 UTC 로 도니 본문에 찍는 일시는 반드시 `kstStamp()` 를 거친다.
+
+**변수 표기**: 뿌리오 본문은 `[*이름*]`·`[*1*]`~`[*8*]`, `changeWord` 키는 `"var1"`~`"var8"`. 카카오 콘솔 문서의 `#{var1}` 표기와 다르니 옮겨 적을 때 주의. 템플릿 원문과 매핑은 `alimtalk-templates.txt` 에 있고, 관리자 [알림톡] 탭에서 코드와 매핑을 넣는다(`ALIMTALK_EVENTS`).
+
+**새 질문 알림의 미답변 수는 전체 학생 기준**이다(해당 학생 것만이 아니다). 관리자에게 "지금 답변해야 할 일이 몇 건 남았는지"를 알리는 숫자다. 집계에 실패하면 0 을 보내지 않고 발송 자체를 건너뛴다 — 틀린 숫자가 나가는 것보다 낫다.
+
 ## 모바일 (표와 아래쪽 버튼)
 
 - **카드 모드 클래스는 감싸는 `div` 에 붙인다**: `<div class="tw tw-cards tw-wide"><table>`. CSS 가 전부 `.tw-cards>table…` 이라 `<table class="tw-cards">` 로 달면 규칙이 하나도 먹지 않고, 모바일에서 `<thead>` 가 그대로 남은 날것의 표가 나온다.

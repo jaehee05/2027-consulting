@@ -8,6 +8,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { sendAlimtalk, sendAlimtalkToAdmins } = require("./ppurio");
 const tokens = require("./tokens");
 const moderation = require("./moderation");
+const notify = require("./notify");
 
 setGlobalOptions({ region: "asia-northeast3", retry: false, maxInstances: 10 });
 
@@ -967,6 +968,7 @@ exports.tokenApi = onRequest(async (req, res) => {
       id: decoded.studentId,
       name: s.name || decoded.name || "",
       grade: s.grade || "",
+      school: s.school || "",
       phone: s.noStudentPhone ? s.guardianPhone || "" : s.studentPhone || "",
     };
   }
@@ -983,13 +985,21 @@ exports.tokenApi = onRequest(async (req, res) => {
       /* 학생 */
       case "createQuestion": {
         const student = await requireStudent();
-        return res.json(await tokens.createQuestion(fs, {
+        const r = await tokens.createQuestion(fs, {
           student, title: p.title, body: p.body, photos: p.photos,
-        }));
+        });
+        // 트랜잭션이 끝난 뒤에 부르고 기다리지 않는다 — 알림톡 실패가 질문 등록을 되돌리면 안 된다.
+        notify.notifyQuestionCreated({ studentName: student.name, createdAt: Date.now() });
+        return res.json(r);
       }
       case "requestPayment": {
         const student = await requireStudent();
-        return res.json(await tokens.createPaymentRequest(fs, { student, packageId: p.packageId }));
+        const r = await tokens.createPaymentRequest(fs, { student, packageId: p.packageId });
+        notify.notifyTokenPaymentRequested({
+          studentName: student.name, school: student.school, grade: student.grade,
+          tokens: r.totalTokens, amount: r.amount, requestedAt: Date.now(),
+        });
+        return res.json(r);
       }
 
       /* 학생·관리자 공용 — 권한 판정은 tokens.js 안에서 한다 */
@@ -1022,9 +1032,26 @@ exports.tokenApi = onRequest(async (req, res) => {
       case "markPaymentSent":
         requireAdmin();
         return res.json(await tokens.markPaymentSent(fs, { requestId: p.requestId, by }));
-      case "markPaymentPaid":
+      case "markPaymentPaid": {
         requireAdmin();
-        return res.json(await tokens.markPaymentPaid(fs, { requestId: p.requestId, by }));
+        const r = await tokens.markPaymentPaid(fs, { requestId: p.requestId, by });
+        // 지급이 확정된 뒤에만 보낸다. 번호는 요청 시점 스냅샷이 아니라 지금 학생 문서에서 읽는다.
+        try {
+          const prSnap = await fs.doc(`paymentRequests/${p.requestId}`).get();
+          const pr = prSnap.exists ? prSnap.data() : {};
+          const stuSnap = pr.studentId ? await fs.doc(`students/${pr.studentId}`).get() : null;
+          const stu = stuSnap && stuSnap.exists ? stuSnap.data() : {};
+          notify.notifyTokenCharged({
+            studentName: stu.name || pr.studentName || "",
+            phone: stu.noStudentPhone ? stu.guardianPhone || "" : stu.studentPhone || "",
+            charged: pr.totalTokens ?? pr.tokens ?? 0,
+            balance: r.balance,
+          });
+        } catch (e) {
+          console.error("tokenCharged 알림 준비 실패:", e);
+        }
+        return res.json(r);
+      }
       case "backfillGrants":
         requireAdmin();
         return res.json(await tokens.backfillSignupGrants(fs, { by }));

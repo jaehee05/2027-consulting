@@ -6,6 +6,7 @@ service cloud.firestore {
     //   settings/* — 뿌리오 API 크리덴셜. ppurioAdmin Cloud Function 만 접근.
     //   admins/*  — 관리자 아이디/평문 비밀번호/PIN. adminApi/loginToken Cloud
     //               Function 만 접근. (Phase 1 보안 강화)
+    //   alimtalkLogs/* — 발송 로그. 수신자·학생 이름이 들어가므로 읽기도 막는다.
     // 나머지(students, bookings, requests, notices, posts, schedule, config,
     // lectures)는 임시 개방 — Phase 2 에서 Firebase Auth 클레임 기반 권한으로 단계적 강화 예정.
     // posts(자유게시판) 의 비밀글(secret:true)도 현재는 클라이언트에서만 가려지므로,
@@ -21,11 +22,12 @@ service cloud.firestore {
           || c == 'paymentRequests'
           || c == 'boardBans'
           || c == 'boardPledges'
+          || c == 'alimtalkLogs'
           || (c == 'config' && d == 'tokens');
     }
 
     match /{collection}/{docPath=**} {
-      allow read: if collection != 'settings' && collection != 'admins';
+      allow read: if collection != 'settings' && collection != 'admins' && collection != 'alimtalkLogs';
       allow write: if collection != 'settings'
                    && collection != 'admins'
                    && !serverOnlyWrite(collection, docPath);
