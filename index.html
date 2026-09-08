@@ -1482,32 +1482,43 @@ function startNoticesListener(){
 function stopNoticesListener(){if(_ntListener){try{_ntListener();}catch(e){}_ntListener=null;}_ntSeedDone=false;}
 
 // 자유게시판(posts) 실시간 동기화. 홈 허브의 [자유게시판] 화면에서 본다.
-let _bdListener=null,_bdSeedDone=false;
+let _bdListeners=[],_bdSeedDone=false,_bdSets=[];
+/* 학생은 비밀글을 아예 받아 오지 못한다(firestore.rules). 컬렉션을 통째로 구독하면
+   "막힌 문서가 섞일 수 있다"는 이유로 쿼리 전체가 거부되므로, '공개글'과 '내 글'
+   두 쿼리로 나눠 구독한다. 두 쿼리는 내 공개글에서 겹치므로 한쪽에서 빠졌다고 지우면
+   안 된다 — 쿼리별 결과를 따로 들고 있다가 합집합으로 S.posts 를 다시 만든다. */
 function startPostsListener(){
-  if(_bdListener){try{_bdListener();}catch(e){}_bdListener=null;}
+  stopPostsListener();
   _bdSeedDone=false;
-  _bdListener=db.collection('posts').onSnapshot(snap=>{
-    const isStudent=S.user&&S.user.type==='student';
-    let changed=false;
+  const isStudent=S.user&&S.user.type==='student';
+  const col=db.collection('posts');
+  const queries=isStudent
+    ? [col.where('secret','==',false), col.where('authorId','==',S.studentDocId||'_none')]
+    : [col];
+  _bdSets=queries.map(()=>new Map());
+
+  const rebuild=()=>{
+    const merged=new Map();
+    _bdSets.forEach(m=>m.forEach((v,k)=>merged.set(k,v)));
+    S.posts=[...merged.values()];
+  };
+  const onSnap=i=>snap=>{
+    const m=_bdSets[i];
     snap.docChanges().forEach(ch=>{
-      const d={_docId:ch.doc.id,...ch.doc.data()};
-      if(ch.type==='added'||ch.type==='modified'){
-        const idx=S.posts.findIndex(q=>q._docId===d._docId);
-        if(idx<0)S.posts.push(d);else S.posts[idx]=d;
-        if(_bdSeedDone)changed=true;
-      }else if(ch.type==='removed'){
-        S.posts=S.posts.filter(q=>q._docId!==d._docId);
-        if(_bdSeedDone)changed=true;
-      }
+      if(ch.type==='removed')m.delete(ch.doc.id);
+      else m.set(ch.doc.id,{_docId:ch.doc.id,...ch.doc.data()});
     });
+    rebuild();
+    const first=!_bdSeedDone;
     _bdSeedDone=true;
-    if(!changed)return;
+    if(first)return;
     if(!_('vBoard').classList.contains('hidden'))renderBoardView();
     else if(isStudent)safeRerenderStu();
     else if(S.tab==='consult'&&S.consultStuId)renderConsultDetail();
-  },err=>{console.error('posts listener error',err);});
+  };
+  _bdListeners=queries.map((q,i)=>q.onSnapshot(onSnap(i),err=>console.error('posts listener error',err)));
 }
-function stopPostsListener(){if(_bdListener){try{_bdListener();}catch(e){}_bdListener=null;}_bdSeedDone=false;}
+function stopPostsListener(){_bdListeners.forEach(u=>{try{u();}catch(e){}});_bdListeners=[];_bdSeedDone=false;}
 
 // 자유게시판 이용정지(boardBans). 서버만 쓰는 컬렉션이라 여기서는 읽기만 한다.
 let _banListener=null,_pledgeListener=null;
@@ -1804,8 +1815,7 @@ function fetchCoreSnaps(){
     db.collection('bookings').get(),
     db.collection('requests').get(),
     db.collection('lectures').get(),
-    db.collection('notices').get(),
-    db.collection('posts').get()
+    db.collection('notices').get()
   ]);
 }
 // 부팅 프리페치는 Firestore 연결이 붙기 전에 나가고, get() 은 그 상태에서 기다리지 않고
@@ -1829,9 +1839,8 @@ async function loadAll(){
   try{
     try{localStorage.setItem('sessHint','1');}catch(_){}
     const pre=_bootSnaps;_bootSnaps=null;
-    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap,bdSnap]=await fetchCoreSnapsRetry(pre);
+    const[stuSnap,scSnap,cfgSnap,bkSnap,reqSnap,lecSnap,ntSnap]=await fetchCoreSnapsRetry(pre);
     S.notices=ntSnap.docs.map(d=>({_docId:d.id,...d.data()}));
-    S.posts=bdSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.lectures=lecSnap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0));
     S.students=stuSnap.docs.map(d=>({_docId:d.id,...d.data()}));
     S.schedule=scSnap.exists?scSnap.data():{dates:JSON.parse(JSON.stringify(DFLT_DATES))};
@@ -2705,8 +2714,13 @@ function bdMyNick(){
   return (stu&&stu.nickname)||'';
 }
 /* 익명 글은 닉네임으로 보이되, 관리자에게는 실명을 괄호로 함께 보여 준다(비밀글과 같은 원칙). */
+/* 익명 글에는 문서에 실명이 없다. 관리자에게만 authorId 로 학생 목록에서 찾아 붙인다. */
+function bdRealNameOf(entry){
+  return entry.authorName||entry.name
+    ||(bdIsStaff()?(S.students.find(x=>x._docId===entry.authorId)?.name||''):'');
+}
 function bdShowName(entry){
-  const real=entry.authorName||entry.name||'';
+  const real=bdRealNameOf(entry);
   if((entry.authorRole||entry.role)==='admin'){
     if(bdIsStaff())return escapeHtml(real||'관리자');
     return real&&real!=='관리자'?escapeHtml(real)+' 선생님':'선생님';
@@ -3161,7 +3175,7 @@ function bdPostHtml(q,ctx){
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         ${q.pinned?'<span style="font-size:11px;color:#b45309;font-weight:700">📌 고정</span>':''}
         <b style="font-size:13px;color:${isStudentPost?'#111827':'#dc2626'}">${bdShowName(q)}</b>
-        ${isStudentPost&&q.authorGrade&&(!q.anon||staff)?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:''}
+        ${(()=>{const g=q.anon?(staff?(S.students.find(x=>x._docId===q.authorId)?.grade||''):''):(q.authorGrade||'');return isStudentPost&&g?`<span style="font-size:11px;color:#6b7280">${escapeHtml(g)}</span>`:'';})()}
         ${q.secret?'<span title="비밀글" style="font-size:11px">🔒</span>':''}
         ${reportMark}
       </div>
@@ -3426,8 +3440,11 @@ async function bdCreatePost(){
     const now=Date.now();
     await ref.set({
       title:title.slice(0,60),body:txt,photos,secret,pinned:false,anon,authorNick:nick,
-      likes:[],scraps:[],reports:[],
-      authorId:bdMyId(),authorRole:role,authorName:bdMyName(),authorGrade:stu?.grade||'',
+      likes:[],scraps:[],reports:[],views:0,
+      authorId:bdMyId(),authorRole:role,
+      /* 익명 글에는 실명·학년을 담지 않는다. posts 는 읽기가 열려 있어 문서에 넣으면 그대로 노출된다.
+         관리자 화면은 authorId 로 학생 목록에서 이름을 찾는다(bdRealNameOf). */
+      authorName:anon?'':bdMyName(),authorGrade:anon?'':(stu?.grade||''),
       createdAt:now,updatedAt:now,comments:[]
     });
     if(anon)await bdSaveNick(nick);
@@ -3459,7 +3476,13 @@ async function bdSaveEdit(id){
     const upd={body:txt,photos:[...keep,...added],updatedAt:Date.now()};
     if(_('bd-edit-title-'+id))upd.title=title.slice(0,60);
     if(secretEl)upd.secret=!!secretEl.checked;
-    if(realEl){upd.anon=!realEl.checked;upd.authorNick=nick;if(!realEl.checked)await bdSaveNick(nick);}
+    if(realEl){
+      const an=!realEl.checked;
+      upd.anon=an;upd.authorNick=nick;
+      upd.authorName=an?'':bdMyName();
+      upd.authorGrade=an?'':(S.students.find(x=>x._docId===S.studentDocId)?.grade||'');
+      if(an)await bdSaveNick(nick);
+    }
     await db.collection('posts').doc(id).update(upd);
     delete S.bdDraftFiles[scope];
     S.bdPostEditId=null;
@@ -3502,7 +3525,7 @@ async function bdAddComment(id){
   try{
     const photos=[];
     for(const f of drafts)photos.push(await bdUploadPhoto(f.file,id,'c_'+cid));
-    const cmt={_id:cid,role:bdMyRole(),name:bdMyName(),authorId:bdMyId(),body:txt,photos,ts:Date.now(),anon:cAnon,nick:cNick,anonNo,parentId,likes:[],reports:[]};
+    const cmt={_id:cid,role:bdMyRole(),name:cAnon?'':bdMyName(),authorId:bdMyId(),body:txt,photos,ts:Date.now(),anon:cAnon,nick:cNick,anonNo,parentId,likes:[],reports:[]};
     await db.collection('posts').doc(id).update({comments:bdNormComments([...bdComments(q),cmt])});
     delete S.bdCommentDraftFiles[scope];
     S.bdReplyTo=null;
@@ -4007,6 +4030,7 @@ function qaAdminBalancesHtml(){
       <td data-label="잔액" style="text-align:center;font-weight:700;color:${bal?'#1C64F2':'#9ca3af'}">${bal===undefined?'—':bal}</td>
       <td data-label="질문" style="text-align:center;color:#6b7280">${used}</td>
       <td data-label="" class="cell-actions" style="white-space:nowrap">
+        <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaOpenLedger('${s._docId}')">내역</button>
         <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaOpenAdjust('${s._docId}')">증감</button>
       </td>
     </tr>`;}).join('');
@@ -4025,6 +4049,55 @@ function qaAdminBalancesHtml(){
   </div>`;
 }
 
+/* ── 토큰 지급 내역 ──
+   tokenLedger 는 읽기가 열려 있어 그때그때 받아 온다. 전교생 원장을 늘 물고 있을 이유가 없다.
+   studentId 로 거른 뒤 정렬은 클라이언트에서 한다 — where + orderBy 조합은 색인이 필요하다. */
+const QA_LEDGER_REASON={signup:'기본 지급',question:'질문 작성',purchase:'결제 지급',manual:'수동 조정'};
+async function qaOpenLedger(stuId){
+  const stu=S.students.find(s=>s._docId===stuId);
+  const name=stu?escapeHtml(stu.name):'학생';
+  _('mCt').innerHTML=`<p class="mtitle">토큰 지급 내역</p><p class="msub">${name}</p>
+    <p style="font-size:13px;color:#6b7280;padding:18px 0;text-align:center">불러오는 중…</p>`;
+  openModal();
+  let rows=[];
+  try{
+    const snap=await db.collection('tokenLedger').where('studentId','==',stuId).get();
+    rows=snap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  }catch(e){
+    _('mCt').innerHTML=`<p class="mtitle">토큰 지급 내역</p><p class="msub">${name}</p>
+      <p style="font-size:13px;color:#dc2626;padding:18px 0;text-align:center">불러오지 못했습니다. ${escapeHtml(e.message)}</p>
+      <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">닫기</button></div>`;
+    return;
+  }
+  const bal=S.qa.balances[stuId]||0;
+  const gained=rows.filter(r=>(r.delta||0)>0).reduce((n,r)=>n+r.delta,0);
+  const used=rows.filter(r=>(r.delta||0)<0).reduce((n,r)=>n-r.delta,0);
+  const body=rows.length?rows.map(r=>{
+    const up=(r.delta||0)>0;
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid #f1f3f5">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="bx" style="font-size:10px;font-weight:700;background:${up?'#dcfce7':'#fef3c7'};color:${up?'#15803d':'#92400e'}">${QA_LEDGER_REASON[r.reason]||r.reason||'-'}</span>
+          ${r.note?`<span style="font-size:12px;color:#374151">${escapeHtml(r.note)}</span>`:''}
+        </div>
+        <p style="font-size:11px;color:#9ca3af;margin-top:3px">${qaFmtDateTime(r.createdAt)}${r.byName?` · ${escapeHtml(r.byName)}`:''}</p>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <b style="font-size:14px;color:${up?'#15803d':'#dc2626'}">${up?'+':''}${r.delta}</b>
+        <p style="font-size:11px;color:#9ca3af;margin-top:2px">잔액 ${r.balanceAfter}</p>
+      </div>
+    </div>`;}).join('')
+    :'<p style="font-size:13px;color:#9ca3af;padding:24px 0;text-align:center">지급 내역이 없습니다.</p>';
+  _('mCt').innerHTML=`<p class="mtitle">토큰 지급 내역</p>
+    <p class="msub">${name} · 현재 <b>${bal}토큰</b></p>
+    <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:999px;padding:5px 12px;font-size:12px"><span style="color:#6b7280;font-weight:600">받은 토큰</span><b style="color:#15803d">${gained}</b></span>
+      <span style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:999px;padding:5px 12px;font-size:12px"><span style="color:#6b7280;font-weight:600">쓴 토큰</span><b style="color:#dc2626">${used}</b></span>
+      <span style="display:inline-flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:999px;padding:5px 12px;font-size:12px"><span style="color:#6b7280;font-weight:600">기록</span><b>${rows.length}건</b></span>
+    </div>
+    <div style="max-height:50vh;overflow-y:auto">${body}</div>
+    <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">닫기</button><button class="btn bp bfw" onclick="qaOpenAdjust('${stuId}')">증감</button></div>`;
+}
 function qaOpenAdjust(stuId){
   const stu=S.students.find(s=>s._docId===stuId);if(!stu)return;
   const bal=S.qa.balances[stuId]||0;

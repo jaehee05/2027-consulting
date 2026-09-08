@@ -260,6 +260,14 @@ There are **no automated tests, linters, or build steps** for the web app. `inde
 - **LaTeX**: KaTeX(CDN, `defer`) + auto-render. `$…$` / `$$…$$` / `\\(…\\)` / `\\[…\\]`. `qaRenderMath()` 가 `.qa-body` 안에서만 돈다. `throwOnError:false` — 학생이 문법을 틀려도 화면이 깨지지 않고 원문이 남는다. CDN 이 늦거나 막히면 `renderMathInElement` 가 없으므로 조용히 넘어가고 본문은 글자 그대로 보인다.
 - **수식은 KaTeX 기본 글꼴 그대로 둔다.** 손글씨 글꼴에는 수학 기호가 없어 본문 글꼴을 억지로 씌우면 깨진다. `.qa-body .katex` 는 크기만 맞춘다.
 
+## firestore.rules 함정
+
+**`{docPath=**}` 는 문자열이 아니라 Path 다.** `docPath == 'tokens'` 같은 비교는 조용히 거짓이 되어, 막으려던 문서가 그냥 열린다. 실제로 `config/tokens` 가 이 방식으로 한동안 열려 있었고 규칙 테스트(`functions/test/rules.emulator.test.js`)에서 잡혔다. 문서 하나만 막을 때는 `match /config/{docId}` 처럼 **단일 세그먼트 와일드카드로 떼어 낸 match** 를 쓴다.
+
+**규칙은 match 블록끼리 OR 된다.** 넓게 여는 blanket match 가 있으면 뒤에 좁은 규칙을 추가해도 좁혀지지 않는다. 좁히려면 blanket 쪽에서 그 컬렉션을 **빼야** 한다.
+
+**보안 규칙은 반드시 테스트를 쓴다.** `@firebase/rules-unit-testing` + 에뮬레이터로 `functions/test/rules.emulator.test.js` 에 있다. 커스텀 토큰 클레임(`role`, `studentId`)을 그대로 흉내 내므로 실제 로그인과 같은 조건으로 검증된다.
+
 ## 알림톡 서비스 레이어 (`functions/notify.js`)
 
 `ppurio.js` 는 "한 건 보낸다"만 하고, 업무 규칙은 전부 `notify.js` 에 있다. 새 알림을 붙일 때는 `ppurio` 를 직접 부르지 말고 여기에 진입점을 추가한다.

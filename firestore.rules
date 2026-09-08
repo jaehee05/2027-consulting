@@ -2,35 +2,74 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 차단 컬렉션:
-    //   settings/* — 뿌리오 API 크리덴셜. ppurioAdmin Cloud Function 만 접근.
-    //   admins/*  — 관리자 아이디/평문 비밀번호/PIN. adminApi/loginToken Cloud
-    //               Function 만 접근. (Phase 1 보안 강화)
-    //   alimtalkLogs/* — 발송 로그. 수신자·학생 이름이 들어가므로 읽기도 막는다.
-    // 나머지(students, bookings, requests, notices, posts, schedule, config,
-    // lectures)는 임시 개방 — Phase 2 에서 Firebase Auth 클레임 기반 권한으로 단계적 강화 예정.
-    // posts(자유게시판) 의 비밀글(secret:true)도 현재는 클라이언트에서만 가려지므로,
-    // 서버 단 보호는 Phase 2 에서 함께 들어가야 한다.
-
-    // 토큰·질문게시판·결제는 돈이 걸려 있어 예외다. 쓰기는 tokenApi Cloud Function
-    // (Admin SDK) 만 하고, 읽기는 열어 둬 클라이언트가 onSnapshot 으로 실시간 반영한다.
-    // 클라이언트에 쓰기를 열면 학생이 자기 잔액을 마음대로 올릴 수 있으므로 절대 풀지 말 것.
-    function serverOnlyWrite(c, d) {
-      return c == 'tokenBalances'
-          || c == 'tokenLedger'
-          || c == 'questions'
-          || c == 'paymentRequests'
-          || c == 'boardBans'
-          || c == 'boardPledges'
-          || c == 'alimtalkLogs'
-          || (c == 'config' && d == 'tokens');
+    // 로그인 시 loginToken 이 커스텀 토큰에 role / studentId 를 실어 준다.
+    // role: 'admin' | 'viewer'(OP) | 'tablet' | 'student'
+    function signedIn() { return request.auth != null; }
+    function role() { return signedIn() ? request.auth.token.role : ''; }
+    function isStudent() { return role() == 'student'; }
+    function myStudentId() {
+      return signedIn() && 'studentId' in request.auth.token ? request.auth.token.studentId : '';
     }
 
+    // 차단 컬렉션:
+    //   settings/*     — 뿌리오 API 크리덴셜. ppurioAdmin Cloud Function 만 접근.
+    //   admins/*       — 관리자 아이디/평문 비밀번호/PIN. adminApi/loginToken 만 접근.
+    //   alimtalkLogs/* — 발송 로그. 수신자·학생 이름이 들어가므로 읽기도 막는다.
+    //
+    // 돈이 걸린 컬렉션(토큰·질문게시판·결제·제재)은 쓰기를 tokenApi Cloud Function
+    // (Admin SDK) 에만 열어 둔다. 읽기는 열어 둬 클라이언트가 onSnapshot 으로 반영한다.
+    // 클라이언트에 쓰기를 열면 학생이 자기 잔액을 마음대로 올릴 수 있으므로 절대 풀지 말 것.
+    //
+    // 주의: `{docPath=**}` 는 문자열이 아니라 Path 라서 `docPath == 'tokens'` 같은 비교가
+    // 조용히 거짓이 된다. 문서 하나만 막을 때는 아래처럼 별도 match 로 떼어 낸다.
+
+    // ── 자유게시판 ──
+    // 비밀글은 화면에서만 가리면 SDK 로 그냥 읽힌다. 여기서 문서 단위로 막는다.
+    // 학생은 '공개글' 과 '내 글' 두 쿼리로 나눠 구독한다(startPostsListener) —
+    // 컬렉션을 통째로 구독하면 막힌 문서가 섞일 수 있다는 이유로 쿼리 전체가 거부된다.
+    //
+    // 익명 글의 실명은 규칙으로 가릴 수 없어(필드 단위 차단 불가) 아예 문서에 담지 않는다.
+    // 다만 authorId 는 남아 있고 students 는 아직 열려 있어 마음먹으면 되짚을 수 있다.
+    // 그 구멍까지 막으려면 students 읽기를 조여야 하는데 앱 전반이 걸려 Phase 2 로 미룬다.
+    match /posts/{postId} {
+      allow read: if signedIn()
+                  && (!isStudent()
+                      || resource.data.secret != true
+                      || resource.data.authorId == myStudentId());
+      allow write: if signedIn();
+    }
+
+    // ── 서버 전용 (tokenApi 만 씀) ──
+    match /tokenBalances/{id}   { allow read: if true; allow write: if false; }
+    match /tokenLedger/{id}     { allow read: if true; allow write: if false; }
+    match /questions/{id}       { allow read: if true; allow write: if false; }
+    match /paymentRequests/{id} { allow read: if true; allow write: if false; }
+    match /boardBans/{id}       { allow read: if true; allow write: if false; }
+    match /boardPledges/{id}    { allow read: if true; allow write: if false; }
+
+    // 발송 로그 — 읽기까지 막는다.
+    match /alimtalkLogs/{id} { allow read, write: if false; }
+
+    // config/tokens 만 서버 전용, 나머지 config 문서는 기존대로 개방.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if docId != 'tokens';
+    }
+
+    // 나머지(students, bookings, requests, notices, schedule, lectures)는 임시 개방 —
+    // Phase 2 에서 Auth 클레임 기반 권한으로 단계적 강화 예정.
     match /{collection}/{docPath=**} {
-      allow read: if collection != 'settings' && collection != 'admins' && collection != 'alimtalkLogs';
-      allow write: if collection != 'settings'
-                   && collection != 'admins'
-                   && !serverOnlyWrite(collection, docPath);
+      allow read, write: if collection != 'settings'
+                         && collection != 'admins'
+                         && collection != 'alimtalkLogs'
+                         && collection != 'posts'
+                         && collection != 'config'
+                         && collection != 'tokenBalances'
+                         && collection != 'tokenLedger'
+                         && collection != 'questions'
+                         && collection != 'paymentRequests'
+                         && collection != 'boardBans'
+                         && collection != 'boardPledges';
     }
   }
 }
