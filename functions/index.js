@@ -994,7 +994,9 @@ exports.tokenApi = onRequest(async (req, res) => {
       }
       case "requestPayment": {
         const student = await requireStudent();
-        const r = await tokens.createPaymentRequest(fs, { student, packageId: p.packageId });
+        const r = await tokens.createPaymentRequest(fs, {
+          student, packageId: p.packageId, method: p.method, depositorName: p.depositorName,
+        });
         notify.notifyTokenPaymentRequested({
           studentName: student.name, school: student.school, grade: student.grade,
           tokens: r.totalTokens, amount: r.amount, requestedAt: Date.now(),

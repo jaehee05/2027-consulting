@@ -3584,6 +3584,11 @@ function qaIsAdmin(){return S.user?.type==='admin';}
 function qaMyId(){return qaIsAdmin()?(S.user?.id||''):(S.studentDocId||'');}
 function qaMyBalance(){return S.qa.balances[S.studentDocId]||0;}
 function qaPolicy(){return S.qa.policy||{signupGrant:1,questionCost:1,unitPrice:1000,packages:[]};}
+const QA_PAY_METHOD={ppurio:'결제선생',bank:'계좌이체'};
+function qaPpurioOn(){return qaPolicy().ppurioEnabled!==false;}
+/* 은행·계좌·예금주가 다 있어야 계좌이체를 켤 수 있다. 하나라도 비면 학생이 입금할 데가 없다. */
+function qaBankOn(){const p=qaPolicy();return !!(p.bankEnabled&&p.bankName&&p.bankAccount&&p.bankHolder);}
+function qaPayMethods(){return [qaPpurioOn()?'ppurio':null,qaBankOn()?'bank':null].filter(Boolean);}
 function qaCost(){return qaPolicy().questionCost;}
 /* 관리자가 등록한 판매 옵션에 금액을 붙여 정렬한다. 서버의 normalizePackages 와 같은 규칙. */
 function qaPackages(activeOnly){
@@ -3918,7 +3923,7 @@ function qaStuTokensHtml(){
         ${off?`<p style="font-size:12px;color:#9ca3af;text-decoration:line-through">${fmtWon(p.listPrice)}</p>
         <p style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px">${p.discountType==='percent'?`${p.discountValue}% 할인`:`${fmtWon(p.discountValue)} 할인`}</p>`:''}</div>
       <p style="font-size:16px;font-weight:800;margin-bottom:10px">${fmtWon(p.amount)}</p>
-      <button class="btn bp bsm" onclick="qaRequestPayment('${p.id}')">결제 요청</button>
+      <button class="btn bp bsm" onclick="qaOpenPurchase('${p.id}')">결제 요청</button>
     </div>`;}).join('')}</div>`
     :`<div style="background:#f9fafb;border:1px dashed #e5e7eb;border-radius:10px;padding:18px;text-align:center;color:#9ca3af;font-size:12px">지금은 판매 중인 토큰 상품이 없습니다.</div>`;
 
@@ -3926,11 +3931,12 @@ function qaStuTokensHtml(){
     const canCancel=p.status==='requested'||p.status==='sent';
     return `<tr>
       <td data-label="" class="cell-head"><b>${p.tokens}토큰${p.bonus?`<span style="font-size:11px;color:#15803d;font-weight:700"> +${p.bonus}</span>`:''}</b><span class="head-meta">${qaChip(QA_P_STATUS,p.status)}</span></td>
+      <td data-label="수단" style="font-size:12px;color:#6b7280">${QA_PAY_METHOD[p.method]||'결제선생'}</td>
       <td data-label="금액">${fmtWon(p.amount)}</td>
       <td data-label="요청일시" style="font-size:12px;color:#6b7280">${qaFmtDateTime(p.createdAt)}</td>
       <td data-label="상태" class="cell-hide">${qaChip(QA_P_STATUS,p.status)}</td>
       <td data-label="" class="cell-actions">${canCancel?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`:''}</td>
-    </tr>`;}).join(''):`<tr><td colspan="5" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">결제 요청 내역이 없습니다.</td></tr>`;
+    </tr>`;}).join(''):`<tr><td colspan="6" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">결제 요청 내역이 없습니다.</td></tr>`;
 
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
@@ -3946,14 +3952,18 @@ function qaStuTokensHtml(){
       <span style="font-size:11px;color:#6b7280">1토큰 ${fmtWon(pol.unitPrice)}</span>
     </div>
     ${pkgHtml}
-    <div class="info" style="margin-top:12px"><p>결제 요청을 보내면 확인 후 <b>결제선생</b>으로 결제 링크를 보내드립니다. 결제가 확인되면 토큰이 자동으로 지급됩니다.</p></div>
+    <div class="info" style="margin-top:12px"><p>${qaBankOn()&&!qaPpurioOn()
+      ?'결제 요청을 보내면 안내된 계좌로 입금해 주세요. 입금이 확인되면 토큰이 지급됩니다.'
+      :(qaBankOn()
+        ?'결제선생 링크를 받거나 계좌로 직접 입금할 수 있습니다. 결제가 확인되면 토큰이 자동으로 지급됩니다.'
+        :'결제 요청을 보내면 확인 후 <b>결제선생</b>으로 결제 링크를 보내드립니다. 결제가 확인되면 토큰이 자동으로 지급됩니다.')}</p></div>
     <p style="font-size:11px;color:#9ca3af;margin-top:10px">토큰은 한 번 사용하면 환불되지 않습니다. <button onclick="qaOpenRefund()" style="background:none;border:none;color:#1C64F2;font-size:11px;font-weight:700;cursor:pointer;padding:0;text-decoration:underline">환불 규정</button></p>
   </div>
 
   <div class="card">
     <p style="font-size:15px;font-weight:700;margin-bottom:12px">내 결제 요청</p>
     <div class="tw tw-cards"><table>
-      <thead><tr><th>상품</th><th>금액</th><th>요청일시</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>상품</th><th>수단</th><th>금액</th><th>요청일시</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
   </div>`;
@@ -3977,9 +3987,14 @@ function qaAdminPaymentsHtml(){
   const rows=list.length?list.map(p=>{
     const stu=S.students.find(s=>s._docId===p.studentId);
     const phone=fmtPhone(p.studentPhone||effectivePhone(stu))||'—';
+    const isBank=p.method==='bank';
     let actions='';
-    if(p.status==='requested')actions=`<button class="btn bp bsm" style="font-size:11px;padding:4px 10px" onclick="qaMarkSent('${p._docId}')">발송 완료</button>
-      <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`;
+    /* 계좌이체는 보낼 링크가 없어 발송 단계를 건너뛴다. */
+    if(p.status==='requested')actions=isBank
+      ?`<button class="btn bp bsm" style="font-size:11px;padding:4px 10px;background:#15803d;border-color:#15803d" onclick="qaMarkPaid('${p._docId}')">입금 확인</button>
+        <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`
+      :`<button class="btn bp bsm" style="font-size:11px;padding:4px 10px" onclick="qaMarkSent('${p._docId}')">발송 완료</button>
+        <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`;
     else if(p.status==='sent')actions=`<button class="btn bp bsm" style="font-size:11px;padding:4px 10px;background:#15803d;border-color:#15803d" onclick="qaMarkPaid('${p._docId}')">결제 완료</button>
       <button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="qaCancelPayment('${p._docId}')">취소</button>`;
     const trail=[
@@ -3989,22 +4004,23 @@ function qaAdminPaymentsHtml(){
     ].filter(Boolean).join(' / ');
     return `<tr>
       <td data-label="" class="cell-head"><b>${escapeHtml(p.studentName||stu?.name||'')}</b><span class="head-meta">${qaChip(QA_P_STATUS,p.status)}${trail?`<span class="only-mobile" style="color:#9ca3af">${trail}</span>`:''}</span></td>
+      <td data-label="수단" style="font-size:12px">${QA_PAY_METHOD[p.method]||'결제선생'}${isBank&&p.depositorName?`<div style="font-size:10px;color:#9ca3af">입금자 ${escapeHtml(p.depositorName)}</div>`:''}</td>
       <td data-label="연락처" style="font-size:12px">${phone}</td>
       <td data-label="토큰" style="text-align:center"><span>${p.totalTokens||p.tokens}${p.bonus?`<span style="font-size:10px;color:#15803d;font-weight:700"> (+${p.bonus})</span>`:''}</span></td>
       <td data-label="금액" style="font-weight:700">${fmtWon(p.amount)}</td>
       <td data-label="요청일시" style="font-size:12px;color:#6b7280">${qaFmtDateTime(p.createdAt)}</td>
       <td data-label="상태" class="cell-hide">${qaChip(QA_P_STATUS,p.status)}${trail?`<div style="font-size:10px;color:#9ca3af;margin-top:3px">${trail}</div>`:''}</td>
       <td data-label="" class="cell-actions" style="white-space:nowrap">${actions}</td>
-    </tr>`;}).join(''):`<tr><td colspan="7" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">해당하는 결제 요청이 없습니다.</td></tr>`;
+    </tr>`;}).join(''):`<tr><td colspan="8" style="text-align:center;color:#9ca3af;font-size:12px;padding:18px">해당하는 결제 요청이 없습니다.</td></tr>`;
 
   return `<div class="card">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <p style="font-size:15px;font-weight:700">결제 요청</p>
-      <span style="font-size:11px;color:#6b7280">결제선생 알림톡을 보낸 뒤 [발송 완료], 입금이 확인되면 [결제 완료]를 누르면 토큰이 지급됩니다.</span>
+      <span style="font-size:11px;color:#6b7280">결제선생은 링크를 보낸 뒤 [발송 완료], 입금이 확인되면 [결제 완료]. 계좌이체는 입금을 확인하고 [입금 확인]을 누르면 토큰이 지급됩니다.</span>
     </div>
     ${filterBar}
     <div class="tw tw-cards tw-wide"><table>
-      <thead><tr><th>학생</th><th>연락처</th><th>토큰</th><th>금액</th><th>요청일시</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>학생</th><th>수단</th><th>연락처</th><th>토큰</th><th>금액</th><th>요청일시</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
   </div>`;
@@ -4119,6 +4135,8 @@ function qaPolicyDraft(){
     const pol=qaPolicy();
     S.qa.draft={
       signupGrant:pol.signupGrant,questionCost:pol.questionCost,unitPrice:pol.unitPrice,
+      ppurioEnabled:pol.ppurioEnabled!==false,bankEnabled:!!pol.bankEnabled,
+      bankName:pol.bankName||'',bankAccount:pol.bankAccount||'',bankHolder:pol.bankHolder||'',
       packages:qaPackages(false).map(p=>({id:p.id,tokens:p.tokens,bonus:p.bonus||0,active:p.active,order:p.order,discountType:p.discountType||'none',discountValue:p.discountValue||0}))
     };
   }
@@ -4130,6 +4148,11 @@ function qaSyncDraftFromDom(){
   d.signupGrant=qaInt('qa-p-signup');
   d.questionCost=qaInt('qa-p-cost');
   d.unitPrice=qaInt('qa-p-unit');
+  if(_('qa-pm-ppurio'))d.ppurioEnabled=!!_('qa-pm-ppurio').checked;
+  if(_('qa-pm-bank'))d.bankEnabled=!!_('qa-pm-bank').checked;
+  if(_('qa-bank-name'))d.bankName=_('qa-bank-name').value.trim();
+  if(_('qa-bank-account'))d.bankAccount=_('qa-bank-account').value.trim();
+  if(_('qa-bank-holder'))d.bankHolder=_('qa-bank-holder').value.trim();
   d.packages=d.packages.map((p,i)=>({
     id:p.id,
     tokens:qaInt(`qa-pk-tokens-${i}`),
@@ -4242,6 +4265,31 @@ function qaAdminPolicyHtml(){
     </div>
   </div>
 
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">결제 수단</p>
+      <span style="font-size:11px;color:#6b7280">학생 구매 화면에 보일 수단</span>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:10px">
+      <input type="checkbox" id="qa-pm-ppurio" ${d.ppurioEnabled!==false?'checked':''} onchange="qaOnPolicyChange()"> <b>결제선생</b>
+      <span style="font-size:11px;color:#9ca3af">요청을 받으면 관리자가 결제 링크를 보냅니다</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+      <input type="checkbox" id="qa-pm-bank" ${d.bankEnabled?'checked':''} onchange="qaOnPolicyChange()"> <b>계좌이체</b>
+      <span style="font-size:11px;color:#9ca3af">학생이 직접 입금합니다</span>
+    </label>
+    ${d.bankEnabled?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:12px">
+      <div class="fg" style="margin:0"><label class="fl">은행</label><input class="fi" id="qa-bank-name" maxlength="30" value="${escapeHtml(d.bankName||'')}" placeholder="예) 국민은행" oninput="qaSyncDraftFromDom()"></div>
+      <div class="fg" style="margin:0"><label class="fl">계좌번호</label><input class="fi" id="qa-bank-account" maxlength="40" value="${escapeHtml(d.bankAccount||'')}" placeholder="숫자와 - 만" oninput="qaSyncDraftFromDom()"></div>
+      <div class="fg" style="margin:0"><label class="fl">예금주</label><input class="fi" id="qa-bank-holder" maxlength="20" value="${escapeHtml(d.bankHolder||'')}" placeholder="예) 김재희" oninput="qaSyncDraftFromDom()"></div>
+    </div>
+    ${(!d.bankName||!d.bankAccount||!d.bankHolder)?'<p style="font-size:11px;color:#dc2626;margin-top:8px">은행·계좌번호·예금주를 모두 채워야 학생 화면에 계좌이체가 나옵니다.</p>':''}`:''}
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn bs" style="flex:1" onclick="qaResetPolicy()">되돌리기</button>
+      <button class="btn bp" style="flex:1" onclick="qaSavePolicy()">저장</button>
+    </div>
+  </div>
+
   <div class="card">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <p style="font-size:15px;font-weight:700">판매 옵션</p>
@@ -4320,13 +4368,55 @@ async function qaDelQuestion(id){
   catch(e){toast(e.message,'error');}
   showLoad(false);
 }
-async function qaRequestPayment(pkgId){
+function qaOpenPurchase(pkgId){
   const p=qaPackages(true).find(x=>x.id===pkgId);if(!p)return;
+  const methods=qaPayMethods();
+  if(!methods.length){toast('지금은 결제 요청을 받지 않습니다.','warn');return;}
   const label=p.bonus?`${p.tokens}토큰 + 보너스 ${p.bonus}토큰`:`${p.tokens}토큰`;
-  if(!(await confirmDialog({title:'결제 요청',message:`${label}을 ${fmtWon(p.amount)}에 요청합니다.\n확인 후 결제선생으로 결제 링크를 보내드립니다.\n\n토큰을 한 개라도 사용하면 환불되지 않습니다.`,confirmLabel:'요청하기'})))return;
+  const pick=methods.length>1
+    ?`<div class="fg"><label class="fl">결제 수단</label>
+       <select class="fi fsel" id="qa-pay-method" onchange="qaPurchaseMethodChanged()">
+         ${methods.map(m=>`<option value="${m}">${QA_PAY_METHOD[m]}</option>`).join('')}
+       </select></div>`
+    :`<input type="hidden" id="qa-pay-method" value="${methods[0]}">
+      <p style="font-size:12px;color:#6b7280;margin-bottom:10px">결제 수단: <b>${QA_PAY_METHOD[methods[0]]}</b></p>`;
+  _('mCt').innerHTML=`<p class="mtitle">결제 요청</p>
+    <p class="msub">${label} · <b>${fmtWon(p.amount)}</b></p>
+    ${pick}
+    <div id="qa-pay-detail"></div>
+    <p style="font-size:11px;color:#9ca3af">토큰을 한 개라도 사용하면 환불되지 않습니다.</p>
+    <p class="ferr" id="mErr"></p>
+    <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">취소</button><button class="btn bp bfw" onclick="qaRequestPayment('${pkgId}')">요청하기</button></div>`;
+  openModal();
+  qaPurchaseMethodChanged();
+}
+function qaPurchaseMethodChanged(){
+  const m=_('qa-pay-method')?.value||'ppurio';
+  const pol=qaPolicy();
+  const stu=S.students.find(x=>x._docId===S.studentDocId);
+  const box=_('qa-pay-detail');if(!box)return;
+  box.innerHTML=m==='bank'
+    ?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:12px">
+        <p style="font-size:12px;color:#6b7280;margin-bottom:6px">아래 계좌로 입금해 주세요</p>
+        <p style="font-size:15px;font-weight:800">${escapeHtml(pol.bankName||'')} ${escapeHtml(pol.bankAccount||'')}</p>
+        <p style="font-size:12px;color:#6b7280;margin-top:2px">예금주 ${escapeHtml(pol.bankHolder||'')}</p>
+      </div>
+      <div class="fg"><label class="fl">입금자명</label>
+        <input class="fi" id="qa-pay-depositor" maxlength="20" value="${escapeHtml(stu?.name||'')}" placeholder="통장에 찍히는 이름">
+        <p style="font-size:11px;color:#9ca3af">이름이 다르면 입금 확인이 늦어질 수 있습니다.</p>
+      </div>`
+    :`<p style="font-size:12px;color:#6b7280;margin-bottom:12px">확인 후 <b>결제선생</b>으로 결제 링크를 보내드립니다.</p>`;
+}
+async function qaRequestPayment(pkgId){
+  const method=_('qa-pay-method')?.value||'ppurio';
+  const depositorName=(_('qa-pay-depositor')?.value||'').trim();
+  if(method==='bank'&&!depositorName){showErr('mErr','입금자명을 입력해 주세요.');return;}
   showLoad(true);
-  try{await qaCall('requestPayment',{packageId:pkgId});toast('결제 요청을 보냈습니다.','success');}
-  catch(e){toast(e.message,'error');}
+  try{
+    await qaCall('requestPayment',{packageId:pkgId,method,depositorName});
+    closeModal();
+    toast(method==='bank'?'결제 요청을 보냈습니다. 안내된 계좌로 입금해 주세요.':'결제 요청을 보냈습니다.','success');
+  }catch(e){showErr('mErr',e.message);}
   showLoad(false);
 }
 async function qaCancelPayment(id){

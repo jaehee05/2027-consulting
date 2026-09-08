@@ -15,7 +15,14 @@ const DEFAULT_POLICY = {
   questionCost: 1,
   unitPrice: 1000,
   packages: [],
+  // 결제 수단. 결제선생은 관리자가 알림톡으로 링크를 보내고, 계좌이체는 학생이 직접 입금한다.
+  ppurioEnabled: true,
+  bankEnabled: false,
+  bankName: "",
+  bankAccount: "",
+  bankHolder: "",
 };
+const PAY_METHODS = ["ppurio", "bank"];
 
 const LEDGER_REASONS = ["signup", "question", "purchase", "manual"];
 const PR_STATUS = ["requested", "sent", "paid", "canceled"];
@@ -41,7 +48,17 @@ async function getPolicy(fs) {
     questionCost: Math.max(0, Math.floor(num(raw.questionCost, DEFAULT_POLICY.questionCost))),
     unitPrice: Math.max(0, Math.floor(num(raw.unitPrice, DEFAULT_POLICY.unitPrice))),
     packages: Array.isArray(raw.packages) ? raw.packages : [],
+    ppurioEnabled: raw.ppurioEnabled !== false,
+    bankEnabled: raw.bankEnabled === true,
+    bankName: String(raw.bankName || ""),
+    bankAccount: String(raw.bankAccount || ""),
+    bankHolder: String(raw.bankHolder || ""),
   };
+}
+
+/** 계좌이체를 켜 두려면 은행·계좌·예금주가 다 있어야 한다. 하나라도 비면 켜 봐야 학생이 입금할 수 없다. */
+function bankReady(policy) {
+  return !!(policy.bankEnabled && policy.bankName && policy.bankAccount && policy.bankHolder);
 }
 
 /** 정가 − 할인. 할인이 정가를 넘어도 0원 아래로는 내려가지 않는다. */
@@ -321,8 +338,11 @@ async function deleteQuestion(fs, { questionId, actor }) {
 /* ── 결제 요청 ──
    요청됨 → 발송완료 → 결제완료. 요청됨/발송완료에서만 취소할 수 있다. */
 
-async function createPaymentRequest(fs, { student, packageId }) {
+async function createPaymentRequest(fs, { student, packageId, method, depositorName }) {
   const policy = await getPolicy(fs);
+  const m = PAY_METHODS.includes(method) ? method : "ppurio";
+  if (m === "ppurio" && !policy.ppurioEnabled) throw new ApiError(400, "지금은 결제선생으로 요청할 수 없습니다.");
+  if (m === "bank" && !bankReady(policy)) throw new ApiError(400, "지금은 계좌이체로 요청할 수 없습니다.");
   const pkgs = normalizePackages(policy.packages, policy.unitPrice);
   const pkg = pkgs.find((p) => p.id === packageId);
   if (!pkg) throw new ApiError(404, "판매 상품을 찾을 수 없습니다.");
@@ -337,6 +357,12 @@ async function createPaymentRequest(fs, { student, packageId }) {
     studentName: student.name || "",
     studentPhone: student.phone || "",
     packageId: pkg.id,
+    method: m,
+    // 나중에 계좌가 바뀌어도 이 요청에 안내한 계좌는 그대로여야 한다.
+    bankName: m === "bank" ? policy.bankName : "",
+    bankAccount: m === "bank" ? policy.bankAccount : "",
+    bankHolder: m === "bank" ? policy.bankHolder : "",
+    depositorName: m === "bank" ? String(depositorName || student.name || "").trim().slice(0, 20) : "",
     tokens: pkg.tokens,
     bonus: pkg.bonus,
     totalTokens: pkg.totalTokens,
@@ -353,7 +379,7 @@ async function createPaymentRequest(fs, { student, packageId }) {
     canceledAt: null, canceledById: "", canceledByName: "",
     ledgerId: "",
   });
-  return { id: ref.id, amount: pkg.amount, tokens: pkg.tokens, bonus: pkg.bonus, totalTokens: pkg.totalTokens };
+  return { id: ref.id, method: m, amount: pkg.amount, tokens: pkg.tokens, bonus: pkg.bonus, totalTokens: pkg.totalTokens };
 }
 
 async function markPaymentSent(fs, { requestId, by }) {
@@ -363,6 +389,9 @@ async function markPaymentSent(fs, { requestId, by }) {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new ApiError(404, "결제 요청을 찾을 수 없습니다.");
     const pr = snap.data();
+    if (pr.method === "bank") {
+      throw new ApiError(409, "계좌이체 요청에는 발송 단계가 없습니다. 입금이 확인되면 바로 결제 완료로 바꾸세요.");
+    }
     if (pr.status !== "requested") {
       throw new ApiError(409, `'요청됨' 상태에서만 발송 완료로 바꿀 수 있습니다. (현재: ${pr.status})`);
     }
@@ -383,8 +412,10 @@ async function markPaymentPaid(fs, { requestId, by }) {
     if (!snap.exists) throw new ApiError(404, "결제 요청을 찾을 수 없습니다.");
     const pr = snap.data();
     if (pr.status === "paid") throw new ApiError(409, "이미 결제 완료 처리된 요청입니다.");
-    if (pr.status !== "sent") {
-      throw new ApiError(409, `'발송완료' 상태에서만 결제 완료로 바꿀 수 있습니다. (현재: ${pr.status})`);
+    // 계좌이체는 관리자가 보낼 링크가 없어 '발송완료' 단계를 거치지 않는다.
+    const okFrom = pr.method === "bank" ? ["requested", "sent"] : ["sent"];
+    if (!okFrom.includes(pr.status)) {
+      throw new ApiError(409, `'${okFrom.join("' 또는 '")}' 상태에서만 결제 완료로 바꿀 수 있습니다. (현재: ${pr.status})`);
     }
     // 보너스 필드가 없던 예전 요청은 tokens 로 떨어진다.
     const tokens = Math.max(0, Math.floor(num(pr.totalTokens, num(pr.tokens))));
@@ -452,6 +483,11 @@ async function savePolicy(fs, patch) {
       id: p.id, tokens: p.tokens, bonus: p.bonus, active: p.active, order: p.order,
       discountType: p.discountType, discountValue: p.discountValue,
     })),
+    ppurioEnabled: patch.ppurioEnabled === undefined ? cur.ppurioEnabled : patch.ppurioEnabled !== false,
+    bankEnabled: patch.bankEnabled === undefined ? cur.bankEnabled : patch.bankEnabled === true,
+    bankName: String(patch.bankName === undefined ? cur.bankName : patch.bankName || "").trim().slice(0, 30),
+    bankAccount: String(patch.bankAccount === undefined ? cur.bankAccount : patch.bankAccount || "").trim().slice(0, 40),
+    bankHolder: String(patch.bankHolder === undefined ? cur.bankHolder : patch.bankHolder || "").trim().slice(0, 20),
     updatedAt: Date.now(),
   };
   await fs.doc(POLICY_DOC).set(next, { merge: true });
@@ -464,6 +500,8 @@ module.exports = {
   DEFAULT_POLICY,
   PR_STATUS,
   Q_STATUS,
+  PAY_METHODS,
+  bankReady,
   LEDGER_REASONS,
   getPolicy,
   savePolicy,

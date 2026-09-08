@@ -375,6 +375,59 @@ describe("결제 요청 흐름", () => {
     expect(led[0].note).toContain("보너스");
   });
 
+  test("계좌이체는 은행·계좌·예금주가 다 있어야 요청된다", async () => {
+    await setPolicy({ unitPrice: 1000, packages: PKG, bankEnabled: true });   // 계좌 정보 없음
+    await expect(tokens.createPaymentRequest(fs, { student, packageId: "p10", method: "bank" }))
+      .rejects.toMatchObject({ status: 400 });
+
+    await setPolicy({ unitPrice: 1000, packages: PKG, bankEnabled: true,
+      bankName: "국민", bankAccount: "123-45", bankHolder: "김재희" });
+    const r = await tokens.createPaymentRequest(fs, {
+      student, packageId: "p10", method: "bank", depositorName: "김승찬맘",
+    });
+    expect(r.method).toBe("bank");
+    const pr = (await fs.doc(`paymentRequests/${r.id}`).get()).data();
+    // 나중에 계좌가 바뀌어도 이 요청에 안내한 계좌는 그대로여야 한다.
+    expect(pr).toMatchObject({
+      method: "bank", bankName: "국민", bankAccount: "123-45", bankHolder: "김재희",
+      depositorName: "김승찬맘", status: "requested",
+    });
+  });
+
+  test("계좌이체는 발송 단계를 건너뛰고 바로 지급된다", async () => {
+    await setPolicy({ unitPrice: 1000, packages: PKG, bankEnabled: true,
+      bankName: "국민", bankAccount: "123-45", bankHolder: "김재희" });
+    const id = (await tokens.createPaymentRequest(fs, { student, packageId: "p10", method: "bank" })).id;
+    await expect(tokens.markPaymentSent(fs, { requestId: id, by: adminActor }))
+      .rejects.toMatchObject({ status: 409 });
+    await tokens.markPaymentPaid(fs, { requestId: id, by: adminActor });
+    expect(await tokens.getBalance(fs, student.id)).toBe(10);
+  });
+
+  test("계좌이체도 두 번 지급되지 않는다", async () => {
+    await setPolicy({ unitPrice: 1000, packages: PKG, bankEnabled: true,
+      bankName: "국민", bankAccount: "123-45", bankHolder: "김재희" });
+    const id = (await tokens.createPaymentRequest(fs, { student, packageId: "p10", method: "bank" })).id;
+    const out = await Promise.allSettled([
+      tokens.markPaymentPaid(fs, { requestId: id, by: adminActor }),
+      tokens.markPaymentPaid(fs, { requestId: id, by: adminActor }),
+    ]);
+    expect(out.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(await tokens.getBalance(fs, student.id)).toBe(10);
+  });
+
+  test("결제선생은 여전히 발송 단계를 거쳐야 한다", async () => {
+    const id = await requested();
+    await expect(tokens.markPaymentPaid(fs, { requestId: id, by: adminActor }))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
+  test("꺼 둔 수단으로는 요청할 수 없다", async () => {
+    await setPolicy({ unitPrice: 1000, packages: PKG, ppurioEnabled: false });
+    await expect(tokens.createPaymentRequest(fs, { student, packageId: "p10", method: "ppurio" }))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
   test("결제 완료된 요청은 취소할 수 없다", async () => {
     const id = await requested();
     await tokens.markPaymentSent(fs, { requestId: id, by: adminActor });
