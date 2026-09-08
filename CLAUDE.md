@@ -256,7 +256,7 @@ There are **no automated tests, linters, or build steps** for the web app. `inde
   - 관리자가 [토큰 설정] → 본문 글꼴에서 고르고, `config/main.qaFont` 에 저장된다. `qaApplyFont` 가 `#qaC` 에 `--qa-font` 를 내려 주고 `.qa-body` 가 그 값을 쓴다.
   - **기본값을 `inherit` 으로 두면 안 된다** — 미리보기가 상위 `#qaC` 의 값을 물려받아 기본으로 돌아오지 않는다. `qaFontStack('')` 이 실제 스택(`QA_FONT_BASE`)을 돌려준다.
 - **LaTeX**: KaTeX(CDN, `defer`) + auto-render. `$…$` / `$$…$$` / `\\(…\\)` / `\\[…\\]`. `qaRenderMath()` 가 `.qa-body` 안에서만 돈다. `throwOnError:false` — 학생이 문법을 틀려도 화면이 깨지지 않고 원문이 남는다. CDN 이 늦거나 막히면 `renderMathInElement` 가 없으므로 조용히 넘어가고 본문은 글자 그대로 보인다.
-- 수식 글꼴은 `.qa-body .katex` 에서 본문 글꼴로 덮는다. 기호(∑ ∫ 분수)는 KaTeX 쪽 규칙이 더 구체적이라 KaTeX 글꼴로 남는다 — 그게 읽기에도 낫다.
+- **수식은 KaTeX 기본 글꼴 그대로 둔다.** 손글씨 글꼴에는 수학 기호가 없어 본문 글꼴을 억지로 씌우면 깨진다. `.qa-body .katex` 는 크기만 맞춘다.
 
 ## 알림톡 서비스 레이어 (`functions/notify.js`)
 

@@ -112,8 +112,9 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 @font-face{font-family:'HUMemories';src:url('fonts/hu-memories.woff2') format('woff2');font-display:swap}
 @font-face{font-family:'HU왼손으로그린별';src:url('fonts/hu-leftstar.woff2') format('woff2');font-display:swap}
 .qa-body{font-family:var(--qa-font,inherit);line-height:1.8}
-/* 수식도 본문과 같은 글꼴로. 기호(∑ ∫ 분수)는 KaTeX 자체 글꼴이 더 구체적인 규칙이라 그대로 남는다. */
-.qa-body .katex{font-family:var(--qa-font,KaTeX_Main),KaTeX_Main,serif;font-size:1.05em}
+/* 수식은 KaTeX 기본 글꼴 그대로 둔다 — 손글씨 글꼴에는 수학 기호가 없어 억지로 맞추면 깨진다.
+   크기만 본문에 맞춰 나란히 놓았을 때 튀지 않게 한다. */
+.qa-body .katex{font-size:1.05em}
 .qa-body .katex-display{margin:.6em 0;overflow-x:auto;overflow-y:hidden}
 
 /* 자유게시판 플로팅 글쓰기 버튼. 카카오톡 채널 런처와 겹치지 않게 그 위에 앉힌다. */
