@@ -249,6 +249,15 @@ cd mobile && npm run android
 
 There are **no automated tests, linters, or build steps** for the web app. `index.html` is served as-is by Vercel.
 
+## 질문게시판 본문 글꼴 · LaTeX
+
+- **글꼴**: `fonts/*.woff2` 네 개(HU 계열, 유료 라이선스 구매본). 원본 TTF 는 1.2~14MB 라 한글 완성형 11,172자로 서브셋하고 컬러 글리프 테이블(`SVG `/`COLR`)을 떼어 냈다 — HUMemories 는 14MB 중 대부분이 SVG 였다. 결과 134KB~1.6MB. `@font-face` 는 넷 다 선언하지만 브라우저는 **실제로 쓰이는 하나만** 내려받는다.
+  - 서브셋을 더 줄이면(KS X 1001 2,350자) 파일은 작아지지만 드문 글자가 시스템 글꼴로 떨어져 한 문장 안에서 글꼴이 섞인다. 게시판 본문은 사용자가 쓴 글이라 쓰일 글자를 미리 알 수 없다.
+  - 관리자가 [토큰 설정] → 본문 글꼴에서 고르고, `config/main.qaFont` 에 저장된다. `qaApplyFont` 가 `#qaC` 에 `--qa-font` 를 내려 주고 `.qa-body` 가 그 값을 쓴다.
+  - **기본값을 `inherit` 으로 두면 안 된다** — 미리보기가 상위 `#qaC` 의 값을 물려받아 기본으로 돌아오지 않는다. `qaFontStack('')` 이 실제 스택(`QA_FONT_BASE`)을 돌려준다.
+- **LaTeX**: KaTeX(CDN, `defer`) + auto-render. `$…$` / `$$…$$` / `\\(…\\)` / `\\[…\\]`. `qaRenderMath()` 가 `.qa-body` 안에서만 돈다. `throwOnError:false` — 학생이 문법을 틀려도 화면이 깨지지 않고 원문이 남는다. CDN 이 늦거나 막히면 `renderMathInElement` 가 없으므로 조용히 넘어가고 본문은 글자 그대로 보인다.
+- 수식 글꼴은 `.qa-body .katex` 에서 본문 글꼴로 덮는다. 기호(∑ ∫ 분수)는 KaTeX 쪽 규칙이 더 구체적이라 KaTeX 글꼴로 남는다 — 그게 읽기에도 낫다.
+
 ## 알림톡 서비스 레이어 (`functions/notify.js`)
 
 `ppurio.js` 는 "한 건 보낸다"만 하고, 업무 규칙은 전부 `notify.js` 에 있다. 새 알림을 붙일 때는 `ppurio` 를 직접 부르지 말고 여기에 진입점을 추가한다.

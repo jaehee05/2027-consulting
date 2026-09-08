@@ -104,6 +104,18 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .tab{padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray-500);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;flex-shrink:0;white-space:nowrap}
 .tab.on{color:var(--primary);border-bottom-color:var(--primary)}.tab:hover{color:var(--gray-900)}
 .tw{overflow-x:auto}
+/* ── 질문게시판 본문 글꼴 ──
+   관리자가 [토큰 설정]에서 고른 글꼴이 --qa-font 로 들어온다. @font-face 는 넷 다 선언해 두지만
+   브라우저는 실제로 쓰이는 하나만 내려받는다. 한글 완성형 전체를 담은 서브셋(woff2)이다. */
+@font-face{font-family:'HU올곧게쓰다';src:url('fonts/hu-olgot.woff2') format('woff2');font-display:swap}
+@font-face{font-family:'HU모노로그';src:url('fonts/hu-monologue.woff2') format('woff2');font-display:swap}
+@font-face{font-family:'HUMemories';src:url('fonts/hu-memories.woff2') format('woff2');font-display:swap}
+@font-face{font-family:'HU왼손으로그린별';src:url('fonts/hu-leftstar.woff2') format('woff2');font-display:swap}
+.qa-body{font-family:var(--qa-font,inherit);line-height:1.8}
+/* 수식도 본문과 같은 글꼴로. 기호(∑ ∫ 분수)는 KaTeX 자체 글꼴이 더 구체적인 규칙이라 그대로 남는다. */
+.qa-body .katex{font-family:var(--qa-font,KaTeX_Main),KaTeX_Main,serif;font-size:1.05em}
+.qa-body .katex-display{margin:.6em 0;overflow-x:auto;overflow-y:hidden}
+
 /* 자유게시판 플로팅 글쓰기 버튼. 카카오톡 채널 런처와 겹치지 않게 그 위에 앉힌다. */
 .bd-fab{position:fixed;right:20px;bottom:88px;z-index:880;height:44px;padding:0 18px;border-radius:999px;border:none;background:var(--primary);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(28,100,242,.32);display:inline-flex;align-items:center;gap:6px}
 .bd-fab:hover{background:var(--primary-hover)}
@@ -623,6 +635,10 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 .fi:focus-visible,.gc-in:focus-visible{box-shadow:var(--focus-ring);border-color:var(--primary)}
 .sw-input:focus-visible,.sw-select:focus-visible{outline:none;border-bottom-color:var(--primary);box-shadow:0 1px 0 0 var(--primary)}
 </style>
+<!-- LaTeX 수식. 질문게시판 본문에서만 쓰므로 defer 로 늦게 받는다. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -3542,6 +3558,48 @@ function qaPackages(activeOnly){
 
 async function qaCall(action,payload){return callFn(TOKEN_API_URL,{action,payload},true);}
 
+/* ── 본문 글꼴 ──
+   관리자가 고른 글꼴을 --qa-font 로 내려 준다. 기본값은 시스템 글꼴. */
+const QA_FONT_BASE="'Pretendard',sans-serif";
+const QA_FONTS=[
+  {id:'',           label:'기본 (본문 글꼴)',   css:''},
+  {id:'olgot',      label:'HU올곧게쓰다',      css:"'HU올곧게쓰다'"},
+  {id:'monologue',  label:'HU모노로그',        css:"'HU모노로그'"},
+  {id:'memories',   label:'HUMemories',       css:"'HUMemories'"},
+  {id:'leftstar',   label:'HU왼손으로그린별',   css:"'HU왼손으로그린별'"}
+];
+function qaFontStack(id){
+  const f=QA_FONTS.find(x=>x.id===(id||''));
+  return f&&f.css?`${f.css},${QA_FONT_BASE}`:QA_FONT_BASE;
+}
+function qaApplyFont(el){
+  (el||_('qaC'))?.style.setProperty('--qa-font',qaFontStack((S.config&&S.config.qaFont)||''));
+}
+
+/* ── LaTeX ──
+   $...$ / $$...$$ / \( \) / \[ \] 를 KaTeX 로 그린다. 본문은 escapeHtml 을 거친 뒤라
+   원문 그대로가 텍스트 노드에 들어 있어, KaTeX 가 그 자리에서 치환한다.
+   CDN 이 늦게 뜨거나 막혀도 본문은 이미 글자로 보이므로 그냥 넘어간다. */
+function qaRenderMath(root){
+  const el=root||_('qaC');
+  if(!el||typeof renderMathInElement!=='function')return;
+  el.querySelectorAll('.qa-body').forEach(node=>{
+    try{
+      renderMathInElement(node,{
+        delimiters:[
+          {left:'$$',right:'$$',display:true},
+          {left:'\\[',right:'\\]',display:true},
+          {left:'$',right:'$',display:false},
+          {left:'\\(',right:'\\)',display:false}
+        ],
+        throwOnError:false,   // 학생이 문법을 틀려도 화면이 깨지면 안 된다 — 원문 그대로 남긴다
+        errorColor:'#dc2626',
+        ignoredTags:['script','noscript','style','textarea','pre','code']
+      });
+    }catch(e){console.error('수식 렌더 실패',e);}
+  });
+}
+
 /* ── 환불 규정 ──
    가능/불가/방법으로 나눈 일반적인 안내 형식. 전자상거래법상 '이미 사용한 디지털 콘텐츠'는
    청약철회 대상이 아니지만 한 개도 쓰지 않은 경우까지 막으면 법에 어긋나므로, 미사용분만
@@ -3645,6 +3703,8 @@ function renderQa(){
   if(admin)body=cur==='p'?qaAdminPaymentsHtml():cur==='b'?qaAdminBalancesHtml():cur==='s'?qaAdminPolicyHtml():qaQuestionsHtml(true);
   else body=cur==='t'?qaStuTokensHtml():qaQuestionsHtml(false);
   el.innerHTML=tabs+body;
+  qaApplyFont(el);
+  qaRenderMath(el);
 }
 
 /* ── 질문 목록 (학생=내 것만, 관리자=전체) ── */
@@ -3699,6 +3759,7 @@ function qaQuestionsHtml(admin){
     <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 질문 · 스레드를 열 때 ${cost}토큰이 차감됩니다</p>
     <input class="fi" id="qa-new-title" maxlength="120" placeholder="제목 (예: 미적분 29번 풀이 질문)" style="margin-bottom:8px">
     <textarea class="fi ta" id="qa-new-body" rows="5" placeholder="궁금한 내용을 자세히 적어 주세요."></textarea>
+    <p style="font-size:11px;color:#9ca3af;margin-top:6px">수식은 <code>$x^2$</code> 처럼 달러 기호로 감싸면 됩니다. 가운데 정렬하려면 <code>$$ … $$</code>.</p>
     <div style="margin-top:8px">
       <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_new','post')"></label>
       <span style="font-size:11px;color:#9ca3af;margin-left:8px">최대 8MB, JPEG/PNG</span>
@@ -3731,7 +3792,7 @@ function qaFeedRowHtml(q,admin){
         ${qaChip(QA_Q_STATUS,q.status)}
         <b style="font-size:14px;color:#111827;word-break:break-word">${escapeHtml(q.title||'')}</b>
       </div>
-      <p style="font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word">${escapeHtml(q.body||'')}</p>
+      <p class="qa-body" style="font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word">${escapeHtml(q.body||'')}</p>
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;flex-wrap:wrap">
         ${who}<span>${bdFmtTs(q.createdAt)}</span>
         ${cmts?`<span style="color:#1C64F2;font-weight:600">💬 ${cmts}</span>`:''}
@@ -3759,7 +3820,7 @@ function qaDetailHtml(q,admin){
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px">${badge}<b>${nm}</b><span style="color:#9ca3af">· ${bdFmtTs(c.ts)}</span>
         ${canDelC?`<button onclick="qaDelComment('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1;margin-left:auto" title="삭제">×</button>`:''}
       </div>
-      <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body||'')}</p>
+      <p class="qa-body" style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${escapeHtml(c.body||'')}</p>
       ${bdPhotosHtml(c.photos)}
     </div>`;
   }).join('');
@@ -3770,13 +3831,14 @@ function qaDetailHtml(q,admin){
       ${qaChip(QA_Q_STATUS,q.status)}${who}
       <span style="font-size:11px;color:#9ca3af;margin-left:auto">${qaFmtDateTime(q.createdAt)}</span>
     </div>
-    <h2 style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word">${escapeHtml(q.title||'')}</h2>
-    <p style="font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word">${escapeHtml(q.body||'')}</p>
+    <h2 class="qa-body" style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word">${escapeHtml(q.title||'')}</h2>
+    <p class="qa-body" style="font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word">${escapeHtml(q.body||'')}</p>
     ${bdPhotosHtml(q.photos)}
     ${cmts.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:18px 0 6px">댓글 (${cmts.length})</p>${cmtHtml}`
       :'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:18px 0;margin-top:14px;border-top:1px solid #f1f3f5">아직 댓글이 없습니다.</p>'}
     <div style="margin-top:10px;padding-top:12px;border-top:1px solid #e5e7eb">
       <textarea class="fi ta" id="qa-cmt-${id}" rows="2" placeholder="${admin?'학생에게 답변하기':'추가로 궁금한 점 남기기'}"></textarea>
+      <p style="font-size:11px;color:#9ca3af;margin-top:4px">수식은 <code>$x^2$</code> 처럼 쓰면 그려집니다.</p>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
         <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_c_${id}','comment')"></label>
         ${canDel?`<button class="btn bd bsm" style="font-size:11px;padding:6px 10px" onclick="qaDelQuestion('${id}')">질문 삭제</button>`:''}
@@ -4005,6 +4067,25 @@ function qaAddPackage(){S.qa.draftDirty=true;qaSyncDraftFromDom().packages.push(
 function qaRemovePackage(i){S.qa.draftDirty=true;const d=qaSyncDraftFromDom();d.packages.splice(i,1);renderQa();}
 function qaResetPolicy(){S.qa.draft=null;S.qa.draftDirty=false;renderQa();}
 
+/* 저장하기 전에 고른 글꼴을 미리보기에만 입혀 본다. */
+function qaPreviewFont(){
+  const box=_('qa-font-preview');
+  if(box)box.style.setProperty('--qa-font',qaFontStack(_('qa-font-sel')?.value||''));
+  qaRenderMath(box?box.parentElement:null);
+}
+function qaResetFont(){const el=_('qa-font-sel');if(el){el.value=(S.config&&S.config.qaFont)||'';qaPreviewFont();}}
+async function qaSaveFont(){
+  const id=_('qa-font-sel')?.value||'';
+  showLoad(true);
+  try{
+    await db.collection('config').doc('main').set({qaFont:id},{merge:true});
+    S.config.qaFont=id;
+    toast('본문 글꼴을 저장했습니다.','success');
+    renderQa();
+  }catch(e){toast('저장 실패: '+e.message,'error');}
+  showLoad(false);
+}
+
 function qaAdminPolicyHtml(){
   if(!S.qa.policyLoaded)return '<div class="card"><p style="font-size:13px;color:#6b7280">설정을 불러오는 중…</p></div>';
   const d=qaPolicyDraft();
@@ -4037,6 +4118,25 @@ function qaAdminPolicyHtml(){
       <div class="fg" style="margin:0"><label class="fl">1토큰 단가 (원)</label><input class="fi" id="qa-p-unit" type="number" min="0" inputmode="numeric" value="${d.unitPrice}" oninput="qaOnPolicyInput()"></div>
     </div>
     <p style="font-size:11px;color:#9ca3af">기본 지급량은 앞으로 등록되는 학생부터 적용됩니다. 이미 등록된 학생은 [학생 잔액] 탭에서 일괄 지급하세요.</p>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <p style="font-size:15px;font-weight:700">본문 글꼴</p>
+      <span style="font-size:11px;color:#6b7280">질문·답변 본문과 수식에 적용됩니다</span>
+    </div>
+    <div class="fg" style="margin:0 0 12px">
+      <select class="fi fsel" id="qa-font-sel" onchange="qaPreviewFont()">
+        ${QA_FONTS.map(f=>`<option value="${f.id}" ${((S.config&&S.config.qaFont)||'')===f.id?'selected':''}>${f.label}</option>`).join('')}
+      </select>
+    </div>
+    <div id="qa-font-preview" class="qa-body" style="border:1px solid #e5e7eb;border-radius:10px;padding:14px;background:#fff;font-size:15px;line-height:1.8">
+      적분 구간을 나누는 기준이 궁금합니다. $\\int_0^1 x^2\\,dx = \\frac{1}{3}$ 이 맞나요?
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn bs" style="flex:1" onclick="qaResetFont()">되돌리기</button>
+      <button class="btn bp" style="flex:1" onclick="qaSaveFont()">글꼴 저장</button>
+    </div>
   </div>
 
   <div class="card">
