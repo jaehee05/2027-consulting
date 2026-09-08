@@ -3011,6 +3011,24 @@ async function bdUnban(stuId){
 /* ── 공감 · 스크랩 · 신고 ──
    posts 는 클라이언트 쓰기가 열려 있어 여기서 바로 토글한다. 숫자 대신 누른 사람 id 배열을 들고 있어야
    같은 사람이 두 번 눌러도 부풀지 않는다. */
+/* 조회수. 같은 사람이 새로고침할 때마다 올라가면 숫자가 의미를 잃으므로
+   브라우저별로 한 번만 센다(localStorage). 글쓴이가 자기 글을 여는 건 세지 않는다. */
+function bdViews(q){return Math.max(0,Math.floor(Number(q.views)||0));}
+const BD_VIEWED_KEY='bdViewed', BD_VIEWED_MAX=500;
+function bdViewedIds(){
+  try{const a=JSON.parse(localStorage.getItem(BD_VIEWED_KEY)||'[]');return Array.isArray(a)?a:[];}
+  catch(_){return [];}
+}
+async function bdCountView(id){
+  const q=S.posts.find(x=>x._docId===id);
+  if(!q||q.authorId===bdMyId())return;
+  const seen=bdViewedIds();
+  if(seen.includes(id))return;
+  try{localStorage.setItem(BD_VIEWED_KEY,JSON.stringify([...seen,id].slice(-BD_VIEWED_MAX)));}catch(_){}
+  try{await db.collection('posts').doc(id).update({views:firebase.firestore.FieldValue.increment(1)});}
+  catch(e){console.error('조회수 기록 실패',e);}
+}
+
 function bdLikes(q){return Array.isArray(q.likes)?q.likes:[];}
 function bdScraps(q){return Array.isArray(q.scraps)?q.scraps:[];}
 function bdReports(q){return Array.isArray(q.reports)?q.reports:[];}
@@ -3156,6 +3174,7 @@ function bdPostHtml(q,ctx){
     <span style="color:#dc2626">👍 ${likeCount}</span>
     <span style="color:#1C64F2">💬 ${comments.length}</span>
     <span style="color:#f59e0b">⭐ ${scrapCount}</span>
+    <span style="color:#9ca3af;font-weight:500">조회 ${bdViews(q)}</span>
   </div>
   <div style="display:flex;gap:8px;margin-top:10px">
     <button onclick="bdToggleLike('${id}',event)" style="border:1px solid ${liked?'#fca5a5':'#e5e7eb'};background:${liked?'#fee2e2':'#f9fafb'};color:${liked?'#dc2626':'#6b7280'};border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">👍 공감</button>
@@ -3303,6 +3322,7 @@ function bdFeedRowHtml(q){
         <span style="margin-left:4px;color:#dc2626;font-weight:600">👍 ${bdLikes(q).length}</span>
         <span style="color:#1C64F2;font-weight:600">💬 ${cmts}</span>
         ${bdScraps(q).length?`<span style="color:#f59e0b;font-weight:600">⭐ ${bdScraps(q).length}</span>`:''}
+        <span style="color:#9ca3af">조회 ${bdViews(q)}</span>
       </div>
     </div>
     ${thumb?`<img src="${thumb.url}" alt="" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;flex-shrink:0">`:''}
@@ -3342,7 +3362,7 @@ function bdBoardHtml(){
   }
   return bdListHtml();
 }
-function bdOpen(id){S.bdOpenId=id;S.bdComposerOpen=false;S.bdReplyTo=null;bdRerender();try{window.scrollTo({top:0});}catch(_){}}
+function bdOpen(id){S.bdOpenId=id;S.bdComposerOpen=false;S.bdReplyTo=null;bdCountView(id);bdRerender();try{window.scrollTo({top:0});}catch(_){}}
 function bdCloseDetail(){S.bdOpenId=null;S.bdPostEditId=null;S.bdReplyTo=null;bdRerender();}
 
 /* 멘토링 상세·예약 상세·태블릿에 붙는 한 학생 전용 섹션. 작성은 게시판에서만 하고 여기서는 답변만 단다. */
