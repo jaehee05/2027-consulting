@@ -1013,6 +1013,11 @@ exports.tokenApi = onRequest(async (req, res) => {
         return res.json(await tokens.deleteQuestionComment(fs, {
           questionId: p.questionId, commentId: p.commentId, actor,
         }));
+      case "setQuestionClosed":
+        requireAdmin();
+        return res.json(await tokens.setQuestionClosed(fs, {
+          questionId: p.questionId, closed: !!p.closed, by,
+        }));
       case "deleteQuestion":
         if (!isAdmin) await requireStudent();
         return res.json(await tokens.deleteQuestion(fs, { questionId: p.questionId, actor }));

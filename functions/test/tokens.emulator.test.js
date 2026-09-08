@@ -245,6 +245,74 @@ describe("질문 댓글 권한", () => {
   });
 });
 
+describe("스레드 닫기", () => {
+  async function makeQuestion() {
+    await setBalance(student.id, 5);
+    return (await tokens.createQuestion(fs, { student, title: "t", body: "b" })).id;
+  }
+  const q = async (id) => (await fs.doc(`questions/${id}`).get()).data();
+
+  test("닫으면 종료 상태가 되고 처리자가 남는다", async () => {
+    const id = await makeQuestion();
+    expect(await tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor }))
+      .toEqual({ status: "closed" });
+    const d = await q(id);
+    expect(d).toMatchObject({ status: "closed", closedByName: "김재희" });
+    expect(typeof d.closedAt).toBe("number");
+  });
+
+  test("종료된 스레드에는 학생도 관리자도 댓글을 달 수 없다", async () => {
+    const id = await makeQuestion();
+    await tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor });
+    await expect(tokens.addQuestionComment(fs, {
+      questionId: id, actor: { id: student.id, name: student.name, role: "student" }, body: "추가",
+    })).rejects.toMatchObject({ status: 409 });
+    await expect(tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답변" }))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
+  test("두 번 닫거나, 열려 있는 걸 열려 하면 거부한다", async () => {
+    const id = await makeQuestion();
+    await tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor });
+    await expect(tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor }))
+      .rejects.toMatchObject({ status: 409 });
+    await tokens.setQuestionClosed(fs, { questionId: id, closed: false, by: adminActor });
+    await expect(tokens.setQuestionClosed(fs, { questionId: id, closed: false, by: adminActor }))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
+  test("다시 열면 답변이 있었는지에 따라 상태가 갈린다", async () => {
+    const a = await makeQuestion();
+    await tokens.setQuestionClosed(fs, { questionId: a, closed: true, by: adminActor });
+    await tokens.setQuestionClosed(fs, { questionId: a, closed: false, by: adminActor });
+    expect((await q(a)).status).toBe("pending");
+
+    const b = await makeQuestion();
+    await tokens.addQuestionComment(fs, { questionId: b, actor: adminActor, body: "답변" });
+    await tokens.setQuestionClosed(fs, { questionId: b, closed: true, by: adminActor });
+    await tokens.setQuestionClosed(fs, { questionId: b, closed: false, by: adminActor });
+    expect((await q(b)).status).toBe("answered");
+  });
+
+  test("종료된 스레드는 댓글을 지워도 다시 열리지 않는다", async () => {
+    const id = await makeQuestion();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답변" });
+    const cid = (await q(id)).comments[0]._id;
+    await tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor });
+    await tokens.deleteQuestionComment(fs, { questionId: id, commentId: cid, actor: adminActor });
+    expect((await q(id)).status).toBe("closed");
+  });
+
+  test("동시에 두 번 닫아도 한 번만 먹는다", async () => {
+    const id = await makeQuestion();
+    const out = await Promise.allSettled([
+      tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor }),
+      tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor }),
+    ]);
+    expect(out.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  });
+});
+
 describe("결제 요청 흐름", () => {
   const PKG = [{ id: "p10", tokens: 10, order: 1, discountType: "percent", discountValue: 10 }];
 

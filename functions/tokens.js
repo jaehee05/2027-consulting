@@ -19,6 +19,7 @@ const DEFAULT_POLICY = {
 
 const LEDGER_REASONS = ["signup", "question", "purchase", "manual"];
 const PR_STATUS = ["requested", "sent", "paid", "canceled"];
+const Q_STATUS = ["pending", "answered", "closed"];
 
 class ApiError extends Error {
   constructor(status, message) {
@@ -220,6 +221,9 @@ async function addQuestionComment(fs, { questionId, actor, body, photos }) {
     const snap = await tx.get(qRef);
     if (!snap.exists) throw new ApiError(404, "질문을 찾을 수 없습니다.");
     const q = snap.data();
+    if (q.status === "closed") {
+      throw new ApiError(409, "종료된 스레드에는 댓글을 달 수 없습니다.");
+    }
     if (actor.role !== "admin" && q.authorId !== actor.id) {
       throw new ApiError(403, "본인 질문에만 댓글을 달 수 있습니다.");
     }
@@ -262,12 +266,43 @@ async function deleteQuestionComment(fs, { questionId, commentId, actor }) {
     const next = list.filter((c) => c._id !== commentId);
     const upd = { comments: next, updatedAt: now };
     // 관리자 댓글이 다 지워지면 다시 답변대기로 돌린다 — 아니면 답변 없는 글이 답변완료로 남는다.
-    if (!next.some((c) => c.role === "admin")) {
+    // 단 종료된 스레드는 건드리지 않는다. 닫아 둔 걸 댓글 삭제로 다시 열면 안 된다.
+    if (q.status !== "closed" && !next.some((c) => c.role === "admin")) {
       upd.status = "pending";
       upd.answeredAt = null;
     }
     tx.update(qRef, upd);
     return { ok: true, status: upd.status || q.status };
+  });
+}
+
+/**
+ * 스레드 닫기 / 다시 열기. 관리자만.
+ * 닫으면 더 이상 댓글을 달 수 없다. 다시 열 때는 관리자 답변이 있었는지 보고
+ * 답변완료 / 답변대기 중 맞는 쪽으로 되돌린다 — 무조건 답변대기로 두면 이미 답한 글이 다시 밀려 올라온다.
+ */
+async function setQuestionClosed(fs, { questionId, closed, by }) {
+  const now = Date.now();
+  return fs.runTransaction(async (tx) => {
+    const qRef = fs.doc(`questions/${questionId}`);
+    const snap = await tx.get(qRef);
+    if (!snap.exists) throw new ApiError(404, "질문을 찾을 수 없습니다.");
+    const q = snap.data();
+    const isClosed = q.status === "closed";
+    if (closed && isClosed) throw new ApiError(409, "이미 종료된 스레드입니다.");
+    if (!closed && !isClosed) throw new ApiError(409, "종료된 스레드가 아닙니다.");
+
+    if (closed) {
+      tx.update(qRef, {
+        status: "closed", updatedAt: now,
+        closedAt: now, closedById: (by && by.id) || "", closedByName: (by && by.name) || "",
+      });
+      return { status: "closed" };
+    }
+    const hasAdmin = (Array.isArray(q.comments) ? q.comments : []).some((c) => c.role === "admin");
+    const status = hasAdmin ? "answered" : "pending";
+    tx.update(qRef, { status, updatedAt: now, closedAt: null, closedById: "", closedByName: "" });
+    return { status };
   });
 }
 
@@ -428,6 +463,7 @@ module.exports = {
   POLICY_DOC,
   DEFAULT_POLICY,
   PR_STATUS,
+  Q_STATUS,
   LEDGER_REASONS,
   getPolicy,
   savePolicy,
@@ -439,6 +475,7 @@ module.exports = {
   createQuestion,
   addQuestionComment,
   deleteQuestionComment,
+  setQuestionClosed,
   deleteQuestion,
   createPaymentRequest,
   markPaymentSent,

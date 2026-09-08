@@ -3518,7 +3518,7 @@ function bdRerender(){
    쓰기는 전부 tokenApi Cloud Function 을 거친다 — firestore.rules 가 클라이언트 쓰기를 막아 두었고,
    잔액 차감·지급은 서버 트랜잭션 안에서만 일어나야 하기 때문이다. 읽기는 열려 있어 onSnapshot 을 쓴다. */
 
-const QA_Q_STATUS={pending:{label:'답변대기',bg:'#fef3c7',fg:'#92400e'},answered:{label:'답변완료',bg:'#dcfce7',fg:'#15803d'}};
+const QA_Q_STATUS={pending:{label:'답변대기',bg:'#fef3c7',fg:'#92400e'},answered:{label:'답변완료',bg:'#dcfce7',fg:'#15803d'},closed:{label:'종료',bg:'#f3f4f6',fg:'#6b7280'}};
 const QA_P_STATUS={
   requested:{label:'요청됨',bg:'#fef3c7',fg:'#92400e'},
   sent:{label:'발송완료',bg:'#dbeafe',fg:'#1d4ed8'},
@@ -3709,7 +3709,7 @@ function renderQa(){
 }
 
 /* ── 질문 목록 (학생=내 것만, 관리자=전체) ── */
-const QA_FILTERS=[{id:'all',label:'전체'},{id:'pending',label:'답변대기'},{id:'answered',label:'답변완료'}];
+const QA_FILTERS=[{id:'all',label:'전체'},{id:'pending',label:'답변대기'},{id:'answered',label:'답변완료'},{id:'closed',label:'종료'}];
 function qaSetFilter(f){S.qa.filter=f;renderQa();}
 function qaOpen(id){S.qa.openId=id;S.qa.composerOpen=false;renderQa();try{window.scrollTo({top:0});}catch(_){}}
 function qaCloseDetail(){S.qa.openId=null;renderQa();}
@@ -3734,7 +3734,7 @@ function qaQuestionsHtml(admin){
 
   let head;
   if(admin){
-    const pend=S.qa.questions.filter(q=>q.status!=='answered').length;
+    const pend=S.qa.questions.filter(q=>q.status==='pending').length;
     head=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <p style="font-size:15px;font-weight:700">질문 게시판</p>
       <span style="font-size:11px;color:#6b7280">전체 ${S.qa.questions.length}${pend?` · 답변대기 ${pend}`:''}</span>
@@ -3807,6 +3807,7 @@ function qaDetailHtml(q,admin){
   const id=q._docId;
   const cmts=Array.isArray(q.comments)?q.comments:[];
   const canDel=admin||q.authorId===qaMyId();
+  const closed=q.status==='closed';
   const who=admin?`<b style="font-size:13px">${escapeHtml(q.authorName||'')}</b>${q.authorGrade?`<span style="font-size:11px;color:#6b7280">${escapeHtml(q.authorGrade)}</span>`:''}`:'';
 
   const cmtHtml=cmts.map(c=>{
@@ -3838,15 +3839,23 @@ function qaDetailHtml(q,admin){
     ${cmts.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:18px 0 6px">댓글 (${cmts.length})</p>${cmtHtml}`
       :'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:18px 0;margin-top:14px;border-top:1px solid #f1f3f5">아직 댓글이 없습니다.</p>'}
     <div style="margin-top:10px;padding-top:12px;border-top:1px solid #e5e7eb">
+      ${closed?`<div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:10px">
+        <p style="font-size:12px;color:#6b7280;font-weight:700">종료된 스레드입니다. 더 이상 댓글을 달 수 없습니다.</p>
+        ${q.closedAt?`<p style="font-size:11px;color:#9ca3af;margin-top:4px">${qaFmtDateTime(q.closedAt)}${q.closedByName?` · ${escapeHtml(q.closedByName)}`:''}</p>`:''}
+        ${admin?'':'<p style="font-size:11px;color:#9ca3af;margin-top:4px">더 물어볼 내용이 있으면 새 질문을 남겨 주세요.</p>'}
+      </div>`:`
       <textarea class="fi ta" id="qa-cmt-${id}" rows="2" placeholder="${admin?'학생에게 답변하기':'추가로 궁금한 점 남기기'}"></textarea>
       <p style="font-size:11px;color:#9ca3af;margin-top:4px">수식은 <code>$x^2$</code> 처럼 쓰면 그려집니다.</p>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
         <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_c_${id}','comment')"></label>
-        ${canDel?`<button class="btn bd bsm" style="font-size:11px;padding:6px 10px" onclick="qaDelQuestion('${id}')">질문 삭제</button>`:''}
         <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="qaAddComment('${id}')">${admin?'답변 등록':'댓글 등록'}</button>
       </div>
       <div id="bd-draft-anchor-comment-qa_c_${id}">${bdDraftPreviewHtml('qa_c_'+id,'comment')}</div>
-      <p style="font-size:11px;color:#9ca3af;margin-top:6px">토큰은 질문 스레드를 열 때 한 번만 부과됩니다. 이 스레드 안에서 주고받는 댓글에는 추가로 부과되지 않습니다.</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:6px">토큰은 질문 스레드를 열 때 한 번만 부과됩니다. 이 스레드 안에서 주고받는 댓글에는 추가로 부과되지 않습니다.</p>`}
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        ${admin?`<button class="btn ${closed?'bp':'bs'} bsm" style="font-size:11px;padding:6px 10px" onclick="qaSetClosed('${id}',${closed?'false':'true'})">${closed?'다시 열기':'스레드 닫기'}</button>`:''}
+        ${canDel?`<button class="btn bd bsm" style="font-size:11px;padding:6px 10px;margin-left:auto" onclick="qaDelQuestion('${id}')">질문 삭제</button>`:''}
+      </div>
     </div>
   </div>`;
 }
@@ -4200,6 +4209,15 @@ async function qaDelComment(id,cid){
   showLoad(true);
   try{await qaCall('deleteComment',{questionId:id,commentId:cid});}
   catch(e){toast(e.message,'error');}
+  showLoad(false);
+}
+async function qaSetClosed(id,closed){
+  if(closed&&!(await confirmDialog({title:'스레드 닫기',message:'이 스레드를 종료합니다. 학생도 관리자도 더 이상 댓글을 달 수 없습니다.',confirmLabel:'닫기'})))return;
+  showLoad(true);
+  try{
+    await qaCall('setQuestionClosed',{questionId:id,closed});
+    toast(closed?'스레드를 종료했습니다.':'스레드를 다시 열었습니다.','success');
+  }catch(e){toast(e.message,'error');}
   showLoad(false);
 }
 async function qaDelQuestion(id){
