@@ -693,9 +693,11 @@ exports.ppurioAdmin = onRequest(async (req, res) => {
 
     if (action === "test") {
       const p = payload || {};
+      const who = p.name || "테스트";
       const result = await sendAlimtalk(p.eventKey, {
         phone: p.phone,
-        name: p.name || "테스트",
+        name: who,
+        ...testSampleVars(p.eventKey, who),
         school: "테스트고", grade: "고3", seat: 1,
         dateLabel: "6월 5일 (금)", slot: "10:00",
         currentDateLabel: "6월 5일 (금)", currentSlot: "10:00",
@@ -931,6 +933,28 @@ exports.onStudentCreate = onDocumentCreated("students/{id}", async (e) => {
     console.error("onStudentCreate 기본 토큰 지급 실패:", e.params.id, err);
   }
 });
+
+/**
+ * 테스트 발송용 var1~var6 샘플값.
+ *
+ * 예약·멘토링 계열은 ${name}·${dateLabel} 처럼 이름 있는 토큰을 쓰지만, 토큰·질문 계열은
+ * notify.js 가 키를 var1~var6 으로 지어 넘긴다(그쪽 매핑이 "var1": "${var1}" 인 이유다).
+ * 테스트 컨텍스트에 그 키가 없어 수량·금액이 빈칸으로 나갔다.
+ * 같은 var1 이 어디선 수량이고 어디선 이름이라 하나로 못 묶는다 — 이벤트별로 준다.
+ */
+function testSampleVars(eventKey, name) {
+  const now = notify.kstStamp(Date.now());
+  switch (eventKey) {
+    case "tokenCharged":
+      return { var1: "5개", var2: "12개" };
+    case "adminNotifyTokenRequest":
+      return { var1: name, var2: "테스트고", var3: "고3", var4: "5개", var5: "5,000원", var6: now };
+    case "adminNotifyQuestionCreated":
+      return { var1: name, var2: now, var3: "7", var4: "132" };
+    default:
+      return {};
+  }
+}
 
 exports.tokenApi = onRequest(async (req, res) => {
   setCors(res);

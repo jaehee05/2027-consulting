@@ -286,6 +286,10 @@ There are **no automated tests, linters, or build steps** for the web app. `inde
 - `ALIMTALK_DRY_RUN=1` 이면 실제 발송 없이 로그만 남긴다. 개발·스테이징용.
 - Cloud Functions 는 UTC 로 도니 본문에 찍는 일시는 반드시 `kstStamp()` 를 거친다.
 
+**토큰·질문 3종만 `${var1}` 이라는 이름을 쓴다.** 예약·멘토링 21종은 `functions/index.js` 트리거가 `${name}`·`${dateLabel}` 처럼 의미 있는 키로 컨텍스트를 만들지만, 나중에 들어온 `notify.js` 는 `vars:{var1:…}` 로 키 이름 자체를 `var1`~`var6` 으로 지어 넘긴다. 그래서 `tokenCharged`·`adminNotifyTokenRequest`·`adminNotifyQuestionCreated` 의 changeWord 매핑만 `"var1": "${var1}"` 이라는 동어반복 모양이 된다 — **의도한 설계가 아니라 어긋난 것**이고, 고칠 때는 `notify.js` 수정 → `tokenApi` 재배포 → 관리자 화면에서 그 3종 매핑 재저장까지 한 묶음이다(그 사이엔 빈 변수라 발송이 `skipped` 로 막힌다). 관리자용 두 종의 `var1` 은 `notify()` 가 `ctx={...vars,name,phone}` 로 이름을 항상 끼워 넣으므로 지금도 `${name}` 으로 쓸 수 있다.
+
+**테스트 발송은 `ppurioAdmin` 의 `action:"test"` 가 자체 샘플 컨텍스트로 보낸다.** 이름 있는 토큰만 채워 두면 위 3종은 수량·금액이 빈칸으로 나간다 — 그래서 `testSampleVars(eventKey, name)` 가 이벤트별로 `var1`~`var6` 을 준다. 같은 `var1` 이 어디선 수량이고 어디선 이름이라 하나로 묶을 수 없다. **새 알림톡을 붙일 때 `var*` 를 쓰면 여기도 같이 채울 것** — 안 채우면 테스트만 빈칸으로 나와 매핑이 틀린 줄 알고 헤매게 된다. 이 경로는 `notify()` 를 거치지 않으므로 빈 변수 검사(`findEmptyVars`)도 걸리지 않는다.
+
 **변수 표기**: 뿌리오 본문은 `[*이름*]`·`[*1*]`~`[*8*]`, `changeWord` 키는 `"var1"`~`"var8"`. 카카오 콘솔 문서의 `#{var1}` 표기와 다르니 옮겨 적을 때 주의. 템플릿 원문과 매핑은 `alimtalk-templates.txt` 에 있고, 관리자 [알림톡] 탭에서 코드와 매핑을 넣는다(`ALIMTALK_EVENTS`).
 
 **새 질문 알림의 미답변 수는 전체 학생 기준**이다(해당 학생 것만이 아니다). 관리자에게 "지금 답변해야 할 일이 몇 건 남았는지"를 알리는 숫자다. 집계에 실패하면 0 을 보내지 않고 발송 자체를 건너뛴다 — 틀린 숫자가 나가는 것보다 낫다.
