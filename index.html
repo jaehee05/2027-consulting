@@ -3903,9 +3903,13 @@ function qaQuestionsHtml(admin){
 
   const composer=(!admin&&S.qa.composerOpen)?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
     <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 질문 · 스레드를 열 때 ${cost}토큰이 차감됩니다${qaIdleHours()?` · 답변 후 ${qaIdleHours()}시간 동안 댓글이 없으면 자동 종료됩니다`:''}</p>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:9px 11px;margin-bottom:8px">
+      <p style="font-size:12px;color:#1e40af;font-weight:700">한 스레드에는 문제 하나만 올려 주세요.</p>
+      <p style="font-size:11px;color:#1e40af;margin-top:3px">여러 문제를 한 번에 적으면 답변이 뒤섞여 알아보기 어렵습니다. 다른 문제는 질문을 따로 열어 주세요.</p>
+    </div>
     <input class="fi" id="qa-new-title" maxlength="120" placeholder="제목 (예: 미적분 29번 풀이 질문)" style="margin-bottom:8px">
     ${qaFmtBar('qa-new-body')}
-    <textarea class="fi ta" id="qa-new-body" rows="5" placeholder="궁금한 내용을 자세히 적어 주세요."></textarea>
+    <textarea class="fi ta" id="qa-new-body" rows="5" placeholder="문제 하나만 골라 궁금한 점을 자세히 적어 주세요."></textarea>
     <p style="font-size:11px;color:#9ca3af;margin-top:6px">수식은 <code>$x^2$</code> 처럼 달러 기호로 감싸면 됩니다. 가운데 정렬하려면 <code>$$ … $$</code>.</p>
     <div style="margin-top:8px">
       <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_new','post')"></label>
@@ -4024,6 +4028,7 @@ function qaDetailHtml(q,admin){
       </div>
       <div id="bd-draft-anchor-comment-qa_c_${id}">${bdDraftPreviewHtml('qa_c_'+id,'comment')}</div>
       <p style="font-size:11px;color:#9ca3af;margin-top:6px">토큰은 질문 스레드를 열 때 한 번만 부과됩니다. 이 스레드 안에서 주고받는 댓글에는 추가로 부과되지 않습니다.</p>
+      ${admin?'':'<p style="font-size:11px;color:#9ca3af;margin-top:4px">이 스레드는 위 문제 하나에 대한 자리입니다. 다른 문제는 새 질문으로 올려 주세요.</p>'}
       ${!idleH?'':(q.status==='answered'
         ?`<p style="font-size:11px;color:#b45309;margin-top:4px">⏳ 마지막 활동 후 ${idleH}시간 동안 댓글이 없으면 스레드가 자동으로 종료됩니다.${qaIdleLeft(q)?` (약 ${qaIdleLeft(q)})`:''}</p>`
         :`<p style="font-size:11px;color:#9ca3af;margin-top:4px">답변이 등록된 뒤 ${idleH}시간 동안 댓글이 없으면 스레드가 자동으로 종료됩니다.</p>`)}`}
@@ -4071,6 +4076,7 @@ function qaStuTokensHtml(){
       <span style="font-size:24px;font-weight:800;color:#1C64F2;margin-left:auto">${bal}<span style="font-size:13px;color:#6b7280;font-weight:600"> 토큰</span></span>
     </div>
     <p style="font-size:12px;color:#6b7280">토큰은 질문 스레드 1개당 ${cost}토큰이 부과됩니다. 한 번 열어 둔 스레드 안에서는 댓글을 몇 번 주고받아도 추가로 부과되지 않습니다.</p>
+    <p style="font-size:12px;color:#6b7280;margin-top:4px"><b>한 스레드에는 문제 하나만</b> 올릴 수 있습니다. 다른 문제는 질문을 따로 열어 주세요.</p>
   </div>
 
   <div class="card" style="margin-bottom:12px">
