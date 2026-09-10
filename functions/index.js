@@ -1104,7 +1104,7 @@ exports.tokenApi = onRequest(async (req, res) => {
       case "banBoard":
         requireAdmin();
         return res.json(await moderation.banBoard(fs, {
-          studentId: p.studentId, reason: p.reason, by,
+          studentId: p.studentId, reason: p.reason, by, postId: p.postId,
         }));
       case "unbanBoard":
         requireAdmin();

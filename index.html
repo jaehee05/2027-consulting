@@ -2731,12 +2731,23 @@ function bdRealNameOf(entry){
   return entry.authorName||entry.name
     ||(bdIsStaff()?(S.students.find(x=>x._docId===entry.authorId)?.name||''):'');
 }
+/* 정지된 학생의 남은 글·댓글은 이름도 닉네임도 아닌 이 표시로 바뀐다. 표시가 모두 같아
+   누가 누군지 이어 붙일 수 없고, 정지가 풀리면 원래 이름으로 그대로 돌아온다.
+   관리자에게는 다른 곳(익명 글·비밀글)과 같은 원칙으로 실명을 괄호로 붙여 준다. */
+const BD_BANNED_NAME='정지된 사용자';
+function bdBannedNameHtml(entry){
+  const id=entry.authorId;
+  if(!id||(entry.authorRole||entry.role)==='admin'||!bdIsBanned(id))return '';
+  const real=bdIsStaff()?bdRealNameOf(entry):'';
+  return BD_BANNED_NAME+(real?`<span style="color:#9ca3af;font-weight:400"> (${escapeHtml(real)})</span>`:'');
+}
 function bdShowName(entry){
   const real=bdRealNameOf(entry);
   if((entry.authorRole||entry.role)==='admin'){
     if(bdIsStaff())return escapeHtml(real||'관리자');
     return real&&real!=='관리자'?escapeHtml(real)+' 선생님':'선생님';
   }
+  const banned=bdBannedNameHtml(entry);if(banned)return banned;
   if(!entry.anon)return escapeHtml(real);
   const nick=entry.authorNick||entry.nick||'익명';
   return escapeHtml(nick)+(bdIsStaff()&&real?`<span style="color:#9ca3af;font-weight:400"> (${escapeHtml(real)})</span>`:'');
@@ -2888,6 +2899,7 @@ function bdCommentName(q,c){
     if(bdIsStaff())return escapeHtml(c.name||'관리자');
     return c.name&&c.name!=='관리자'?escapeHtml(c.name)+' 선생님':'선생님';
   }
+  const banned=bdBannedNameHtml(c);if(banned)return banned;
   if(!c.anon)return escapeHtml(c.name||'');
   const label=c.authorId===q.authorId?'익명(글쓴이)':'익명'+(c.anonNo||bdAnonNoFor(q,c.authorId));
   return label+(bdIsStaff()&&c.name?`<span style="color:#9ca3af;font-weight:400"> (${escapeHtml(c.name)})</span>`:'');
@@ -3003,8 +3015,14 @@ function bdOpenBan(stuId,postId){
       <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">취소</button><button class="btn bp bfw" onclick="bdUnban('${stuId}')">해제</button></div>`;
   }else{
     const opts=BD_RULES.map(r=>`<option value="${r.title}">${r.title}</option>`).join('');
+    const post=postId?S.posts.find(x=>x._docId===postId):null;
     _('mCt').innerHTML=`<p class="mtitle">자유게시판 영구 이용정지</p>
       <p class="msub">${name} 학생의 자유게시판 이용을 영구 정지합니다. 다른 기능은 그대로 쓸 수 있습니다.</p>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin-bottom:10px">
+        <p style="font-size:12px;color:#991b1b;font-weight:700">${post?'이 글은 댓글·사진과 함께 삭제됩니다.':'삭제할 글이 지정되지 않아 정지만 됩니다.'}</p>
+        ${post&&post.title?`<p style="font-size:11px;color:#991b1b;margin-top:2px">제목: ${escapeHtml(post.title)}</p>`:''}
+        <p style="font-size:11px;color:#991b1b;margin-top:4px">남은 글과 댓글은 지워지지 않고 작성자만 '${BD_BANNED_NAME}'로 바뀝니다.</p>
+      </div>
       ${(()=>{const pl=bdPledgeOf(stuId);return pl?`<p style="font-size:11px;color:#9ca3af;margin-bottom:10px">${new Date(pl.agreedAt).toLocaleDateString('ko-KR')} 이용 서약 동의함</p>`:'<p style="font-size:11px;color:#9ca3af;margin-bottom:10px">이용 서약 기록 없음</p>';})()}
       <div class="fg"><label class="fl">사유</label><select class="fi fsel" id="bd-ban-rule">${opts}<option value="기타">기타</option></select></div>
       <div class="fg"><label class="fl">메모 (선택)</label><input class="fi" id="bd-ban-reason" maxlength="60" placeholder="구체적인 내용"></div>
@@ -3013,14 +3031,23 @@ function bdOpenBan(stuId,postId){
   }
   openModal();
 }
+/* 글 문서는 서버가 정지와 한 트랜잭션에서 지운다. 여기서는 Storage 에 남는 사진만 치운다 —
+   정지가 성공한 뒤에 지워야, 정지가 409 로 막혔을 때 사진만 사라져 글이 깨지는 일이 없다. */
 async function bdBan(stuId,postId){
   const rule=_('bd-ban-rule')?.value||'';
   const memo=(_('bd-ban-reason')?.value||'').trim();
   const reason=memo?`${rule} — ${memo}`:rule;
+  const post=postId?S.posts.find(x=>x._docId===postId):null;
+  const photos=post?[...bdNormPhotos(post.photos),...bdComments(post).flatMap(c=>bdNormPhotos(c.photos))]:[];
   showLoad(true);
   try{
-    await callFn(TOKEN_API_URL,{action:'banBoard',payload:{studentId:stuId,reason}},true);
-    closeModal();toast('영구 이용정지 처리했습니다.','success');
+    const r=await callFn(TOKEN_API_URL,{action:'banBoard',payload:{studentId:stuId,reason,postId:postId||''}},true);
+    if(r&&r.postDeleted){
+      try{await bdDeletePhotos(photos);}catch(_){}
+      if(S.bdOpenId===postId)S.bdOpenId=null;
+      if(S.bdPostEditId&&S.bdPostEditId.id===postId)S.bdPostEditId=null;
+    }
+    closeModal();toast(r&&r.postDeleted?'영구 이용정지하고 이 글을 삭제했습니다.':'영구 이용정지 처리했습니다.','success');
   }catch(e){showErr('mErr',e.message);}
   showLoad(false);
 }
@@ -3187,7 +3214,7 @@ function bdPostHtml(q,ctx){
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         ${q.pinned?'<span style="font-size:11px;color:#b45309;font-weight:700">📌 고정</span>':''}
         <b style="font-size:13px;color:${isStudentPost?'#111827':'#dc2626'}">${bdShowName(q)}</b>
-        ${(()=>{const g=q.anon?(staff?(S.students.find(x=>x._docId===q.authorId)?.grade||''):''):(q.authorGrade||'');return isStudentPost&&g?`<span style="font-size:11px;color:#6b7280">${escapeHtml(g)}</span>`:'';})()}
+        ${(()=>{const g=bdIsBanned(q.authorId)?'':(q.anon?(staff?(S.students.find(x=>x._docId===q.authorId)?.grade||''):''):(q.authorGrade||''));return isStudentPost&&g?`<span style="font-size:11px;color:#6b7280">${escapeHtml(g)}</span>`:'';})()}
         ${q.secret?'<span title="비밀글" style="font-size:11px">🔒</span>':''}
         ${reportMark}
       </div>

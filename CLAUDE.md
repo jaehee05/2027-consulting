@@ -171,6 +171,10 @@ Both are **server-only writes** through `tokenApi` (`functions/moderation.js`), 
 - **`BD_RULES` is the single source** for the rules modal, the pledge sentences (`pledge` field, first person), and the 신고 사유 dropdown — a student must never be reportable for something not in the rules.
 - **제재는 영구 이용정지 하나뿐**. Tiered durations were deliberately rejected — 위반이면 영구, 오처리면 해제. `banBoard` refuses if already banned and `unbanBoard` refuses if not, so a double click can't double-log; both keep `history`.
 - A banned student keeps every other feature (멘토링·성적·질문게시판); only 자유게시판 writing is blocked — the FAB, the composer and the comment box all disappear, and `bdCreatePost`/`bdAddComment` re-check before writing.
+- **정지하면 사유가 된 글은 지우고, 남은 글·댓글은 작성자만 `정지된 사용자`로 바뀐다.** 이용 서약이 "글이 삭제되고 이용이 정지된다"고 약속하므로 둘은 한 동작이다.
+  - **삭제는 `banBoard` 트랜잭션 안에서 한다** — 클라이언트가 정지 뒤에 따로 지우면 정지만 되고 글은 남는 절반짜리 상태가 생긴다. 정지가 409 로 막히면 글도 그대로 남는다. `postId` 는 화면에서 보고 있던 글이고, 서버가 `authorId` 를 확인해 **남의 글이면 지우지 않는다**. Storage 사진은 문서와 같이 지울 수 없어 `bdBan` 이 성공 응답(`postDeleted`)을 받은 뒤에 치운다(먼저 지우면 정지가 막혔을 때 사진만 사라져 글이 깨진다).
+  - **지우기 전 제목·본문(500자)·사진 개수를 `history[].post` 에 남긴다.** 근거가 된 글이 사라지면 "그런 글 쓴 적 없다"에 내놓을 게 없다.
+  - **이름 교체는 화면에서만 한다**(`bdBannedNameHtml` → `bdShowName`·`bdCommentName`). 문서를 고쳐 쓰면 정지 해제해도 이름이 안 돌아오고 글 수만큼 쓰기가 나간다. 표시가 전부 같은 문구라 여러 정지자를 서로 이어 붙일 수도 없다 — 닉네임보다 오히려 덜 드러난다. 관리자에게는 실명을 괄호로 붙여 준다(익명 글·비밀글과 같은 원칙). **학년 칩도 같이 감춘다** — 이름만 가리고 학년을 남기면 반쪽이다.
 
 ### 질문게시판 환불 규정
 

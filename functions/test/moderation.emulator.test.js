@@ -30,7 +30,7 @@ beforeEach(wipe);
 describe("영구 이용정지", () => {
   test("정지하면 banned 가 서고 이력이 남는다", async () => {
     const r = await moderation.banBoard(fs, { studentId: "stu1", reason: "타인 비방", by });
-    expect(r).toEqual({ banned: true });
+    expect(r).toEqual({ banned: true, postDeleted: false });
     const ban = await moderation.getBan(fs, "stu1");
     expect(ban).toMatchObject({ banned: true, reason: "타인 비방", byName: "김재희" });
     expect(ban.history).toHaveLength(1);
@@ -61,6 +61,48 @@ describe("영구 이용정지", () => {
     const ban = await moderation.getBan(fs, "stu1");
     expect(ban.banned).toBe(true);
     expect(ban.history).toHaveLength(1);
+  });
+});
+
+describe("사유가 된 글 삭제", () => {
+  const post = { authorId: "stu1", title: "문제의 글", body: "비방 내용", photos: [{ path: "a" }, { path: "b" }], createdAt: 1700000000000 };
+
+  test("정지하면 그 글이 지워지고 내용은 이력에 남는다", async () => {
+    await fs.doc("posts/p1").set(post);
+    const r = await moderation.banBoard(fs, { studentId: "stu1", reason: "타인 비방", by, postId: "p1" });
+    expect(r).toEqual({ banned: true, postDeleted: true });
+    expect((await fs.doc("posts/p1").get()).exists).toBe(false);
+    const ban = await moderation.getBan(fs, "stu1");
+    expect(ban.history[0].post).toMatchObject({ id: "p1", title: "문제의 글", body: "비방 내용", photos: 2 });
+  });
+
+  test("남의 글은 지우지 않는다", async () => {
+    await fs.doc("posts/p1").set({ ...post, authorId: "stu2" });
+    const r = await moderation.banBoard(fs, { studentId: "stu1", reason: "비방", by, postId: "p1" });
+    expect(r).toEqual({ banned: true, postDeleted: false });
+    expect((await fs.doc("posts/p1").get()).exists).toBe(true);
+    expect((await moderation.getBan(fs, "stu1")).history[0].post).toBeUndefined();
+  });
+
+  test("이미 지워진 글이어도 정지는 된다", async () => {
+    const r = await moderation.banBoard(fs, { studentId: "stu1", reason: "비방", by, postId: "gone" });
+    expect(r).toEqual({ banned: true, postDeleted: false });
+    expect(moderation.isBanned(await moderation.getBan(fs, "stu1"))).toBe(true);
+  });
+
+  test("정지가 거부되면 글도 그대로 남는다", async () => {
+    await moderation.banBoard(fs, { studentId: "stu1", reason: "1차", by });
+    await fs.doc("posts/p1").set(post);
+    await expect(moderation.banBoard(fs, { studentId: "stu1", reason: "2차", by, postId: "p1" }))
+      .rejects.toMatchObject({ status: 409 });
+    expect((await fs.doc("posts/p1").get()).exists).toBe(true);
+  });
+
+  test("긴 본문은 잘라서 남긴다", async () => {
+    await fs.doc("posts/p1").set({ ...post, body: "가".repeat(900) });
+    await moderation.banBoard(fs, { studentId: "stu1", reason: "비방", by, postId: "p1" });
+    const ban = await moderation.getBan(fs, "stu1");
+    expect(ban.history[0].post.body).toHaveLength(500);
   });
 });
 

@@ -13,12 +13,26 @@
  * 클라이언트가 onSnapshot 으로 정지 여부를 바로 반영한다.
  *
  * 문서 형태: { banned, reason, byId, byName, updatedAt,
- *              history:[{type:'ban'|'unban', reason, byId, byName, ts}] }
+ *              history:[{type:'ban'|'unban', reason, byId, byName, ts, post?}] }
  */
 
 const { ApiError } = require("./tokens");
 
 const MAX_HISTORY = 50;
+const EVIDENCE_TITLE_MAX = 120;
+const EVIDENCE_BODY_MAX = 500;
+
+/* 지우기 전의 글을 정지 이력에 박아 둔다. 근거가 된 글이 사라지면
+   "난 그런 글 쓴 적 없다"에 아무것도 내놓을 수 없다. */
+function postEvidence(id, d) {
+  return {
+    id,
+    title: String(d.title || "").slice(0, EVIDENCE_TITLE_MAX),
+    body: String(d.body || "").slice(0, EVIDENCE_BODY_MAX),
+    photos: Array.isArray(d.photos) ? d.photos.length : 0,
+    createdAt: d.createdAt || 0,
+  };
+}
 
 function isBanned(ban) {
   return !!(ban && ban.banned === true);
@@ -28,22 +42,34 @@ function pushHistory(cur, entry) {
   return [...(Array.isArray(cur.history) ? cur.history : []), entry].slice(-MAX_HISTORY);
 }
 
-/** 영구 이용정지. */
-async function banBoard(fs, { studentId, reason, by }) {
+/**
+ * 영구 이용정지. 정지 사유가 된 글(`postId`)은 같은 트랜잭션에서 지운다 —
+ * 이용 서약이 "글이 삭제되고 이용이 정지된다"고 약속하므로 둘이 따로 놀면 안 된다.
+ * 클라이언트가 지우게 두면 정지만 되고 글은 남는 절반짜리 상태가 생긴다.
+ * 사진은 Storage 라 문서와 함께 지울 수 없어 호출한 쪽이 이어서 지운다.
+ */
+async function banBoard(fs, { studentId, reason, by, postId }) {
   if (!studentId) throw new ApiError(400, "학생을 선택해 주세요.");
   const r = String(reason || "").trim();
   if (!r) throw new ApiError(400, "사유를 입력해 주세요.");
 
   const now = Date.now();
   const ref = fs.doc(`boardBans/${studentId}`);
+  const postRef = postId ? fs.doc(`posts/${postId}`) : null;
   return fs.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
+    const postSnap = postRef ? await tx.get(postRef) : null;
     const cur = snap.exists ? snap.data() : {};
     if (cur.banned === true) throw new ApiError(409, "이미 이용정지된 학생입니다.");
+    /* 남의 글을 지우지 않도록 작성자를 확인한다 — 화면은 그 글 작성자를 정지하는 자리지만
+       payload 가 어긋나면 엉뚱한 글이 사라진다. */
+    const post = postSnap && postSnap.exists && postSnap.data().authorId === studentId
+      ? postSnap.data() : null;
     const entry = {
       type: "ban", reason: r,
       byId: (by && by.id) || "", byName: (by && by.name) || "", ts: now,
     };
+    if (post) entry.post = postEvidence(postId, post);
     tx.set(ref, {
       banned: true,
       reason: r,
@@ -52,7 +78,8 @@ async function banBoard(fs, { studentId, reason, by }) {
       updatedAt: now,
       history: pushHistory(cur, entry),
     }, { merge: true });
-    return { banned: true };
+    if (post) tx.delete(postRef);
+    return { banned: true, postDeleted: !!post };
   });
 }
 
