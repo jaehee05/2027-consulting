@@ -2902,7 +2902,11 @@ function bdCommentName(q,c){
   const banned=bdBannedNameHtml(c);if(banned)return banned;
   if(!c.anon)return escapeHtml(c.name||'');
   const label=c.authorId===q.authorId?'익명(글쓴이)':'익명'+(c.anonNo||bdAnonNoFor(q,c.authorId));
-  return label+(bdIsStaff()&&c.name?`<span style="color:#9ca3af;font-weight:400"> (${escapeHtml(c.name)})</span>`:'');
+  /* 익명 댓글은 글과 마찬가지로 문서에 실명을 담지 않는다(name:'').
+     관리자에게만 authorId 로 학생 목록에서 찾아 붙인다 — 그러지 않으면 모더레이션할 때
+     누가 쓴 댓글인지 알 길이 없다. 글 쪽과 같은 원칙이라 판정도 bdRealNameOf 하나로 모은다. */
+  const real=bdRealNameOf(c);
+  return label+(bdIsStaff()&&real?`<span style="color:#9ca3af;font-weight:400"> (${escapeHtml(real)})</span>`:'');
 }
 
 const BD_AVATAR='<span style="display:inline-flex;width:28px;height:28px;border-radius:50%;background:#e5e7eb;align-items:center;justify-content:center;flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="#9ca3af"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8z"/></svg></span>';
