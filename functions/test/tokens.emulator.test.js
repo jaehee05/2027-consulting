@@ -520,3 +520,110 @@ describe("기존 학생 일괄 지급", () => {
     expect(await tokens.getBalance(fs, "s3")).toBe(0);
   });
 });
+
+/**
+ * 자동 종료.
+ *
+ * 시간을 실제로 흘려보낼 수 없으니 질문의 updatedAt(= 마지막 활동)을 과거로 밀어 둔다.
+ * 판정 기준이 그 필드 하나이므로 이게 곧 "24시간이 지난 상태"다.
+ */
+describe("스레드 자동 종료", () => {
+  const HOUR = 3600000;
+  const me = { id: student.id, name: student.name, role: "student" };
+
+  async function answeredQuestion(idleFor) {
+    await setBalance(student.id, 5);
+    const { id } = await tokens.createQuestion(fs, { student, title: "미적분 29번", body: "b" });
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "이렇게" });
+    if (idleFor) await fs.doc(`questions/${id}`).update({ updatedAt: Date.now() - idleFor });
+    return id;
+  }
+  const load = (id) => fs.doc(`questions/${id}`).get().then((s) => s.data());
+
+  test("답변 후 24시간이 지나면 댓글이 거부되고 스레드가 닫힌다", async () => {
+    const id = await answeredQuestion(25 * HOUR);
+    await expect(tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "추가 질문" }))
+      .rejects.toMatchObject({ status: 409 });
+    const q = await load(id);
+    expect(q.status).toBe("closed");
+    expect(q.closedReason).toBe("idle");
+    expect(q.closedByName).toBe("");
+    expect(q.comments).toHaveLength(1); // 거부된 댓글은 남지 않는다
+  });
+
+  test("24시간 안이면 그대로 댓글이 달린다", async () => {
+    const id = await answeredQuestion(23 * HOUR);
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "추가 질문" });
+    const q = await load(id);
+    expect(q.status).toBe("answered");
+    expect(q.comments).toHaveLength(2);
+  });
+
+  test("미답변 스레드는 아무리 오래돼도 닫히지 않는다", async () => {
+    await setBalance(student.id, 5);
+    const { id } = await tokens.createQuestion(fs, { student, title: "t", body: "b" });
+    await fs.doc(`questions/${id}`).update({ updatedAt: Date.now() - 100 * HOUR });
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "아직인가요" });
+    expect((await load(id)).status).toBe("pending");
+    expect(await tokens.closeIdleQuestions(fs, {})).toMatchObject({ closed: 0 });
+  });
+
+  test("종료된 스레드의 댓글은 수정도 막힌다", async () => {
+    const id = await answeredQuestion(0);
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "내 댓글" });
+    const cid = (await load(id)).comments.find((c) => c.role === "student")._id;
+    await fs.doc(`questions/${id}`).update({ updatedAt: Date.now() - 25 * HOUR });
+    await expect(tokens.editQuestionComment(fs, { questionId: id, commentId: cid, actor: me, body: "고침" }))
+      .rejects.toMatchObject({ status: 409 });
+    expect((await load(id)).status).toBe("closed");
+  });
+
+  test("스케줄러가 지난 스레드만 닫는다", async () => {
+    const stale = await answeredQuestion(30 * HOUR);
+    const fresh = await answeredQuestion(2 * HOUR);
+    expect(await tokens.closeIdleQuestions(fs, {})).toMatchObject({ closed: 1 });
+    expect((await load(stale)).status).toBe("closed");
+    expect((await load(fresh)).status).toBe("answered");
+  });
+
+  test("0시간이면 자동 종료를 끈다", async () => {
+    const id = await answeredQuestion(100 * HOUR);
+    await setPolicy({ questionIdleHours: 0 });
+    expect(await tokens.closeIdleQuestions(fs, {})).toMatchObject({ closed: 0, skipped: "disabled" });
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "한참 뒤에" });
+    expect((await load(id)).status).toBe("answered");
+  });
+
+  test("설정한 시간을 따른다", async () => {
+    await setPolicy({ questionIdleHours: 48 });
+    const id = await answeredQuestion(30 * HOUR);
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "아직 살아 있다" });
+    expect((await load(id)).comments).toHaveLength(2);
+  });
+
+  test("다시 열면 자동 종료 시계도 처음부터 다시 돈다", async () => {
+    const id = await answeredQuestion(30 * HOUR);
+    await tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor });
+    await tokens.setQuestionClosed(fs, { questionId: id, closed: false, by: adminActor });
+    const q = await load(id);
+    expect(q.status).toBe("answered");
+    expect(q.closedReason).toBe("");
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "다시 물어봅니다" });
+    expect((await load(id)).comments).toHaveLength(2);
+  });
+
+  test("관리자가 닫으면 사유가 idle 이 아니다", async () => {
+    const id = await answeredQuestion(0);
+    await tokens.setQuestionClosed(fs, { questionId: id, closed: true, by: adminActor });
+    const q = await load(id);
+    expect(q.closedReason).toBe("admin");
+    expect(q.closedByName).toBe("김재희");
+  });
+
+  test("답변 알림톡에 필요한 값을 돌려준다", async () => {
+    await setBalance(student.id, 5);
+    const { id } = await tokens.createQuestion(fs, { student, title: "미적분 29번", body: "b" });
+    const r = await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답" });
+    expect(r).toMatchObject({ authorId: student.id, title: "미적분 29번", firstAnswer: true });
+  });
+});

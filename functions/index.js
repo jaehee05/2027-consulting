@@ -3,6 +3,7 @@ admin.initializeApp();
 
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
 const { sendAlimtalk, sendAlimtalkToAdmins } = require("./ppurio");
@@ -951,6 +952,8 @@ function testSampleVars(eventKey, name) {
       return { var1: name, var2: "테스트고", var3: "고3", var4: "5개", var5: "5,000원", var6: now };
     case "adminNotifyQuestionCreated":
       return { var1: name, var2: now, var3: "7", var4: "132" };
+    case "questionAnswered":
+      return { var1: "미적분 29번 풀이 질문", var2: now };
     default:
       return {};
   }
@@ -1029,11 +1032,27 @@ exports.tokenApi = onRequest(async (req, res) => {
       }
 
       /* 학생·관리자 공용 — 권한 판정은 tokens.js 안에서 한다 */
-      case "addComment":
+      case "addComment": {
         if (!isAdmin) await requireStudent();
-        return res.json(await tokens.addQuestionComment(fs, {
+        const r = await tokens.addQuestionComment(fs, {
           questionId: p.questionId, actor, body: p.body, photos: p.photos,
-        }));
+        });
+        // 관리자 답변만 알린다. 학생이 자기 스레드에 남긴 댓글까지 자기한테 보낼 이유가 없다.
+        if (isAdmin && r.authorId) {
+          try {
+            const stu = await loadStudent(r.authorId);
+            notify.notifyQuestionAnswered({
+              studentName: (stu && stu.name) || "",
+              phone: notifyPhone(stu),
+              title: r.title,
+              answeredAt: Date.now(),
+            });
+          } catch (e) {
+            console.error("questionAnswered 알림 준비 실패:", e);
+          }
+        }
+        return res.json(r);
+      }
       case "editComment":
         if (!isAdmin) await requireStudent();
         return res.json(await tokens.editQuestionComment(fs, {
@@ -1121,3 +1140,23 @@ exports.tokenApi = onRequest(async (req, res) => {
     return res.status(500).json({ error: String((err && err.message) || err) });
   }
 });
+
+/**
+ * 답변 뒤 조용한 질문 스레드를 닫는다.
+ *
+ * 화면은 `updatedAt` 으로 종료 여부를 바로 계산하므로 학생이 닫힌 스레드에 글을 쓸 일은
+ * 이게 늦게 돌아도 없다. 이 함수가 하는 일은 **저장된 `status` 를 실제와 맞추는 것**이다 —
+ * 관리자 목록의 답변대기 필터와 새 질문 알림톡의 미답변 건수가 그 필드를 세기 때문이다.
+ * 그래서 매시간이면 충분하다.
+ */
+exports.closeIdleQuestions = onSchedule(
+  { schedule: "every 60 minutes", timeZone: "Asia/Seoul" },
+  async () => {
+    try {
+      const r = await tokens.closeIdleQuestions(admin.firestore(), {});
+      if (r.closed) console.log(`[closeIdleQuestions] ${r.closed}건 자동 종료`);
+    } catch (e) {
+      console.error("[closeIdleQuestions] 실패:", e);
+    }
+  }
+);

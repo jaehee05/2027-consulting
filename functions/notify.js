@@ -216,11 +216,28 @@ async function notifyQuestionCreated({ studentName, createdAt }) {
   });
 }
 
+/**
+ * 4. 관리자 답변 등록 — 질문을 쓴 학생에게.
+ * var1 질문 제목, var2 답변 등록 일시
+ *
+ * 관리자가 댓글을 달 때마다 보낸다(첫 답변만이 아니다). 답변 뒤 24시간이 지나면
+ * 스레드가 자동으로 닫히므로, 학생이 그 사이에 이어 물을 수 있으려면 매번 알아야 한다.
+ * 제목은 템플릿 한 줄에 들어가야 해서 잘라 보낸다.
+ */
+function notifyQuestionAnswered({ studentName, phone, title, answeredAt }) {
+  const t = String(title || "").trim();
+  return notify("questionAnswered", {
+    to: "student", phone, name: studentName,
+    vars: { var1: t.length > 30 ? `${t.slice(0, 30)}…` : t, var2: kstStamp(answeredAt) },
+  });
+}
+
 module.exports = {
   notify,
   notifyTokenCharged,
   notifyTokenPaymentRequested,
   notifyQuestionCreated,
+  notifyQuestionAnswered,
   // 테스트용
   findEmptyVars, kstStamp, won, maskPhone, MAX_ATTEMPTS, LOG_COLLECTION,
 };

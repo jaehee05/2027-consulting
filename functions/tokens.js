@@ -21,7 +21,10 @@ const DEFAULT_POLICY = {
   bankName: "",
   bankAccount: "",
   bankHolder: "",
+  // 답변이 달린 스레드를 마지막 활동으로부터 몇 시간 뒤에 자동 종료할지. 0 이면 끈다.
+  questionIdleHours: 24,
 };
+const IDLE_HOURS_MAX = 24 * 7;
 const PAY_METHODS = ["ppurio", "bank"];
 
 const LEDGER_REASONS = ["signup", "question", "purchase", "manual"];
@@ -53,6 +56,39 @@ async function getPolicy(fs) {
     bankName: String(raw.bankName || ""),
     bankAccount: String(raw.bankAccount || ""),
     bankHolder: String(raw.bankHolder || ""),
+    questionIdleHours: clampIdleHours(raw.questionIdleHours, DEFAULT_POLICY.questionIdleHours),
+  };
+}
+
+function clampIdleHours(v, dflt) {
+  return Math.min(IDLE_HOURS_MAX, Math.max(0, Math.floor(num(v, dflt))));
+}
+
+/**
+ * 자동 종료 판정.
+ *
+ * **답변이 달린 스레드만 닫는다.** 미답변 스레드까지 닫으면 관리자가 주말에 늦게
+ * 답하는 동안 학생이 토큰만 쓰고 스레드가 사라진다 — 환불 규정상 스레드를 연
+ * 순간 환불이 안 되므로 그건 그냥 손해다. 시계는 관리자가 답한 뒤부터 돈다.
+ *
+ * 기준 시각은 `updatedAt` — 댓글·수정·삭제가 전부 이 값을 올리므로 "마지막 활동"이다.
+ */
+function idleDeadline(q, hours) {
+  if (!q || q.status !== "answered" || !hours) return 0;
+  const last = q.updatedAt || q.createdAt || 0;
+  return last ? last + hours * 3600000 : 0;
+}
+
+function isIdle(q, hours, now) {
+  const due = idleDeadline(q, hours);
+  return !!due && now >= due;
+}
+
+/** 자동 종료로 남기는 값. `closedReason` 이 있어야 화면이 "관리자가 닫음"과 다른 안내를 낼 수 있다. */
+function idleCloseUpdate(now) {
+  return {
+    status: "closed", updatedAt: now, closedAt: now,
+    closedReason: "idle", closedById: "", closedByName: "",
   };
 }
 
@@ -232,14 +268,21 @@ async function addQuestionComment(fs, { questionId, actor, body, photos }) {
   const ph = normPhotos(photos);
   if (!b && !ph.length) throw new ApiError(400, "내용 또는 사진을 입력해 주세요.");
   const now = Date.now();
+  const { questionIdleHours: idleHours } = await getPolicy(fs);
 
-  return fs.runTransaction(async (tx) => {
+  const r = await fs.runTransaction(async (tx) => {
     const qRef = fs.doc(`questions/${questionId}`);
     const snap = await tx.get(qRef);
     if (!snap.exists) throw new ApiError(404, "질문을 찾을 수 없습니다.");
     const q = snap.data();
     if (q.status === "closed") {
       throw new ApiError(409, "종료된 스레드에는 댓글을 달 수 없습니다.");
+    }
+    /* 스케줄러가 아직 안 돌았어도 시간이 지났으면 여기서 닫는다. 던지면 트랜잭션이
+       통째로 되돌아가 종료 표시가 남지 않으므로, 닫고 커밋한 뒤 바깥에서 던진다. */
+    if (isIdle(q, idleHours, now)) {
+      tx.update(qRef, idleCloseUpdate(now));
+      return { idleClosed: true };
     }
     if (actor.role !== "admin" && q.authorId !== actor.id) {
       throw new ApiError(403, "본인 질문에만 댓글을 달 수 있습니다.");
@@ -262,8 +305,20 @@ async function addQuestionComment(fs, { questionId, actor, body, photos }) {
       upd.answeredAt = now;
     }
     tx.update(qRef, upd);
-    return { comment };
+    return {
+      comment,
+      status: upd.status || q.status,
+      authorId: q.authorId || "",
+      title: q.title || "",
+      firstAnswer: upd.status === "answered",
+    };
   });
+  if (r.idleClosed) throw new ApiError(409, idleClosedMessage(idleHours));
+  return r;
+}
+
+function idleClosedMessage(hours) {
+  return `마지막 활동 후 ${hours}시간이 지나 자동으로 종료된 스레드입니다. 이어서 물어볼 내용은 새 질문으로 남겨 주세요.`;
 }
 
 /**
@@ -277,14 +332,19 @@ async function editQuestionComment(fs, { questionId, commentId, actor, body, pho
   const ph = normPhotos(photos);
   if (!b && !ph.length) throw new ApiError(400, "내용 또는 사진을 입력해 주세요.");
   const now = Date.now();
+  const { questionIdleHours: idleHours } = await getPolicy(fs);
 
-  return fs.runTransaction(async (tx) => {
+  const r = await fs.runTransaction(async (tx) => {
     const qRef = fs.doc(`questions/${questionId}`);
     const snap = await tx.get(qRef);
     if (!snap.exists) throw new ApiError(404, "질문을 찾을 수 없습니다.");
     const q = snap.data();
     if (q.status === "closed") {
       throw new ApiError(409, "종료된 스레드의 댓글은 수정할 수 없습니다.");
+    }
+    if (isIdle(q, idleHours, now)) {
+      tx.update(qRef, idleCloseUpdate(now));
+      return { idleClosed: true };
     }
     const list = Array.isArray(q.comments) ? q.comments : [];
     const i = list.findIndex((c) => c._id === commentId);
@@ -297,6 +357,8 @@ async function editQuestionComment(fs, { questionId, commentId, actor, body, pho
     tx.update(qRef, { comments: next, updatedAt: now });
     return { comment: next[i] };
   });
+  if (r.idleClosed) throw new ApiError(409, idleClosedMessage(idleHours));
+  return r;
 }
 
 /** 댓글 삭제. 학생은 자기 댓글만, 관리자는 전부. 토큰은 돌려주지 않는다(애초에 댓글은 무료다). */
@@ -344,16 +406,41 @@ async function setQuestionClosed(fs, { questionId, closed, by }) {
 
     if (closed) {
       tx.update(qRef, {
-        status: "closed", updatedAt: now,
+        status: "closed", updatedAt: now, closedReason: "admin",
         closedAt: now, closedById: (by && by.id) || "", closedByName: (by && by.name) || "",
       });
       return { status: "closed" };
     }
     const hasAdmin = (Array.isArray(q.comments) ? q.comments : []).some((c) => c.role === "admin");
     const status = hasAdmin ? "answered" : "pending";
-    tx.update(qRef, { status, updatedAt: now, closedAt: null, closedById: "", closedByName: "" });
+    /* 다시 열면 updatedAt 이 지금으로 올라가 자동 종료 시계도 처음부터 다시 돈다.
+       바로 다시 닫히면 열어 준 의미가 없다. */
+    tx.update(qRef, { status, updatedAt: now, closedAt: null, closedReason: "", closedById: "", closedByName: "" });
     return { status };
   });
+}
+
+/**
+ * 자동 종료 일괄 처리 — 스케줄러가 부른다.
+ *
+ * 화면은 `updatedAt` 으로 종료 여부를 즉시 계산하지만, 저장된 `status` 도 따라가야 한다.
+ * 관리자 목록의 답변대기 필터와 새 질문 알림톡의 미답변 건수가 이 필드를 세기 때문이다.
+ * 한 번에 다 못 지우면 다음 회차가 이어서 처리하므로 배치 크기만 지킨다.
+ */
+async function closeIdleQuestions(fs, { now = Date.now(), limit = 400 } = {}) {
+  const { questionIdleHours: hours } = await getPolicy(fs);
+  if (!hours) return { closed: 0, skipped: "disabled" };
+  const cutoff = now - hours * 3600000;
+  const snap = await fs.collection("questions")
+    .where("status", "==", "answered")
+    .where("updatedAt", "<=", cutoff)
+    .limit(limit)
+    .get();
+  if (snap.empty) return { closed: 0 };
+  const batch = fs.batch();
+  snap.docs.forEach((d) => batch.update(d.ref, idleCloseUpdate(now)));
+  await batch.commit();
+  return { closed: snap.size };
 }
 
 async function deleteQuestion(fs, { questionId, actor }) {
@@ -521,6 +608,10 @@ async function savePolicy(fs, patch) {
     bankName: String(patch.bankName === undefined ? cur.bankName : patch.bankName || "").trim().slice(0, 30),
     bankAccount: String(patch.bankAccount === undefined ? cur.bankAccount : patch.bankAccount || "").trim().slice(0, 40),
     bankHolder: String(patch.bankHolder === undefined ? cur.bankHolder : patch.bankHolder || "").trim().slice(0, 20),
+    questionIdleHours: clampIdleHours(
+      patch.questionIdleHours === undefined ? cur.questionIdleHours : patch.questionIdleHours,
+      cur.questionIdleHours
+    ),
     updatedAt: Date.now(),
   };
   await fs.doc(POLICY_DOC).set(next, { merge: true });
@@ -548,6 +639,9 @@ module.exports = {
   editQuestionComment,
   deleteQuestionComment,
   setQuestionClosed,
+  closeIdleQuestions,
+  idleDeadline,
+  isIdle,
   deleteQuestion,
   createPaymentRequest,
   markPaymentSent,
