@@ -50,6 +50,10 @@ service cloud.firestore {
     // 발송 로그 — 읽기까지 막는다.
     match /alimtalkLogs/{id} { allow read, write: if false; }
 
+    // 앱 푸시 토큰 — 읽기까지 막는다. 토큰은 그 기기로 알림을 보낼 수 있는 자격증명이다.
+    // 등록·삭제는 tokenApi(registerPush/unregisterPush)만 한다.
+    match /pushTokens/{id} { allow read, write: if false; }
+
     // config/tokens 만 서버 전용, 나머지 config 문서는 기존대로 개방.
     match /config/{docId} {
       allow read: if true;
@@ -62,6 +66,7 @@ service cloud.firestore {
       allow read, write: if collection != 'settings'
                          && collection != 'admins'
                          && collection != 'alimtalkLogs'
+                         && collection != 'pushTokens'
                          && collection != 'posts'
                          && collection != 'config'
                          && collection != 'tokenBalances'

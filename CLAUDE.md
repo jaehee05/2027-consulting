@@ -127,6 +127,7 @@ Modelled on **에브리타임**: a compact feed you scan, tap into a detail page
 - **공감** is `likes[]` holding user ids, toggled with `arrayUnion`/`arrayRemove` — an id array rather than a counter so a double tap can't inflate the number.
 - **Three renderers**: `bdListHtml()` (feed + composer + FAB) and `bdDetailHtml()` (one post expanded) both go through `bdBoardHtml()`, which branches on `S.bdOpenId`. `bdStudentSectionHtml(studentId)` is the one-student, no-composer section embedded in 멘토링 상세, 예약 상세, and the tablet — it renders posts in detail form.
 - Kept in sync by `startPostsListener()` (`onSnapshot`); CRUD handlers write to Firestore **only** and let the listener re-render, same rule as `notices`. `bdRerender()` is the single re-render entry point (checks `#vBoard` first, then student page, tablet, 예약 상세 modal via `S.bdModalBookingId`, 멘토링 상세).
+- **사진은 `bdPhotosHtml` 이 그리고 눌러서 `bdOpenPhoto` 로 크게 본다**(자유게시판·질문게시판 공용). 새 탭으로 원본 URL 을 열면 Storage 서명 URL 이 주소창에 드러나고, 앱(WebView)에서는 사파리로 튕겨 나가 돌아올 길이 없다. 라이트박스(`#lbOv`)는 예약 상세 같은 **모달 위**에서도 열리므로 z-index 가 `.overlay`(1000)보다 높다. 사진 묶음은 전역에 담지 않고 누른 썸네일의 부모(`.bd-photos`)에서 그때그때 읽는다 — 화면을 다시 그릴 때마다 어긋나지 않게.
 - Photos go to Storage under `board/<postId>/<scope>/`. A new post takes its doc id from `db.collection('posts').doc()` *before* uploading so the path is stable. The 질문게시판 reuses `bdUploadPhoto` with a throwaway batch id, so its photos also land under `board/` — one `storage.rules` match covers both.
 - The home card shows a red dot from `bdStuNewCount()` against a `localStorage` `bdSeen` timestamp stamped by `goBoard()` — per-browser, like popup dismissals.
 - The 멘토링 목록 **게시글** column and its summary chip come from `S.posts` (`_bdHas`).
@@ -287,6 +288,18 @@ There are **no automated tests, linters, or build steps** for the web app. `inde
 **규칙은 match 블록끼리 OR 된다.** 넓게 여는 blanket match 가 있으면 뒤에 좁은 규칙을 추가해도 좁혀지지 않는다. 좁히려면 blanket 쪽에서 그 컬렉션을 **빼야** 한다.
 
 **보안 규칙은 반드시 테스트를 쓴다.** `@firebase/rules-unit-testing` + 에뮬레이터로 `functions/test/rules.emulator.test.js` 에 있다. 커스텀 토큰 클레임(`role`, `studentId`)을 그대로 흉내 내므로 실제 로그인과 같은 조건으로 검증된다.
+
+## 관리자 앱 푸시 (`functions/push.js`)
+
+알림톡과 나란히 서는 **두 번째 알림 경로**다. 알림톡은 학생·보호자에게(건당 비용), 푸시는 **관리자 본인 폰**에 간다. 설정 절차는 `PUSH.md`.
+
+- **보내는 때는 셋**: 새 질문(`createQuestion`), **추가 질문**(`addComment` 에서 `followUp` — 답변완료 스레드에 학생이 다시 댓글), 결제 요청(`requestPayment`). 추가 질문을 따로 두는 이유는 그 스레드가 **답변완료 상태 그대로**라 답변대기 필터만 보면 놓치기 때문이다.
+- **토큰은 `pushTokens/{token}` 문서 하나 = 기기 하나.** 관리자 문서 안 배열로 두면 토큰이 갱신되거나 기기를 바꿀 때 지우지 못한 값이 쌓인다. 문서 id 가 토큰이라 재등록해도 늘지 않는다. **읽기까지 막혀 있다** — 토큰은 그 기기로 알림을 보낼 수 있는 자격증명이다.
+- **죽은 토큰은 발송 응답을 보고 그 자리에서 지운다**(`registration-token-not-registered`). 안 지우면 매번 같은 실패가 쌓여 로그가 쓸모없어진다.
+- `push.js` 는 **절대 throw 하지 않는다**. `notify.js` 와 같은 규칙 — 푸시 실패가 질문 등록이나 결제 요청을 되돌리면 안 된다.
+- **클라이언트는 네이티브 앱에서만 동작한다**(`window.Capacitor`). 웹에서는 `pushSync()` 가 바로 빠진다. **관리자가 아닌 계정으로 로그인하면 그 기기의 등록을 지운다** — 학원 공용 기기를 학생이 쓸 때 관리자 알림이 계속 가면 안 된다. 로그아웃은 세션이 끊기기 전에 지운다(지운 뒤엔 인증 헤더를 못 만든다).
+- iOS 는 `@capacitor-firebase/messaging` 을 쓴다. 공식 `@capacitor/push-notifications` 는 iOS 에서 **APNs 토큰**을 주는데, 그러면 `admin.messaging()` 으로 못 보내고 서버에 APNs 클라이언트를 따로 둬야 한다. FCM 으로 통일해야 나중에 안드로이드도 서버 수정 없이 붙는다.
+- `AppDelegate.swift` 의 `didRegisterForRemoteNotifications…` 두 메서드가 없으면 **`getToken()` 이 영영 돌아오지 않는다**. Capacitor 로 등록 결과를 넘기는 다리다.
 
 ## 알림톡 서비스 레이어 (`functions/notify.js`)
 

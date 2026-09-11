@@ -305,6 +305,16 @@ tr:last-child td{border-bottom:none}
 .br{background:var(--danger-soft);color:var(--danger)}.bgr{background:var(--gray-300);color:var(--gray-700)}
 .bx.bpk{background:#fce7f3;color:#be185d}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+/* 사진 크게 보기. 예약 상세 같은 모달(z 1000) 안에서도 열리므로 그 위에 둔다. */
+#lbOv{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:1500;display:none;align-items:center;justify-content:center;padding:calc(16px + var(--sat)) 16px calc(16px + var(--sab))}
+#lbOv.on{display:flex}
+#lbOv img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;-webkit-user-select:none;user-select:none}
+.lb-btn{position:absolute;border:none;background:rgba(255,255,255,.16);color:#fff;border-radius:50%;width:40px;height:40px;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.lb-x{top:calc(14px + var(--sat));right:14px}
+.lb-prev{left:12px;top:50%;transform:translateY(-50%)}
+.lb-next{right:12px;top:50%;transform:translateY(-50%)}
+.lb-count{position:absolute;bottom:calc(14px + var(--sab));left:0;right:0;text-align:center;color:#fff;font-size:12px;opacity:.8}
+.bd-thumb{display:block;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb;padding:0;cursor:zoom-in;-webkit-tap-highlight-color:transparent}
 .modal{background:var(--surface);border-radius:var(--radius-modal);padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-modal)}
 .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .shtitle{font-size:16px;font-weight:700}
@@ -839,6 +849,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 </div>
 
 <!-- 모달 -->
+<div id="lbOv" onclick="if(event.target===this)bdClosePhoto()"></div>
 <div id="mOv" class="overlay hidden" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="mCt"></div>
 </div>
@@ -939,7 +950,7 @@ const S = {
   posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
   bdFilter:'all', bdModalBookingId:null, bdOpenId:null, bdReplyTo:null, boardBans:{}, boardPledges:{},
   qa:{policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',
-      composerOpen:false,openId:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null}
+      composerOpen:false,openId:null,pendingOpen:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null}
 };
 
 const _=id=>document.getElementById(id);
@@ -1882,6 +1893,72 @@ async function loadAll(){
   startBansListener();
   if(S.user&&S.user.type!=='student')startCallsListener();
   if(S.user&&(S.user.type==='admin'||S.user.type==='tablet'))startTabletSessionListener();
+  pushSync();
+}
+
+/* ── 앱 푸시 (관리자) ──
+   웹에서는 아무 일도 하지 않는다. TestFlight/스토어로 받은 네이티브 앱에서만 동작한다
+   (`window.Capacitor`). 알림톡은 학생·보호자에게, 푸시는 관리자 본인 폰에 간다 —
+   관리자에게 알림톡을 쏘면 건당 비용이 나가고, "지금 답할 게 생겼다"는 신호는
+   앱을 열어 처리하는 흐름이라야 한다.
+
+   토큰은 기기마다 다르고 앱 재설치·갱신으로 바뀐다. 서버는 문서 id 를 토큰으로 두므로
+   같은 기기가 다시 등록해도 늘어나지 않는다. 죽은 토큰은 발송할 때 서버가 지운다. */
+let _pushToken='',_pushWired=false,_pushPending=null;
+function isNativeApp(){try{return !!window.Capacitor?.isNativePlatform?.();}catch(_){return false;}}
+function pushPlugin(){return window.Capacitor?.Plugins?.FirebaseMessaging||null;}
+function pushPlatform(){try{return window.Capacitor?.getPlatform?.()||'';}catch(_){return '';}}
+
+async function pushSync(){
+  if(!isNativeApp())return;
+  const P=pushPlugin();if(!P)return;               // 플러그인 없이 만든 빌드
+  /* 관리자가 아닌 계정으로 로그인했다면 이 기기에 남아 있을지 모를 등록을 지운다.
+     학원 공용 기기를 학생이 쓸 때 관리자 알림이 계속 가면 안 된다. */
+  if(S.user?.type!=='admin'){
+    try{const r=await P.getToken();await pushDrop(r&&r.token);}catch(_){}
+    return;
+  }
+  try{
+    let perm=await P.checkPermissions();
+    if(perm.receive!=='granted')perm=await P.requestPermissions();
+    if(perm.receive!=='granted')return;            // 거절해도 앱은 그대로 쓴다
+    if(!_pushWired){
+      _pushWired=true;
+      P.addListener('tokenReceived',e=>pushRegister(e&&e.token));
+      P.addListener('notificationActionPerformed',e=>pushOpen(e&&e.notification&&e.notification.data));
+    }
+    const r=await P.getToken();
+    await pushRegister(r&&r.token);
+    if(_pushPending){const d=_pushPending;_pushPending=null;pushOpen(d);}
+  }catch(e){console.error('푸시 등록 실패',e);}
+}
+async function pushRegister(token){
+  if(!token||token===_pushToken)return;
+  try{
+    await callFn(TOKEN_API_URL,{action:'registerPush',payload:{token,platform:pushPlatform()}},true);
+    _pushToken=token;
+  }catch(e){console.error('푸시 토큰 등록 실패',e);}
+}
+async function pushDrop(token){
+  const t=token||_pushToken;if(!t)return;
+  _pushToken='';
+  try{await callFn(TOKEN_API_URL,{action:'unregisterPush',payload:{token:t}},true);}catch(_){}
+}
+/* 로그아웃은 세션이 끊기기 전에 지워야 한다(지운 뒤엔 인증 헤더를 못 만든다).
+   오프라인이면 기다릴 이유가 없으므로 2초만 기다리고 넘어간다 — 못 지운 토큰은
+   서버가 발송 실패 응답으로 정리한다. */
+function pushDropOnLogout(){
+  if(!_pushToken)return Promise.resolve();
+  return Promise.race([pushDrop(),new Promise(r=>setTimeout(r,2000))]);
+}
+/* 알림을 눌러 들어온 경우. 로그인 전이면 세션이 잡힌 뒤에 처리한다. */
+function pushOpen(data){
+  if(!data||!data.view)return;
+  if(!S.user){_pushPending=data;return;}
+  if(data.view!=='qa')return;
+  goQa();
+  if(data.sub)qaSetSub(data.sub);
+  if(data.questionId){S.qa.pendingOpen=data.questionId;renderQa();}
 }
 async function loadAdmins(){
   try{
@@ -2030,8 +2107,9 @@ function showWithdrawnNotice(){
   });
 }
 
-function doLogout(){
+async function doLogout(){
   if(S.adminPreviewSnapshot){exitAdminPreview();return;}
+  await pushDropOnLogout();
   stopRequestsListener();
   stopBookingsListener();
   stopNoticesListener();
@@ -2045,7 +2123,7 @@ function doLogout(){
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
   S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;S.bdOpenId=null;S.bdReplyTo=null;
-  S.qa={policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',composerOpen:false,openId:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null};
+  S.qa={policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',composerOpen:false,openId:null,pendingOpen:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null};
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   S._pendingAdmin=null;
@@ -2843,8 +2921,44 @@ function bdNormComments(list){
 }
 function bdPhotosHtml(photos){
   if(!Array.isArray(photos)||!photos.length)return '';
-  const cells=photos.map(p=>`<a href="${p.url}" target="_blank" rel="noopener" style="display:block;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb"><img src="${p.url}" alt="${escapeHtml(p.name||'')}" style="width:100%;height:100%;object-fit:cover;cursor:zoom-in" loading="lazy"></a>`).join('');
-  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${cells}</div>`;
+  const cells=photos.map(p=>`<button type="button" class="bd-thumb" data-url="${p.url}" onclick="bdOpenPhoto(this)"><img src="${p.url}" alt="${escapeHtml(p.name||'')}" style="width:100%;height:100%;object-fit:cover" loading="lazy"></button>`).join('');
+  return `<div class="bd-photos" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${cells}</div>`;
+}
+/* ── 사진 크게 보기 ──
+   원본 URL 을 새 탭으로 열면 Storage 서명 URL 이 주소창에 그대로 드러나고,
+   앱(WebView)에서는 사파리로 튕겨 나가 돌아올 길이 없다. 그 자리에서 띄운다.
+   목록은 누른 썸네일이 속한 묶음에서 그때그때 읽는다 — 전역에 담아 두면
+   화면을 다시 그릴 때마다 어긋난다. */
+let _lbList=[],_lbIdx=0;
+function bdOpenPhoto(el){
+  const box=el.closest('.bd-photos')||el.parentNode;
+  _lbList=Array.from(box.querySelectorAll('[data-url]')).map(b=>b.getAttribute('data-url'));
+  _lbIdx=Math.max(0,_lbList.indexOf(el.getAttribute('data-url')));
+  document.addEventListener('keydown',bdLbKey);
+  document.body.style.overflow='hidden';
+  bdLbDraw();
+  _('lbOv').classList.add('on');
+}
+function bdLbDraw(){
+  const ov=_('lbOv');if(!ov)return;
+  const many=_lbList.length>1;
+  ov.innerHTML=`<img src="${_lbList[_lbIdx]||''}" alt="">
+    <button type="button" class="lb-btn lb-x" onclick="bdClosePhoto()" title="닫기">×</button>
+    ${many?`<button type="button" class="lb-btn lb-prev" onclick="bdLbMove(-1)" title="이전">‹</button>
+      <button type="button" class="lb-btn lb-next" onclick="bdLbMove(1)" title="다음">›</button>
+      <div class="lb-count">${_lbIdx+1} / ${_lbList.length}</div>`:''}`;
+}
+function bdLbMove(d){if(_lbList.length<2)return;_lbIdx=(_lbIdx+d+_lbList.length)%_lbList.length;bdLbDraw();}
+function bdClosePhoto(){
+  const ov=_('lbOv');if(ov){ov.classList.remove('on');ov.innerHTML='';}
+  document.removeEventListener('keydown',bdLbKey);
+  document.body.style.overflow='';
+  _lbList=[];_lbIdx=0;
+}
+function bdLbKey(e){
+  if(e.key==='Escape'){e.preventDefault();bdClosePhoto();}
+  else if(e.key==='ArrowLeft')bdLbMove(-1);
+  else if(e.key==='ArrowRight')bdLbMove(1);
 }
 function bdDraftPreviewHtml(scopeKey,kind){
   const list=(kind==='comment'?S.bdCommentDraftFiles:S.bdDraftFiles)[scopeKey]||[];
@@ -3831,7 +3945,12 @@ function qaStartListeners(){
   const qCol=db.collection('questions');
   on(admin?qCol:qCol.where('authorId','==',me),snap=>{
     S.qa.questions=snap.docs.map(d=>({_docId:d.id,...d.data()}));
-    S.qa.loaded=true;renderQa();
+    S.qa.loaded=true;
+    /* 푸시를 눌러 들어왔는데 아직 목록이 안 와 있던 경우. 도착한 뒤에 연다. */
+    if(S.qa.pendingOpen&&S.qa.questions.some(q=>q._docId===S.qa.pendingOpen)){
+      S.qa.openId=S.qa.pendingOpen;S.qa.pendingOpen=null;
+    }
+    renderQa();
   });
   const pCol=db.collection('paymentRequests');
   on(admin?pCol:pCol.where('studentId','==',me),snap=>{

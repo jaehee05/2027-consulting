@@ -46,6 +46,7 @@ beforeEach(async () => {
     await db.doc("posts/secret").set(SECRET);
     await db.doc("tokenBalances/stuA").set({ balance: 5 });
     await db.doc("alimtalkLogs/x").set({ eventKey: "e" });
+    await db.doc("pushTokens/tok1").set({ role: "admin", ownerId: "admin1" });
     await db.doc("students/stuA").set({ name: "가나다" });
   });
 });
@@ -113,6 +114,12 @@ describe("서버 전용 컬렉션", () => {
   test("발송 로그는 읽기도 막힌다", async () => {
     await assertFails(student("stuA").firestore().doc("alimtalkLogs/x").get());
     await assertFails(adminCtx().firestore().doc("alimtalkLogs/x").get());
+  });
+
+  test("푸시 토큰은 읽기도 막힌다 — 토큰은 그 기기로 알림을 보낼 수 있는 자격증명이다", async () => {
+    await assertFails(student("stuA").firestore().doc("pushTokens/tok1").get());
+    await assertFails(adminCtx().firestore().doc("pushTokens/tok1").get());
+    await assertFails(adminCtx().firestore().doc("pushTokens/tok2").set({ role: "admin" }));
   });
 
   test("config/tokens 는 쓰기가 막히고 읽기는 열려 있다", async () => {

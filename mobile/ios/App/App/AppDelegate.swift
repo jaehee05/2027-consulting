@@ -11,6 +11,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    // 푸시 등록 결과를 Capacitor 로 넘겨준다. 이 두 메서드가 없으면 앱은 APNs 토큰을 받고도
+    // 플러그인(FirebaseMessaging)에 전달하지 못해 getToken() 이 영영 돌아오지 않는다.
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.

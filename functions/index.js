@@ -10,6 +10,7 @@ const { sendAlimtalk, sendAlimtalkToAdmins } = require("./ppurio");
 const tokens = require("./tokens");
 const moderation = require("./moderation");
 const notify = require("./notify");
+const push = require("./push");
 
 setGlobalOptions({ region: "asia-northeast3", retry: false, maxInstances: 10 });
 
@@ -1017,6 +1018,7 @@ exports.tokenApi = onRequest(async (req, res) => {
         });
         // 트랜잭션이 끝난 뒤에 부르고 기다리지 않는다 — 알림톡 실패가 질문 등록을 되돌리면 안 된다.
         notify.notifyQuestionCreated({ studentName: student.name, createdAt: Date.now() });
+        push.pushQuestionCreated({ studentName: student.name, title: p.title, questionId: r.id });
         return res.json(r);
       }
       case "requestPayment": {
@@ -1028,6 +1030,7 @@ exports.tokenApi = onRequest(async (req, res) => {
           studentName: student.name, school: student.school, grade: student.grade,
           tokens: r.totalTokens, amount: r.amount, requestedAt: Date.now(),
         });
+        push.pushPaymentRequested({ studentName: student.name, tokens: r.totalTokens, amount: r.amount });
         return res.json(r);
       }
 
@@ -1050,6 +1053,13 @@ exports.tokenApi = onRequest(async (req, res) => {
           } catch (e) {
             console.error("questionAnswered 알림 준비 실패:", e);
           }
+        }
+        // 답변완료 스레드에 학생이 다시 물었다 — 상태가 그대로라 목록만 봐서는 놓친다.
+        if (r.followUp) {
+          push.pushQuestionFollowUp({
+            studentName: r.authorName || actor.name || "학생",
+            title: r.title, questionId: p.questionId,
+          });
         }
         return res.json(r);
       }
@@ -1110,6 +1120,13 @@ exports.tokenApi = onRequest(async (req, res) => {
       case "backfillGrants":
         requireAdmin();
         return res.json(await tokens.backfillSignupGrants(fs, { by }));
+
+      /* 관리자 앱 푸시 토큰. 기기가 스스로 등록하므로 학생·관리자 모두 부를 수 있지만,
+         지금 보내는 알림은 관리자용뿐이다(role 로 갈라 저장해 둔다). */
+      case "registerPush":
+        return res.json(await push.registerToken(fs, { token: p.token, platform: p.platform, actor }));
+      case "unregisterPush":
+        return res.json(await push.unregisterToken(fs, { token: p.token }));
 
       /* 자유게시판 이용 서약 — 본인이 지울 수 없는 곳에 남겨야 제재 근거가 된다. */
       case "agreePledge": {

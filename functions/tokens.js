@@ -310,7 +310,11 @@ async function addQuestionComment(fs, { questionId, actor, body, photos }) {
       status: upd.status || q.status,
       authorId: q.authorId || "",
       title: q.title || "",
+      authorName: q.authorName || "",
       firstAnswer: upd.status === "answered",
+      /* 답변완료 스레드에 학생이 다시 물은 경우. 상태는 답변완료 그대로라
+         관리자가 목록만 봐서는 새 글이 달린 걸 알 수 없다. */
+      followUp: actor.role !== "admin" && q.status === "answered",
     };
   });
   if (r.idleClosed) throw new ApiError(409, idleClosedMessage(idleHours));

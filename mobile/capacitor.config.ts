@@ -34,6 +34,11 @@ const config: CapacitorConfig = {
       style: 'LIGHT',
       backgroundColor: '#ffffff',
     },
+    // 관리자 앱 푸시. 앱이 열려 있는 동안에도 배너를 띄운다 —
+    // 질문 화면을 보고 있을 때 새 질문이 들어오면 그게 제일 알고 싶은 순간이다.
+    FirebaseMessaging: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
   },
 };
 
