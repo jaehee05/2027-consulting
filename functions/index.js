@@ -1014,7 +1014,7 @@ exports.tokenApi = onRequest(async (req, res) => {
       case "createQuestion": {
         const student = await requireStudent();
         const r = await tokens.createQuestion(fs, {
-          student, title: p.title, body: p.body, photos: p.photos,
+          student, title: p.title, body: p.body, photos: p.photos, problems: p.problems,
         });
         // 트랜잭션이 끝난 뒤에 부르고 기다리지 않는다 — 알림톡 실패가 질문 등록을 되돌리면 안 된다.
         notify.notifyQuestionCreated({ studentName: student.name, createdAt: Date.now() });

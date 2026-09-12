@@ -215,18 +215,29 @@ function normPhotos(a) {
   }));
 }
 
+/* 한 스레드에 담을 수 있는 문제 수의 상한. 토큰은 문제 수만큼 곱해서 받는다 —
+   답변하는 품이 문제 수에 비례하기 때문이다. 화면 쪽 상한(QA_MAX_PROBLEMS)과 같은 값이어야 한다. */
+const MAX_PROBLEMS = 2;
+
+function normProblems(v) {
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, MAX_PROBLEMS);
+}
+
 /**
  * 질문 작성 + 토큰 차감을 한 트랜잭션으로.
  * 잔액 확인과 차감이 같은 트랜잭션 안에 있어야 동시 작성으로 음수가 되지 않는다.
  */
-async function createQuestion(fs, { student, title, body, photos }) {
+async function createQuestion(fs, { student, title, body, photos, problems }) {
   const t = String(title || "").trim();
   const b = String(body || "").trim();
   if (!t) throw new ApiError(400, "제목을 입력해 주세요.");
   if (!b) throw new ApiError(400, "내용을 입력해 주세요.");
 
   const policy = await getPolicy(fs);
-  const cost = policy.questionCost;
+  const count = normProblems(problems);
+  const cost = policy.questionCost * count;
   const now = Date.now();
 
   return fs.runTransaction(async (tx) => {
@@ -244,6 +255,7 @@ async function createQuestion(fs, { student, title, body, photos }) {
       authorName: student.name || "",
       authorGrade: student.grade || "",
       status: "pending",
+      problems: count,
       tokenCost: cost,
       comments: [],
       createdAt: now,
@@ -253,7 +265,8 @@ async function createQuestion(fs, { student, title, body, photos }) {
     tx.set(balRef, { balance: next, updatedAt: now }, { merge: true });
     ledgerEntry(tx, fs, {
       studentId: student.id, delta: -cost, reason: "question", refId: qRef.id,
-      balanceAfter: next, note: t.slice(0, 40), by: { id: student.id, name: student.name }, now,
+      balanceAfter: next, note: t.slice(0, 40) + (count > 1 ? ` (문제 ${count}개)` : ""),
+      by: { id: student.id, name: student.name }, now,
     });
     return { id: qRef.id, balance: next };
   });
@@ -639,6 +652,7 @@ module.exports = {
   grantSignupTokens,
   adjustTokens,
   createQuestion,
+  MAX_PROBLEMS,
   addQuestionComment,
   editQuestionComment,
   deleteQuestionComment,

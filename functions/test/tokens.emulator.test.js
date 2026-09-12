@@ -136,6 +136,49 @@ describe("질문 작성 토큰 차감", () => {
     expect(await ledgerFor(student.id)).toHaveLength(3);
   });
 
+  test("문제 2개짜리는 토큰을 두 배 쓰고 problems 가 남는다", async () => {
+    await setPolicy({ questionCost: 2 });
+    await setBalance(student.id, 5);
+    const r = await tokens.createQuestion(fs, { student, title: "미적분", body: "29·30번", problems: 2 });
+    expect(r.balance).toBe(1);
+    const led = await ledgerFor(student.id);
+    expect(led[0]).toMatchObject({ delta: -4, reason: "question", balanceAfter: 1 });
+    const q = await fs.doc(`questions/${r.id}`).get();
+    expect(q.data()).toMatchObject({ problems: 2, tokenCost: 4 });
+  });
+
+  test("problems 가 없거나 이상하면 1개로 본다", async () => {
+    await setPolicy({ questionCost: 2 });
+    await setBalance(student.id, 10);
+    for (const p of [undefined, 0, -3, "두개", 1.7]) {
+      const r = await tokens.createQuestion(fs, { student, title: "t", body: "b", problems: p });
+      const q = await fs.doc(`questions/${r.id}`).get();
+      expect(q.data()).toMatchObject({ problems: 1, tokenCost: 2 });
+    }
+  });
+
+  test("상한을 넘겨 보내도 상한까지만 받는다", async () => {
+    await setPolicy({ questionCost: 1 });
+    await setBalance(student.id, 20);
+    const r = await tokens.createQuestion(fs, { student, title: "t", body: "b", problems: 9 });
+    const q = await fs.doc(`questions/${r.id}`).get();
+    expect(q.data()).toMatchObject({ problems: tokens.MAX_PROBLEMS, tokenCost: tokens.MAX_PROBLEMS });
+    expect(r.balance).toBe(20 - tokens.MAX_PROBLEMS);
+  });
+
+  test("2개짜리를 낼 만큼 잔액이 없으면 402 로 거부한다", async () => {
+    await setPolicy({ questionCost: 2 });
+    await setBalance(student.id, 3);
+    await expect(
+      tokens.createQuestion(fs, { student, title: "t", body: "b", problems: 2 })
+    ).rejects.toMatchObject({ status: 402 });
+    expect(await tokens.getBalance(fs, student.id)).toBe(3);
+    expect((await fs.collection("questions").get()).size).toBe(0);
+    // 1개짜리는 여전히 낼 수 있다
+    const r = await tokens.createQuestion(fs, { student, title: "t", body: "b" });
+    expect(r.balance).toBe(1);
+  });
+
   test("제목이나 내용이 비면 거부한다", async () => {
     await setBalance(student.id, 5);
     await expect(tokens.createQuestion(fs, { student, title: " ", body: "b" }))
