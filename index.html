@@ -3748,6 +3748,26 @@ function qaBankOn(){const p=qaPolicy();return !!(p.bankEnabled&&p.bankName&&p.ba
 function qaPayMethods(){return [qaPpurioOn()?'ppurio':null,qaBankOn()?'bank':null].filter(Boolean);}
 function qaCost(){return qaPolicy().questionCost;}
 
+/* ── 질문 과목 ──
+   성적 입력에서 쓰는 과목 상수를 그대로 쓴다(사탐 9 · 과탐 I·II 8). 질문게시판에는 시험(exam) 이
+   없어 과탐II 를 켜고 끌 기준이 없으므로 둘 다 늘어놓는다. 국어·수학은 선택과목으로 쪼개지 않는다 —
+   답변을 배정하는 단위가 과목이지 선택과목이 아니다. */
+const QA_SUBJECT_GROUPS=[
+  {group:'',items:['국어','수학','영어']},
+  {group:'사회탐구',items:EXP_SOCIAL_SUBJS},
+  {group:'과학탐구',items:EXP_SCI1_SUBJS.concat(EXP_SCI2_SUBJS)},
+];
+function qaSubjOpts(sel){
+  return `<option value="">과목 선택</option>`+QA_SUBJECT_GROUPS.map(g=>{
+    const opts=g.items.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
+    return g.group?`<optgroup label="${g.group}">${opts}</optgroup>`:opts;
+  }).join('');
+}
+function qaSubjChip(q){
+  const v=String(q&&q.subject||'').trim();
+  return v?`<span class="bx" style="font-size:10px;font-weight:700;background:#f1f5f9;color:#475569">${escapeHtml(v)}</span>`:'';
+}
+
 /* ── 한 스레드의 문제 수 ──
    한 스레드에 문제를 2개까지 담을 수 있고, 토큰은 문제 수만큼 곱해 받는다(서버 tokens.js 의 MAX_PROBLEMS 와 같은 값). */
 const QA_MAX_PROBLEMS=2;
@@ -4085,6 +4105,7 @@ function qaQuestionsHtml(admin){
       <p style="font-size:11px;color:#1e40af;margin-top:3px">문제 수만큼 토큰이 차감되고, 문제마다 어디까지 물어보는지 나누어 적어 주세요. ${QA_MAX_PROBLEMS+1}개 이상은 답변이 뒤섞여 알아보기 어려우니 질문을 따로 열어 주세요.</p>
     </div>
     <div id="qa-np-box" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:9px 11px;margin-bottom:8px">${qaProblemPickInner()}</div>
+    <select class="fi" id="qa-new-subject" style="margin-bottom:8px">${qaSubjOpts('')}</select>
     <input class="fi" id="qa-new-title" maxlength="120" placeholder="제목 (예: 미적분 29번 풀이 질문)" style="margin-bottom:8px">
     ${qaFmtBar('qa-new-body')}
     <textarea class="fi ta" id="qa-new-body" rows="14" style="min-height:280px" placeholder="궁금한 점을 자세히 적어 주세요. 문제를 2개 담을 때는 1) 2) 로 나누어 적으면 답변도 나누어 달립니다." oninput="qaOnBodyInput('qa-new-body')"></textarea>
@@ -4119,7 +4140,7 @@ function qaFeedRowHtml(q,admin){
   return `<div onclick="qaOpen('${id}')" style="border-bottom:1px solid #f1f3f5;padding:14px 4px;cursor:pointer;display:flex;gap:12px;align-items:flex-start">
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">
-        ${qaChip(QA_Q_STATUS,qaEffStatus(q))}
+        ${qaChip(QA_Q_STATUS,qaEffStatus(q))}${qaSubjChip(q)}
         ${(()=>{const n=qaProblemLabel(q);return n?`<span class="bx" style="font-size:10px;font-weight:700;background:#eef2ff;color:#4338ca">문제 ${n}개</span>`:'';})()}
         <b style="font-size:14px;color:#111827;word-break:break-word">${escapeHtml(q.title||'')}</b>
       </div>
@@ -4186,7 +4207,7 @@ function qaDetailHtml(q,admin){
   return `<button class="btn bs bsm" style="margin-bottom:12px" onclick="qaCloseDetail()">← 목록</button>
   <div class="card">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      ${qaChip(QA_Q_STATUS,qaEffStatus(q))}${(()=>{const n=qaProblemLabel(q);return n?`<span class="bx" style="font-size:10px;font-weight:700;background:#eef2ff;color:#4338ca">문제 ${n}개</span>`:'';})()}${who}
+      ${qaChip(QA_Q_STATUS,qaEffStatus(q))}${qaSubjChip(q)}${(()=>{const n=qaProblemLabel(q);return n?`<span class="bx" style="font-size:10px;font-weight:700;background:#eef2ff;color:#4338ca">문제 ${n}개</span>`:'';})()}${who}
       <span style="font-size:11px;color:#9ca3af;margin-left:auto">${qaFmtDateTime(q.createdAt)}</span>
     </div>
     <h2 class="qa-body" style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word">${escapeHtml(q.title||'')}</h2>
@@ -4635,14 +4656,16 @@ async function qaUploadDrafts(scope,kind){
   return out;
 }
 async function qaCreateQuestion(){
+  const subject=(_('qa-new-subject')?.value||'').trim();
   const title=(_('qa-new-title')?.value||'').trim();
   const body=(_('qa-new-body')?.value||'').trim();
+  if(!subject){toast('과목을 선택하세요.','warn');return;}
   if(!title){toast('제목을 입력하세요.','warn');return;}
   if(!body){toast('내용을 입력하세요.','warn');return;}
   showLoad(true);
   try{
     const photos=await qaUploadDrafts('qa_new','post');
-    const r=await qaCall('createQuestion',{title,body,photos,problems:qaNewProblems()});
+    const r=await qaCall('createQuestion',{title,body,photos,problems:qaNewProblems(),subject});
     delete S.bdDraftFiles['qa_new'];
     S.qa.composerOpen=false;S.qa.newProblems=1;S.qa.openId=r.id;
     toast(`질문이 등록되었습니다. (남은 토큰 ${r.balance}개)`,'success');

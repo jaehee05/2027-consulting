@@ -229,9 +229,13 @@ function normProblems(v) {
  * 질문 작성 + 토큰 차감을 한 트랜잭션으로.
  * 잔액 확인과 차감이 같은 트랜잭션 안에 있어야 동시 작성으로 음수가 되지 않는다.
  */
-async function createQuestion(fs, { student, title, body, photos, problems }) {
+async function createQuestion(fs, { student, title, body, photos, problems, subject }) {
   const t = String(title || "").trim();
   const b = String(body || "").trim();
+  /* 과목 목록을 서버에 다시 두지 않는다 — 과목이 늘 때마다 두 군데가 어긋나고,
+     학생 자기 질문에 붙는 표시 라벨일 뿐이라 막아서 지킬 게 없다. 고르게 하는 건 화면 몫이고,
+     여기서는 길이만 자른다. 빈 값도 받는다: 스토어 배포 전의 앱은 이 칸 없이 보낸다. */
+  const subj = String(subject || "").trim().slice(0, 30);
   if (!t) throw new ApiError(400, "제목을 입력해 주세요.");
   if (!b) throw new ApiError(400, "내용을 입력해 주세요.");
 
@@ -255,6 +259,7 @@ async function createQuestion(fs, { student, title, body, photos, problems }) {
       authorName: student.name || "",
       authorGrade: student.grade || "",
       status: "pending",
+      subject: subj,
       problems: count,
       tokenCost: cost,
       comments: [],

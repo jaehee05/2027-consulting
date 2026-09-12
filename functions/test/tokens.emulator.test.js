@@ -179,6 +179,20 @@ describe("질문 작성 토큰 차감", () => {
     expect(r.balance).toBe(1);
   });
 
+  test("과목이 문서에 남고, 안 보내면 빈 값이다", async () => {
+    await setBalance(student.id, 10);
+    const a = await tokens.createQuestion(fs, { student, title: "t", body: "b", subject: "생명과학Ⅰ" });
+    expect((await fs.doc(`questions/${a.id}`).get()).data()).toMatchObject({ subject: "생명과학Ⅰ" });
+    const c = await tokens.createQuestion(fs, { student, title: "t", body: "b" });
+    expect((await fs.doc(`questions/${c.id}`).get()).data()).toMatchObject({ subject: "" });
+  });
+
+  test("과목이 길면 잘라 담는다", async () => {
+    await setBalance(student.id, 5);
+    const r = await tokens.createQuestion(fs, { student, title: "t", body: "b", subject: "과".repeat(80) });
+    expect((await fs.doc(`questions/${r.id}`).get()).data().subject).toHaveLength(30);
+  });
+
   test("제목이나 내용이 비면 거부한다", async () => {
     await setBalance(student.id, 5);
     await expect(tokens.createQuestion(fs, { student, title: " ", body: "b" }))
