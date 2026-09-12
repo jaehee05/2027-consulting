@@ -3785,7 +3785,9 @@ function qaProblemLabel(q){const n=Math.floor(Number(q&&q.problems)||1);return n
 function qaNewBodyId(i){return i===1?'qa-new-body':`qa-new-body${i}`;}
 function qaNewBodyColHtml(i){
   const id=qaNewBodyId(i),two=qaNewProblems()>=2;
-  const ph=i===1?'궁금한 점을 자세히 적어 주세요.':'두 번째 문제를 적어 주세요.';
+  /* 두 칸은 하는 일이 같으므로 안내도 같다. 어느 칸인지는 위의 [문제 N] 이 말해 준다 —
+     칸마다 다르게 적으면 둘째 칸에는 문제를 옮겨 적으라는 말처럼 읽힌다. */
+  const ph='궁금한 점을 자세히 적어 주세요.';
   return `<div class="qa-bcol" data-col="${i}" style="flex:1 1 260px;min-width:0;${i>1&&!two?'display:none':''}">
     <p class="qa-blabel" style="font-size:11px;color:#4338ca;font-weight:700;margin-bottom:4px;${two?'':'display:none'}">문제 ${i}</p>
     ${qaFmtBar(id)}
