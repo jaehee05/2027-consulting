@@ -136,15 +136,51 @@ describe("질문 작성 토큰 차감", () => {
     expect(await ledgerFor(student.id)).toHaveLength(3);
   });
 
-  test("문제 2개짜리는 토큰을 두 배 쓰고 problems 가 남는다", async () => {
+  test("문제 2개짜리는 토큰을 두 배 쓰고 본문이 둘로 남는다", async () => {
     await setPolicy({ questionCost: 2 });
     await setBalance(student.id, 5);
-    const r = await tokens.createQuestion(fs, { student, title: "미적분", body: "29·30번", problems: 2 });
+    const r = await tokens.createQuestion(fs, {
+      student, title: "미적분", bodies: ["29번 풀이", "30번 풀이"], problems: 2,
+    });
     expect(r.balance).toBe(1);
     const led = await ledgerFor(student.id);
     expect(led[0]).toMatchObject({ delta: -4, reason: "question", balanceAfter: 1 });
     const q = await fs.doc(`questions/${r.id}`).get();
-    expect(q.data()).toMatchObject({ problems: 2, tokenCost: 4 });
+    expect(q.data()).toMatchObject({ problems: 2, tokenCost: 4, bodies: ["29번 풀이", "30번 풀이"] });
+    // 목록 미리보기가 보는 body 는 둘을 이어 붙인 값이다
+    expect(q.data().body).toBe("29번 풀이\n\n30번 풀이");
+  });
+
+  test("문제 2개인데 한 칸이 비면 400 이고 토큰도 안 나간다", async () => {
+    await setPolicy({ questionCost: 2 });
+    await setBalance(student.id, 10);
+    await expect(
+      tokens.createQuestion(fs, { student, title: "t", bodies: ["있음", "  "], problems: 2 })
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      tokens.createQuestion(fs, { student, title: "t", bodies: ["하나뿐"], problems: 2 })
+    ).rejects.toMatchObject({ status: 400 });
+    expect(await tokens.getBalance(fs, student.id)).toBe(10);
+    expect((await fs.collection("questions").get()).size).toBe(0);
+  });
+
+  test("bodies 없이 body 만 보내는 예전 앱도 그대로 받는다", async () => {
+    await setPolicy({ questionCost: 1 });
+    await setBalance(student.id, 5);
+    const r = await tokens.createQuestion(fs, { student, title: "t", body: "한 칸짜리" });
+    const d = (await fs.doc(`questions/${r.id}`).get()).data();
+    expect(d).toMatchObject({ problems: 1, tokenCost: 1, body: "한 칸짜리", bodies: ["한 칸짜리"] });
+  });
+
+  test("1개로 고르면 둘째 칸을 보내도 첫 칸만 담고 1개 값만 받는다", async () => {
+    await setPolicy({ questionCost: 3 });
+    await setBalance(student.id, 10);
+    const r = await tokens.createQuestion(fs, {
+      student, title: "t", bodies: ["첫째", "둘째"], problems: 1,
+    });
+    const d = (await fs.doc(`questions/${r.id}`).get()).data();
+    expect(d).toMatchObject({ problems: 1, tokenCost: 3, body: "첫째", bodies: ["첫째"] });
+    expect(r.balance).toBe(7);
   });
 
   test("problems 가 없거나 이상하면 1개로 본다", async () => {
@@ -160,9 +196,12 @@ describe("질문 작성 토큰 차감", () => {
   test("상한을 넘겨 보내도 상한까지만 받는다", async () => {
     await setPolicy({ questionCost: 1 });
     await setBalance(student.id, 20);
-    const r = await tokens.createQuestion(fs, { student, title: "t", body: "b", problems: 9 });
+    const r = await tokens.createQuestion(fs, {
+      student, title: "t", bodies: Array.from({ length: 9 }, (_, i) => `b${i}`), problems: 9,
+    });
     const q = await fs.doc(`questions/${r.id}`).get();
     expect(q.data()).toMatchObject({ problems: tokens.MAX_PROBLEMS, tokenCost: tokens.MAX_PROBLEMS });
+    expect(q.data().bodies).toHaveLength(tokens.MAX_PROBLEMS);
     expect(r.balance).toBe(20 - tokens.MAX_PROBLEMS);
   });
 
@@ -170,7 +209,7 @@ describe("질문 작성 토큰 차감", () => {
     await setPolicy({ questionCost: 2 });
     await setBalance(student.id, 3);
     await expect(
-      tokens.createQuestion(fs, { student, title: "t", body: "b", problems: 2 })
+      tokens.createQuestion(fs, { student, title: "t", bodies: ["b1", "b2"], problems: 2 })
     ).rejects.toMatchObject({ status: 402 });
     expect(await tokens.getBalance(fs, student.id)).toBe(3);
     expect((await fs.collection("questions").get()).size).toBe(0);

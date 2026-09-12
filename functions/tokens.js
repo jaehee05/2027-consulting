@@ -229,18 +229,26 @@ function normProblems(v) {
  * 질문 작성 + 토큰 차감을 한 트랜잭션으로.
  * 잔액 확인과 차감이 같은 트랜잭션 안에 있어야 동시 작성으로 음수가 되지 않는다.
  */
-async function createQuestion(fs, { student, title, body, photos, problems, subject }) {
+async function createQuestion(fs, { student, title, body, bodies, photos, problems, subject }) {
   const t = String(title || "").trim();
-  const b = String(body || "").trim();
   /* 과목 목록을 서버에 다시 두지 않는다 — 과목이 늘 때마다 두 군데가 어긋나고,
      학생 자기 질문에 붙는 표시 라벨일 뿐이라 막아서 지킬 게 없다. 고르게 하는 건 화면 몫이고,
      여기서는 길이만 자른다. 빈 값도 받는다: 스토어 배포 전의 앱은 이 칸 없이 보낸다. */
   const subj = String(subject || "").trim().slice(0, 30);
   if (!t) throw new ApiError(400, "제목을 입력해 주세요.");
-  if (!b) throw new ApiError(400, "내용을 입력해 주세요.");
+
+  const count = normProblems(problems);
+  /* 문제마다 본문이 하나씩 온다. `bodies` 가 없으면 예전 한 칸짜리 요청(번들로 나간 앱)이므로
+     `body` 를 한 칸으로 본다. 저장할 때 `body` 는 둘을 이어 붙인 값으로도 같이 남긴다 —
+     목록 미리보기·검색이 한 필드만 보고 있어, 그쪽을 전부 고치는 것보다 낫다. */
+  const raw = Array.isArray(bodies) ? bodies.map((x) => String(x || "").trim()) : [];
+  const list = (raw.length ? raw : [String(body || "").trim()]).slice(0, count);
+  if (list.length < count || list.some((x) => !x)) {
+    throw new ApiError(400, count > 1 ? "문제마다 내용을 입력해 주세요." : "내용을 입력해 주세요.");
+  }
+  const b = list.join("\n\n");
 
   const policy = await getPolicy(fs);
-  const count = normProblems(problems);
   const cost = policy.questionCost * count;
   const now = Date.now();
 
@@ -254,6 +262,7 @@ async function createQuestion(fs, { student, title, body, photos, problems, subj
     tx.set(qRef, {
       title: t.slice(0, 120),
       body: b,
+      bodies: list,
       photos: normPhotos(photos),
       authorId: student.id,
       authorName: student.name || "",

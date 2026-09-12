@@ -3763,6 +3763,12 @@ function qaSubjOpts(sel){
     return g.group?`<optgroup label="${g.group}">${opts}</optgroup>`:opts;
   }).join('');
 }
+/* 본문은 문제마다 하나씩 `bodies` 에 들어 있다. 예전 글(과 번들로 나간 앱이 올린 글)은
+   `body` 한 덩어리뿐이라 그걸 한 칸으로 본다. */
+function qaBodies(q){
+  const a=Array.isArray(q&&q.bodies)?q.bodies.map(x=>String(x||'').trim()).filter(Boolean):[];
+  return a.length?a:[String(q&&q.body||'')];
+}
 function qaSubjChip(q){
   const v=String(q&&q.subject||'').trim();
   return v?`<span class="bx" style="font-size:10px;font-weight:700;background:#f1f5f9;color:#475569">${escapeHtml(v)}</span>`:'';
@@ -3774,14 +3780,34 @@ const QA_MAX_PROBLEMS=2;
 function qaNewProblems(){const n=Math.floor(Number(S.qa.newProblems)||1);return n>=1&&n<=QA_MAX_PROBLEMS?n:1;}
 function qaNewCost(){return qaCost()*qaNewProblems();}
 function qaProblemLabel(q){const n=Math.floor(Number(q&&q.problems)||1);return n>1?n:0;}
-/* 문제 수 버튼과 등록 버튼 글자만 그 자리에서 갈아 끼운다.
-   여기서 renderQa() 를 부르면 이미 쳐 둔 제목·본문이 날아가고 커서가 튄다(사진 첨부와 같은 이유). */
+/* 본문은 문제마다 한 칸씩 나란히 둔다(넓으면 좌우, 좁으면 위아래로 접힌다 — flex-wrap).
+   두 칸을 늘 그려 두고 보이고 감추기만 한다: 1개로 되돌렸다가 다시 2개를 골라도 쳐 둔 글이 남는다. */
+function qaNewBodyId(i){return i===1?'qa-new-body':`qa-new-body${i}`;}
+function qaNewBodyColHtml(i){
+  const id=qaNewBodyId(i),two=qaNewProblems()>=2;
+  const ph=i===1?'궁금한 점을 자세히 적어 주세요.':'두 번째 문제를 적어 주세요.';
+  return `<div class="qa-bcol" data-col="${i}" style="flex:1 1 260px;min-width:0;${i>1&&!two?'display:none':''}">
+    <p class="qa-blabel" style="font-size:11px;color:#4338ca;font-weight:700;margin-bottom:4px;${two?'':'display:none'}">문제 ${i}</p>
+    ${qaFmtBar(id)}
+    <textarea class="fi ta" id="${id}" rows="14" style="min-height:280px" placeholder="${ph}" oninput="qaOnBodyInput('${id}')"></textarea>
+    ${qaPrevBoxHtml(id)}
+  </div>`;
+}
+/* 문제 수를 바꿔도 renderQa() 를 부르지 않는다 — 컴포저를 다시 그리면 이미 쳐 둔
+   제목·본문이 날아가고 커서가 튄다(사진 첨부가 앵커만 갈아 끼우는 것과 같은 이유).
+   버튼 줄·등록 버튼 글자와 둘째 칸의 표시 여부만 그 자리에서 바꾼다. */
 function qaSetProblems(n){
   const v=Math.max(1,Math.min(QA_MAX_PROBLEMS,Math.floor(Number(n)||1)));
   if(qaNewProblems()===v)return;
   S.qa.newProblems=v;
   const box=_('qa-np-box');if(box)box.innerHTML=qaProblemPickInner();
   const btn=_('qa-new-submit');if(btn)btn.textContent=`${qaNewCost()}토큰 쓰고 등록`;
+  const two=v>=2;
+  document.querySelectorAll('.qa-bcol').forEach(el=>{
+    if(Number(el.dataset.col)>1)el.style.display=two?'':'none';
+  });
+  document.querySelectorAll('.qa-blabel').forEach(el=>{el.style.display=two?'':'none';});
+  if(two)qaUpdatePreview(qaNewBodyId(2));
 }
 function qaProblemPickInner(){
   const unit=qaCost(),bal=qaMyBalance(),cur=qaNewProblems();
@@ -3902,8 +3928,12 @@ function qaUpdatePreview(taId){
   </div>`;
   qaRenderMath(box);
 }
-let _qaPrevTimer=null;
-function qaOnBodyInput(taId){clearTimeout(_qaPrevTimer);_qaPrevTimer=setTimeout(()=>qaUpdatePreview(taId),180);}
+/* 입력칸마다 따로 센다. 타이머가 하나면 두 칸을 번갈아 칠 때 앞 칸의 갱신이 취소돼 미리보기가 뒤처진다. */
+const _qaPrevTimers={};
+function qaOnBodyInput(taId){
+  clearTimeout(_qaPrevTimers[taId]);
+  _qaPrevTimers[taId]=setTimeout(()=>qaUpdatePreview(taId),180);
+}
 /* 화면을 다시 그린 뒤에는 이미 들어 있던 글(댓글 수정 등)도 바로 보여 줘야 한다. */
 function qaRefreshPreviews(root){
   (root||_('qaC'))?.querySelectorAll('[id^="qa-prev-"]').forEach(box=>qaUpdatePreview(box.id.slice(8)));
@@ -4102,18 +4132,18 @@ function qaQuestionsHtml(admin){
     <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 질문 · 문제 1개에 ${cost}토큰이 차감됩니다${qaIdleHours()?` · 답변 후 ${qaIdleHours()}시간 동안 댓글이 없으면 자동 종료됩니다`:''}</p>
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:9px 11px;margin-bottom:8px">
       <p style="font-size:12px;color:#1e40af;font-weight:700">한 스레드에 문제는 ${QA_MAX_PROBLEMS}개까지 올릴 수 있습니다.</p>
-      <p style="font-size:11px;color:#1e40af;margin-top:3px">문제 수만큼 토큰이 차감되고, 문제마다 어디까지 물어보는지 나누어 적어 주세요. ${QA_MAX_PROBLEMS+1}개 이상은 답변이 뒤섞여 알아보기 어려우니 질문을 따로 열어 주세요.</p>
+      <p style="font-size:11px;color:#1e40af;margin-top:3px">문제 수만큼 토큰이 차감되고, 문제마다 칸이 따로 생깁니다. ${QA_MAX_PROBLEMS+1}개 이상은 답변이 뒤섞여 알아보기 어려우니 질문을 따로 열어 주세요.</p>
     </div>
     <div id="qa-np-box" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:9px 11px;margin-bottom:8px">${qaProblemPickInner()}</div>
     <select class="fi" id="qa-new-subject" style="margin-bottom:8px">${qaSubjOpts('')}</select>
     <input class="fi" id="qa-new-title" maxlength="120" placeholder="제목 (예: 미적분 29번 풀이 질문)" style="margin-bottom:8px">
-    ${qaFmtBar('qa-new-body')}
-    <textarea class="fi ta" id="qa-new-body" rows="14" style="min-height:280px" placeholder="궁금한 점을 자세히 적어 주세요. 문제를 2개 담을 때는 1) 2) 로 나누어 적으면 답변도 나누어 달립니다." oninput="qaOnBodyInput('qa-new-body')"></textarea>
-    ${qaPrevBoxHtml('qa-new-body')}
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${qaNewBodyColHtml(1)}${qaNewBodyColHtml(2)}
+    </div>
     <p style="font-size:11px;color:#9ca3af;margin-top:6px">수식은 <code>$x^2$</code> 처럼 달러 기호로 감싸면 됩니다. 가운데 정렬하려면 <code>$$ … $$</code>.</p>
-    <div style="margin-top:8px">
-      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_new','post')"></label>
-      <span style="font-size:11px;color:#9ca3af;margin-left:8px">최대 8MB, JPEG/PNG</span>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block;flex-shrink:0">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_new','post')"></label>
+      <span style="font-size:11px;color:#9ca3af">최대 8MB, JPEG/PNG · 문제 2개면 어느 쪽 사진인지 본문에 적어 주세요</span>
     </div>
     <div id="bd-draft-anchor-post-qa_new">${bdDraftPreviewHtml('qa_new','post')}</div>
     <div style="display:flex;gap:6px;margin-top:10px">
@@ -4211,7 +4241,18 @@ function qaDetailHtml(q,admin){
       <span style="font-size:11px;color:#9ca3af;margin-left:auto">${qaFmtDateTime(q.createdAt)}</span>
     </div>
     <h2 class="qa-body" style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word">${escapeHtml(q.title||'')}</h2>
-    <p class="qa-body" style="font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word">${qaBodyHtml(q.body)}</p>
+    ${(()=>{
+      const bs=qaBodies(q);
+      const sty='font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word';
+      if(bs.length<2)return `<p class="qa-body" style="${sty}">${qaBodyHtml(bs[0])}</p>`;
+      /* 작성 화면과 같이 나란히 둔다 — 좁으면 flex-wrap 이 위아래로 접는다.
+         관리자가 두 문제를 함께 보면서 답할 수 있어야 한다. */
+      return `<div style="display:flex;gap:10px;flex-wrap:wrap">${bs.map((b,i)=>`
+        <div style="flex:1 1 260px;min-width:0;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;background:#fafafa">
+          <p style="font-size:11px;color:#4338ca;font-weight:700;margin-bottom:5px">문제 ${i+1}</p>
+          <p class="qa-body" style="${sty}">${qaBodyHtml(b)}</p>
+        </div>`).join('')}</div>`;
+    })()}
     ${bdPhotosHtml(q.photos)}
     ${cmts.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:18px 0 6px">댓글 (${cmts.length})</p>${cmtHtml}`
       :'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:18px 0;margin-top:14px;border-top:1px solid #f1f3f5">아직 댓글이 없습니다.</p>'}
@@ -4658,14 +4699,18 @@ async function qaUploadDrafts(scope,kind){
 async function qaCreateQuestion(){
   const subject=(_('qa-new-subject')?.value||'').trim();
   const title=(_('qa-new-title')?.value||'').trim();
-  const body=(_('qa-new-body')?.value||'').trim();
+  const problems=qaNewProblems();
+  /* 감춰 둔 둘째 칸의 글은 보내지 않는다 — 2개로 골랐다가 1개로 되돌린 학생이
+     지우지도 않은 글에 토큰을 더 내면 안 된다. */
+  const bodies=Array.from({length:problems},(_2,i)=>(_(qaNewBodyId(i+1))?.value||'').trim());
   if(!subject){toast('과목을 선택하세요.','warn');return;}
   if(!title){toast('제목을 입력하세요.','warn');return;}
-  if(!body){toast('내용을 입력하세요.','warn');return;}
+  const miss=bodies.findIndex(b=>!b);
+  if(miss>=0){toast(problems>1?`문제 ${miss+1}의 내용을 입력하세요.`:'내용을 입력하세요.','warn');return;}
   showLoad(true);
   try{
     const photos=await qaUploadDrafts('qa_new','post');
-    const r=await qaCall('createQuestion',{title,body,photos,problems:qaNewProblems(),subject});
+    const r=await qaCall('createQuestion',{title,bodies,photos,problems,subject});
     delete S.bdDraftFiles['qa_new'];
     S.qa.composerOpen=false;S.qa.newProblems=1;S.qa.openId=r.id;
     toast(`질문이 등록되었습니다. (남은 토큰 ${r.balance}개)`,'success');
