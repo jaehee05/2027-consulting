@@ -2361,7 +2361,7 @@ function renderStu(){
       }else if(st.kind==='after'){
         bodyHtml=`<p style="color:#6b7280;font-size:13px">예약 기간이 종료되었습니다.</p>${pl?`<p style="color:#9ca3af;font-size:12px;margin-top:4px">종료: ${pl}</p>`:''}`;
       }else{
-        bodyHtml=`<p style="color:#6b7280;font-size:13px">선생님이 예약 기간을 설정하면 예약할 수 있어요.</p>`;
+        bodyHtml=`<p style="color:#6b7280;font-size:13px">선생님이 예약 기간을 설정하면 예약할 수 있습니다.</p>`;
       }
       emptyCard=emptyStateHtml('clock','예약 신청 기간이 아닙니다',
         `${bodyHtml}<p class="sub" style="margin-top:10px">성적 입력 기간이면 [성적] 탭에서 입력할 수 있습니다.</p>`);
@@ -4040,10 +4040,10 @@ function qaProblemPickInner(){
     </button>`;
   }).join('');
   const short=bal<unit*cur,idle=qaIdleHours();
-  return `<p style="font-size:11px;color:var(--gray-500);margin-bottom:5px">몇 문제 물어볼까요?</p>
+  return `<p style="font-size:11px;color:var(--gray-500);margin-bottom:5px">물어볼 문제 개수</p>
     <div style="display:flex;gap:6px">${btns}</div>
     <p style="font-size:11px;color:${short?'var(--warning-text)':'var(--gray-400)'};margin-top:6px;line-height:1.55">
-      ${short?'토큰이 모자라요':`토큰 <b style="color:var(--primary)">${unit*cur}개</b> 사용 · 내 토큰 ${bal}개`}${idle?`<br>답변 후 ${idle}시간 동안 대화가 없으면 자동으로 닫혀요.`:''}</p>`;
+      ${short?'토큰이 모자랍니다':`토큰 <b style="color:var(--primary)">${unit*cur}개</b> 사용 · 내 토큰 ${bal}개`}${idle?`<br>답변 후 ${idle}시간 동안 대화가 없으면 자동으로 닫힙니다.`:''}</p>`;
 }
 /* ── 자동 종료 ──
    답변이 달린 스레드는 마지막 활동 후 일정 시간이 지나면 닫힌다. 저장된 status 는
@@ -4355,7 +4355,7 @@ function qaQuestionsHtml(admin){
         ?`<button class="btn bp bsm" style="font-size:12px;padding:6px 12px" onclick="qaOpenComposer()">+ 질문하기</button>`
         :`<button class="btn bs bsm" style="font-size:12px;padding:6px 12px" onclick="qaSetSub('t')">토큰 구매하기</button>`)}</div>
     </div>
-    ${canAsk?'':`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">토큰이 모자라 질문을 올릴 수 없어요.</p><p style="font-size:11px;color:#92400e;margin-top:4px">[토큰·결제] 에서 충전하면 바로 질문할 수 있어요.</p></div>`}`;
+    ${canAsk?'':`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">토큰이 모자라 질문을 올릴 수 없습니다.</p><p style="font-size:11px;color:#92400e;margin-top:4px">[토큰·결제] 에서 충전할 수 있습니다.</p></div>`}`;
   }
 
   const filters=chipBarHtml(QA_FILTERS.map(x=>({...x,n:mine.filter(q=>qaFilterMatch(q,x.id)).length})),f,'qaSetFilter');
@@ -4371,8 +4371,8 @@ function qaQuestionsHtml(admin){
       ${qaNewBodyColHtml(1)}${qaNewBodyColHtml(2)}
     </div>
     <p style="font-size:11px;color:var(--gray-400);margin-top:8px;line-height:1.6">
-      수식은 <code>$x^2$</code> 처럼 달러 기호로 감싸면 돼요. 가운데 정렬은 <code>$$ … $$</code>.<br>
-      한 번에 ${QA_MAX_PROBLEMS}문제까지 물어볼 수 있어요. 더 있으면 따로 올려 주세요.</p>
+      수식은 <code>$x^2$</code> 처럼 달러 기호로 감싸면 됩니다. 가운데 정렬은 <code>$$ … $$</code>.<br>
+      한 번에 ${QA_MAX_PROBLEMS}문제까지 물어볼 수 있습니다. 더 있으면 따로 올려 주세요.</p>
     <div style="display:flex;gap:6px;margin-top:10px">
       <button class="btn bs bsm" style="flex:1" onclick="qaCloseComposer()">취소</button>
       <button class="btn bp bsm" id="qa-new-submit" style="flex:1" onclick="qaCreateQuestion()">토큰 ${qaNewCost()}개로 질문하기</button>
@@ -4439,7 +4439,7 @@ function qaDetailHtml(q,admin){
       ?`${qaFmtBar('qa-cedit-'+c._id)}
         <textarea class="fi ta" id="qa-cedit-${c._id}" rows="3" oninput="qaOnBodyInput('qa-cedit-${c._id}')">${escapeHtml(c.body||'')}</textarea>
         ${qaPrevBoxHtml('qa-cedit-'+c._id)}
-        <p style="font-size:11px;color:var(--gray-400);margin-top:4px">수식은 <code>$x^2$</code> 처럼 쓰면 돼요.</p>
+        <p style="font-size:11px;color:var(--gray-400);margin-top:4px">수식은 <code>$x^2$</code> 처럼 쓰면 됩니다.</p>
         <div style="margin-top:6px;font-size:11px;color:#6b7280">기존 사진:</div>
         ${keep.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${keep.map((ph,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb"><img src="${ph.url}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="qaRemoveCmtPhoto('${c._id}',${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('')}</div>`:'<p style="font-size:11px;color:#9ca3af;margin-top:4px">없음</p>'}
         <div style="margin-top:6px">
@@ -4486,24 +4486,24 @@ function qaDetailHtml(q,admin){
       :'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:18px 0;margin-top:14px;border-top:1px solid #f1f3f5">아직 댓글이 없습니다.</p>'}
     <div style="margin-top:10px;padding-top:12px;border-top:1px solid #e5e7eb">
       ${closed?`<div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:10px">
-        <p style="font-size:12px;color:var(--gray-500);font-weight:700">${autoClosed?`${idleH}시간 동안 대화가 없어 자동으로 닫혔어요.`:'닫힌 질문이에요.'}</p>
+        <p style="font-size:12px;color:var(--gray-500);font-weight:700">${autoClosed?`${idleH}시간 동안 대화가 없어 자동으로 닫혔습니다.`:'닫힌 질문입니다.'}</p>
         ${(()=>{const at=q.closedAt||qaIdleDue(q);return at?`<p style="font-size:11px;color:#9ca3af;margin-top:4px">${qaFmtDateTime(at)}${!autoClosed&&q.closedByName?` · ${escapeHtml(q.closedByName)}`:''}</p>`:'';})()}
         ${admin?'':'<p style="font-size:11px;color:var(--gray-400);margin-top:4px">더 물어볼 게 있으면 새로 질문해 주세요.</p>'}
       </div>`:`
       ${qaFmtBar('qa-cmt-'+id)}
       <textarea class="fi ta" id="qa-cmt-${id}" rows="5" style="min-height:130px" placeholder="${admin?'학생에게 답변하기':'이어서 물어보기'}" oninput="qaOnBodyInput('qa-cmt-${id}')"></textarea>
       ${qaPrevBoxHtml('qa-cmt-'+id)}
-      <p style="font-size:11px;color:var(--gray-400);margin-top:4px">수식은 <code>$x^2$</code> 처럼 쓰면 돼요.</p>
+      <p style="font-size:11px;color:var(--gray-400);margin-top:4px">수식은 <code>$x^2$</code> 처럼 쓰면 됩니다.</p>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
         <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">${fmIco('photo')}사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_c_${id}','comment')"></label>
         <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="qaAddComment('${id}')">${admin?'답변 등록':'댓글 등록'}</button>
       </div>
       <div id="bd-draft-anchor-comment-qa_c_${id}">${bdDraftPreviewHtml('qa_c_'+id,'comment')}</div>
-      <p style="font-size:11px;color:var(--gray-400);margin-top:6px">댓글은 몇 번을 주고받아도 토큰이 더 들지 않아요.</p>
+      <p style="font-size:11px;color:var(--gray-400);margin-top:6px">댓글은 몇 번을 주고받아도 토큰이 더 들지 않습니다.</p>
       ${admin?'':`<p style="font-size:11px;color:var(--gray-400);margin-top:4px">새로운 문제는 새로 질문해 주세요.</p>`}
       ${!idleH?'':(q.status==='answered'
         ?`<p style="font-size:11px;color:var(--warning-text);margin-top:4px">${idleH}시간 동안 대화가 없으면 닫혀요${qaIdleLeft(q)?` · 약 ${qaIdleLeft(q)} 남음`:''}</p>`
-        :`<p style="font-size:11px;color:var(--gray-400);margin-top:4px">답변이 오면 ${idleH}시간 동안 이어서 물어볼 수 있어요.</p>`)}`}
+        :`<p style="font-size:11px;color:var(--gray-400);margin-top:4px">답변이 오면 ${idleH}시간 동안 이어서 물어볼 수 있습니다.</p>`)}`}
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         ${admin?`<button class="btn ${closed?'bp':'bs'} bsm" style="font-size:11px;padding:6px 10px" onclick="qaSetClosed('${id}',${closed?'false':'true'})">${closed?'다시 열기':'질문 닫기'}</button>`:''}
         ${canDel?`<button class="btn bd bsm" style="font-size:11px;padding:6px 10px;margin-left:auto" onclick="qaDelQuestion('${id}')">질문 삭제</button>`:''}
@@ -4547,8 +4547,8 @@ function qaStuTokensHtml(){
       <p style="font-size:15px;font-weight:700">내 토큰</p>
       <span style="font-size:26px;font-weight:800;color:var(--primary);margin-left:auto">${bal}<span style="font-size:13px;color:var(--gray-500);font-weight:600">개</span></span>
     </div>
-    <p style="font-size:12px;color:var(--gray-500)">질문할 때 <b>문제 수만큼</b> 토큰을 써요. 댓글은 몇 번을 주고받아도 더 들지 않아요.</p>
-    <p style="font-size:12px;color:var(--gray-500);margin-top:4px">한 번에 <b>${QA_MAX_PROBLEMS}문제까지</b> 물어볼 수 있어요.</p>
+    <p style="font-size:12px;color:var(--gray-500)">질문할 때 <b>문제 수만큼</b> 토큰을 사용합니다. 댓글은 몇 번을 주고받아도 더 들지 않습니다.</p>
+    <p style="font-size:12px;color:var(--gray-500);margin-top:4px">한 번에 <b>${QA_MAX_PROBLEMS}문제까지</b> 물어볼 수 있습니다.</p>
   </div>
 
   <div class="card" style="margin-bottom:12px">
@@ -4942,7 +4942,7 @@ async function qaCreateQuestion(){
     const r=await qaCall('createQuestion',{title,bodies,bodyPhotos,problems,subject});
     qaClearNewDrafts();
     S.qa.composerOpen=false;S.qa.newProblems=1;S.qa.openId=r.id;
-    toast(`질문을 올렸어요 · 남은 토큰 ${r.balance}개`,'success');
+    toast(`질문을 등록했습니다 · 남은 토큰 ${r.balance}개`,'success');
     renderQa();
   }catch(e){toast(e.message,'error');}
   showLoad(false);
@@ -5552,10 +5552,10 @@ async function saveExamScore(examId){
 
 function showBookForm(isChange){
   const c=_('stuC');
-  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'':(pl?'예약 가능 기간: '+pl:'선생님이 예약 기간을 설정하면 예약할 수 있어요.');c.innerHTML=emptyStateHtml('clock','예약 기간이 아닙니다',sub||'',
+  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'':(pl?'예약 가능 기간: '+pl:'선생님이 예약 기간을 설정하면 예약할 수 있습니다.');c.innerHTML=emptyStateHtml('clock','예약 기간이 아닙니다',sub||'',
       isChange?'<button class="btn bs" onclick="renderStu()">← 돌아가기</button>':'');return;}
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
-  if(!avail.length){c.innerHTML=emptyStateHtml('calendar','예약 가능한 일정이 없습니다','선생님이 일정을 등록하면 예약할 수 있어요.');return;}
+  if(!avail.length){c.innerHTML=emptyStateHtml('calendar','예약 가능한 일정이 없습니다','선생님이 일정을 등록하면 예약할 수 있습니다.');return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
   const sel=avail.find(d=>d.id===S.selDate),taken=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).map(b=>b.slot),myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const dtabs=avail.map(d=>`<button class="dt ${d.id===S.selDate?'on':''}" onclick="selDate('${d.id}')">${d.label}</button>`).join('');
@@ -10031,11 +10031,11 @@ function renderHomeCards(){
             :(isStu?'예약 · 성적 · 멘토링 기록':'성적으로 방향을 잡는 1:1 멘토링')},
     ];
     if(isStu||isAdmin)items.push({ico:'board',color:'blue',title:'자유게시판',onclick:'goBoard()',new:bdNew>0,
-      desc:bdNew>0?`새 글 <b>${bdNew}개</b>`:'익명으로 편하게 이야기해요'});
+      desc:bdNew>0?`새 글 <b>${bdNew}개</b>`:'익명으로 편하게 이야기하는 공간'});
     const bal=isStu?S.myBalance:null;
     if(isStu||isAdmin)items.push({ico:'qa',color:'red',title:'질문게시판',onclick:'goQa()',
       desc:bal===null||bal===undefined?'선생님께 1:1로 질문하기'
-           :(bal>0?`토큰 <b>${bal}개</b>`:'토큰이 없어요 · 충전하고 질문하기')});
+           :(bal>0?`토큰 <b>${bal}개</b>`:'토큰이 없습니다 · 충전 후 질문')});
     if(isStu)items.push({ico:'my',color:'purple',title:'내 정보',onclick:'goMyPage()',
       desc:'프로필 · 비밀번호'});
     const icoPath=id=>(SNAV_ITEMS.find(x=>x.id===id)||{}).d||'';
@@ -10058,7 +10058,7 @@ function enterHome(){
     if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">안녕하세요, ${escapeHtml(greet)} 님</p>`;
   }else{
     if(tr)tr.innerHTML=`<button class="btn bp bsm" onclick="goLoginView()">로그인</button>`;
-    if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">KJHEDU</p><p style="font-size:13px;color:var(--gray-500);margin-top:6px">로그인하면 예약과 성적을 볼 수 있어요.</p>`;
+    if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">KJHEDU</p><p style="font-size:13px;color:var(--gray-500);margin-top:6px">로그인하면 예약과 성적을 확인할 수 있습니다.</p>`;
   }
   renderHomeCards();
   showView('vHome');
