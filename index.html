@@ -177,6 +177,12 @@ label.btn{display:inline-flex!important}
 .act.on svg{fill:currentColor}
 .act.like.on{border-color:#fca5a5;background:var(--danger-soft);color:var(--danger)}
 .act.scrap.on{border-color:#fcd34d;background:var(--warning-soft);color:var(--warning-text)}
+.act b{font-weight:700;font-variant-numeric:tabular-nums}
+/* 좁은 화면에서는 두 버튼이 한 줄을 나눠 가져 엄지로 누르기 쉽게 넓어진다. */
+@media(max-width:480px){
+  .act.like,.act.scrap{flex:1;min-width:0;padding:0 10px}
+  .act.like~.fm,.act.scrap~.fm{width:100%;margin-left:0!important;margin-top:8px}
+}
 /* 댓글 한 덩이 — 선생님 답변만 왼쪽에 강조선을 둔다(학생이 답을 찾기 쉬우라고). */
 .cm{border-top:1px solid var(--gray-100);padding:13px 0}
 .cm.reply{padding-left:22px}
@@ -3478,13 +3484,14 @@ function bdPostHtml(q,ctx){
     ${isEditing?'':`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${reportBtn}${modBtn}${pinBtn}${editBtn}${delBtn}</div>`}
   </div>${modPanel}`;
 
-  const counters=`<div class="fm" style="margin-top:14px">
-    ${fmStat('like',likeCount,'공감')}${fmStat('comment',comments.length,'댓글')}
-    ${fmStat('scrap',scrapCount,'스크랩')}${fmStat('view',bdViews(q),'조회')}
-  </div>
-  <div style="display:flex;gap:8px;margin-top:10px">
-    <button class="act like${liked?' on':''}" onclick="bdToggleLike('${id}',event)">${fmIco('like')}공감</button>
-    <button class="act scrap${scrapped?' on':''}" onclick="bdToggleScrap('${id}',event)">${fmIco('scrap')}스크랩</button>
+  /* 숫자는 버튼에만 둔다. 위에 카운터 줄을 따로 두면 같은 수를 두 번 보여 주는 셈이고,
+     정작 누를 수 있는 쪽이 장식처럼 보인다. 셀 수만 있고 누를 수 없는 댓글·조회만 옆에 남긴다. */
+  const counters=`<div style="display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap">
+    <button class="act like${liked?' on':''}" aria-pressed="${liked}" onclick="bdToggleLike('${id}',event)">
+      ${fmIco('like')}공감${likeCount?` <b>${likeCount}</b>`:''}</button>
+    <button class="act scrap${scrapped?' on':''}" aria-pressed="${scrapped}" onclick="bdToggleScrap('${id}',event)">
+      ${fmIco('scrap')}스크랩${scrapCount?` <b>${scrapCount}</b>`:''}</button>
+    <div class="fm" style="margin-left:auto">${fmStat('comment',comments.length,'댓글')}${fmStat('view',bdViews(q),'조회',true)}</div>
   </div>`;
 
   return `<div style="padding:4px 2px">
