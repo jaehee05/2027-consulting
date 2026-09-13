@@ -152,6 +152,7 @@ Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see
 - The 토큰 설정 editor **must not re-render on every keystroke**: rebuilding a number input mid-typing jumps the cursor and turns the transient empty string back into `0`. `qaOnPolicyInput()` syncs the draft and swaps only the computed price text (`qa-pk-sum-*`). 요청됨 → 발송완료 → 결제완료, with 취소 allowed only from the first two; each transition stores its timestamp and the admin who did it.
 - **토큰은 스레드를 열 때 한 번, 문제 수만큼 과금한다** — `questionCost × problems` 를 스레드를 열 때 차감하고, 그 안의 댓글은 몇 번을 주고받든 무료다. UI 문구도 "문제 1개당 N토큰"으로 쓴다.
 - **한 스레드에 문제는 2개까지.** 상한은 서버 `tokens.js` 의 `MAX_PROBLEMS` 와 화면의 `QA_MAX_PROBLEMS` **두 군데에 같은 값**으로 있다(질문 작성은 `tokenApi` 를 타므로 화면 상수만 고치면 서버가 잘라 버린다). 학생이 작성 화면에서 [문제 1개]/[문제 2개] 를 고르고, `createQuestion` 이 `normProblems` 로 1~상한 사이로 자른 뒤(없거나 이상한 값은 1) 그 배수로 잔액을 확인·차감하고 `problems`·`tokenCost` 를 문서에 남긴다. **개수를 글에서 세지는 않는다** — 셀 방법이 없고 잘못 막으면 정상 질문이 거부되므로, 3개 이상을 적는 것은 예전처럼 안내로만 말린다. 문구는 작성 화면·스레드 상세·[토큰·결제] 안내 세 군데에 같이 둔다(한 군데만 적으면 이미 스레드를 연 학생은 못 본다).
+  - **작성 화면에 안내 상자를 겹겹이 쌓지 않는다.** 예전에는 회색 줄 + 파란 상자 + 문제 수 상자 셋이 글을 쓰기도 전에 먼저 나와, 같은 토큰 이야기를 두 번 하면서 화면만 시끄러웠다. 지금은 **문제 수 상자 하나**가 값·잔액·자동 종료를 다 말하고, `2개까지`라는 규칙은 입력칸 아래 한 줄이다.
   - **본문은 문제마다 한 칸씩, 나란히 둔다.** 작성 화면의 두 칸(`qa-new-body` / `qa-new-body2`)과 스레드 상세의 두 블록 모두 `flex` + `flex-wrap` + `flex:1 1 260px` 이라, 넓으면 좌우로 놓이고 휴대폰 폭에서는 저절로 위아래로 접힌다(미디어 쿼리 없음). **사진도 문제마다 따로** 붙고(칸마다 [📷 사진 첨부] + 초안 썸네일), 상세에서도 해당 문제 블록 안에 보인다.
   - 사진은 `bodyPhotos` 에 문제 순서대로 담고, `photos` 에는 **전부를 이어 붙여** 같이 남긴다(목록 썸네일이 `photos[0]` 만 본다). **Firestore 는 배열 안에 배열을 담지 못하므로** `[{photos:[…]}, …]` 로 한 겹 감싼다 — 읽는 쪽은 `qaBodyPhotos(q)` 하나를 거치고, 이 칸이 없는 예전 글에는 `null` 을 돌려줘 사진을 본문 아래에 통째로 보여 준다. 초안 스코프는 `qaNewPhotoScope(i)` 이고 **첫 칸은 예전 `'qa_new'` 를 그대로 쓴다**.
   - 저장은 `bodies` 배열이고, `body` 에는 **둘을 `\n\n` 으로 이어 붙인 값도 같이** 남긴다 — 목록 미리보기·검색이 `body` 한 필드만 보고 있어 그쪽을 전부 고치는 것보다 낫다. 읽는 쪽은 `qaBodies(q)` 하나를 거친다(예전 글과 번들 앱이 올린 글은 `bodies` 가 없어 `body` 를 한 칸으로 본다).
@@ -208,6 +209,10 @@ Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see
 
 - **잔액은 `ensureMyBalanceListener()` 가 세션 내내 따로 본다.** 질문게시판 구독(`qaStartListeners`)은 `#vQa` 에서만 살아 있어서(원장·결제가 전교생 분량이라 그렇게 두었다) 홈에서는 잔액을 알 수 없었다. `tokenBalances/{me}` **문서 하나짜리** 구독이라 비용이 사실상 없다. `renderStuNav` 에서 부르는데, 로그인·세션 복원·관리자 미리보기로 학생 세션이 만들어지는 길이 여럿이라 화면이 바뀔 때 한 군데서 보장하는 편이 낫다. 학생이 바뀌면 갈아 끼우고 로그아웃에서 끊는다.
 - **잔액이 아직 안 왔으면(`null`) 0 이 아니라 고정 문구를 보여 준다** — 토큰이 있는 학생에게 0토큰이라고 잘못 말하면 안 된다.
+
+### 내 정보 (`renderMyPage`)
+
+항목마다 카드를 하나씩 두면 휴대폰에서 상자만 잔뜩 보인다. **기본 정보·연락처를 한 카드**에 `.mi` 줄로 모으고, **토큰(잔액 + 충전하기)** 과 **계정(비밀번호)** 만 따로 둔다. 잔액은 `S.myBalance` 이고 도착 전에는 `0` 이 아니라 `불러오는 중…` 이다(홈 카드와 같은 이유). 잔액 구독이 값을 받으면 떠 있는 화면만 다시 그린다 — `goMyPage()` 를 다시 부르면 방문 기록이 쌓인다. 화면 맨 아래 로그아웃은 상단 topbar 의 작은 버튼보다 누르기 쉬우라고 둔 것이다. 예전의 `멘토링 예약 → 바로가기` 카드는 하단 내비가 대신하므로 뺐다.
 
 ### 멘토링 화면의 속탭 (`STU_TABS`)
 

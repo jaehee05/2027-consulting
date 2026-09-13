@@ -192,6 +192,12 @@ label.btn{display:inline-flex!important}
 .cm-h b{font-size:12px;font-weight:700}
 .cm-b{font-size:13px;color:var(--gray-900);white-space:pre-wrap;line-height:1.65;word-break:break-word;margin-top:5px}
 .cm-t{font-size:11px;color:var(--gray-400);margin-top:6px}
+/* 내 정보의 항목 줄. 항목마다 카드를 하나씩 두면 휴대폰에서 상자만 잔뜩 보인다. */
+.mi{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-top:1px solid var(--gray-100);font-size:13px}
+.mi:first-of-type{border-top:none;padding-top:0}
+.mi-k{color:var(--gray-500);flex-shrink:0;min-width:88px}
+.mi-v{font-weight:600;text-align:right;margin-left:auto;word-break:break-all}
+.mi-h{font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:10px}
 /* 필터 알약 줄 — 두 게시판이 같은 모양을 각자 인라인으로 그리고 있었다. */
 .chipbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .chip-f{border:1px solid var(--gray-200);background:var(--surface);color:var(--gray-500);border-radius:var(--radius-pill);
@@ -4000,10 +4006,11 @@ function qaProblemPickInner(){
       문제 ${n}개<br><span style="font-size:11px;font-weight:600">${unit*n}토큰</span>
     </button>`;
   }).join('');
-  const short=bal<unit*cur;
-  return `<p style="font-size:11px;color:#6b7280;margin-bottom:5px">이 스레드에 담을 문제 수</p>
+  const short=bal<unit*cur,idle=qaIdleHours();
+  return `<p style="font-size:11px;color:var(--gray-500);margin-bottom:5px">이 스레드에 담을 문제 수</p>
     <div style="display:flex;gap:6px">${btns}</div>
-    <p style="font-size:11px;color:${short?'#b45309':'#9ca3af'};margin-top:5px">보유 ${bal}토큰 · 이 질문에 ${unit*cur}토큰이 차감됩니다${short?' — 토큰이 부족합니다.':''}</p>`;
+    <p style="font-size:11px;color:${short?'var(--warning-text)':'var(--gray-400)'};margin-top:6px;line-height:1.55">
+      보유 <b style="color:${short?'var(--warning-text)':'var(--primary)'}">${bal}토큰</b> · 이 질문에 <b>${unit*cur}토큰</b>이 차감됩니다${short?' — 토큰이 부족합니다.':''}${idle?`<br>답변 후 ${idle}시간 동안 댓글이 없으면 스레드가 자동으로 종료됩니다.`:''}</p>`;
 }
 /* ── 자동 종료 ──
    답변이 달린 스레드는 마지막 활동 후 일정 시간이 지나면 닫힌다. 저장된 status 는
@@ -4233,12 +4240,14 @@ function goQa(){
   _('qaUname').textContent=S.user.type==='student'
     ?(S.user.isTest?S.user.name+' (테스트)':S.user.name+' 학생')
     :S.user.name;
-  S.qa.sub=qaIsAdmin()?'q':'q';
+  S.qa.sub='q';
   showView('vQa');applyChips();
   qaStartListeners();
   renderQa();
   if(!_skipPush)navPush({v:'vQa'});
 }
+/* 내 정보에서 바로 충전으로 — 질문 목록을 거치지 않는다. */
+function goQaTokens(){goQa();S.qa.sub='t';renderQa();}
 
 const QA_SUBS_STU=[{id:'q',label:'내 질문'},{id:'t',label:'토큰·결제'}];
 const QA_SUBS_ADM=[{id:'q',label:'질문'},{id:'p',label:'결제 요청'},{id:'b',label:'학생 잔액'},{id:'s',label:'토큰 설정'}];
@@ -4318,19 +4327,19 @@ function qaQuestionsHtml(admin){
 
   const filters=chipBarHtml(QA_FILTERS.map(x=>({...x,n:mine.filter(q=>qaFilterMatch(q,x.id)).length})),f,'qaSetFilter');
 
-  const composer=(!admin&&S.qa.composerOpen)?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
-    <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 질문 · 문제 1개에 ${cost}토큰이 차감됩니다${qaIdleHours()?` · 답변 후 ${qaIdleHours()}시간 동안 댓글이 없으면 자동 종료됩니다`:''}</p>
-    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:9px 11px;margin-bottom:8px">
-      <p style="font-size:12px;color:#1e40af;font-weight:700">한 스레드에 문제는 ${QA_MAX_PROBLEMS}개까지 올릴 수 있습니다.</p>
-      <p style="font-size:11px;color:#1e40af;margin-top:3px">문제 수만큼 토큰이 차감되고, 문제마다 칸이 따로 생깁니다. ${QA_MAX_PROBLEMS+1}개 이상은 답변이 뒤섞여 알아보기 어려우니 질문을 따로 열어 주세요.</p>
-    </div>
-    <div id="qa-np-box" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:9px 11px;margin-bottom:8px">${qaProblemPickInner()}</div>
+  /* 안내 상자를 겹겹이 쌓지 않는다. 예전에는 회색 줄 + 파란 상자 + 문제 수 상자 셋이
+     글을 쓰기도 전에 먼저 나와, 같은 토큰 이야기를 두 번 하면서 화면만 시끄러웠다.
+     지금은 문제 수 상자 하나가 값·잔액·자동 종료를 다 말하고, 규칙은 그 아래 한 줄이다. */
+  const composer=(!admin&&S.qa.composerOpen)?`<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:12px;margin-bottom:14px">
+    <div id="qa-np-box" style="background:var(--surface);border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:8px">${qaProblemPickInner()}</div>
     <select class="fi" id="qa-new-subject" style="margin-bottom:8px">${qaSubjOpts('')}</select>
     <input class="fi" id="qa-new-title" maxlength="120" placeholder="제목 (예: 미적분 29번 풀이 질문)" style="margin-bottom:8px">
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       ${qaNewBodyColHtml(1)}${qaNewBodyColHtml(2)}
     </div>
-    <p style="font-size:11px;color:#9ca3af;margin-top:6px">수식은 <code>$x^2$</code> 처럼 달러 기호로 감싸면 됩니다. 가운데 정렬하려면 <code>$$ … $$</code>.</p>
+    <p style="font-size:11px;color:var(--gray-400);margin-top:8px;line-height:1.6">
+      수식은 <code>$x^2$</code> 처럼 달러 기호로 감싸면 됩니다. 가운데 정렬하려면 <code>$$ … $$</code>.<br>
+      한 스레드에 문제는 ${QA_MAX_PROBLEMS}개까지입니다. ${QA_MAX_PROBLEMS+1}개 이상은 답변이 뒤섞여 알아보기 어려우니 질문을 따로 열어 주세요.</p>
     <div style="display:flex;gap:6px;margin-top:10px">
       <button class="btn bs bsm" style="flex:1" onclick="qaCloseComposer()">취소</button>
       <button class="btn bp bsm" id="qa-new-submit" style="flex:1" onclick="qaCreateQuestion()">${qaNewCost()}토큰 쓰고 등록</button>
@@ -9966,8 +9975,9 @@ function ensureMyBalanceListener(){
   _myBalFor=me;
   _myBalUnsub=db.doc('tokenBalances/'+me).onSnapshot(snap=>{
     S.myBalance=snap.exists?Math.floor(Number(snap.data().balance)||0):0;
-    /* 홈에 떠 있으면 숫자를 갈아 끼운다. enterHome() 을 다시 부르면 방문 기록이 쌓인다. */
+    /* 떠 있는 화면의 숫자만 갈아 끼운다. enterHome()/goMyPage() 를 다시 부르면 방문 기록이 쌓인다. */
     if(!_('vHome')?.classList.contains('hidden'))renderHomeCards();
+    if(!_('vMy')?.classList.contains('hidden'))renderMyPage();
   },err=>console.error('balance listener error',err));
 }
 function stopMyBalanceListener(){
@@ -10106,43 +10116,39 @@ function classStatusLabel(status){
 function renderMyPage(){
   const stu=S.students.find(x=>x._docId===S.studentDocId);
   if(!stu){_('myC').innerHTML='<div class="card"><p>학생 정보를 찾을 수 없습니다.</p></div>';return;}
-  const myBooking=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
-  const classSt=classroomStatusOf(stu);
+  const bal=S.myBalance;
+  const row=(k,v)=>`<div class="mi"><span class="mi-k">${k}</span><span class="mi-v">${v}</span></div>`;
   _('myC').innerHTML=`
     <div class="card" style="margin-bottom:12px">
-      <p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:10px">기본 정보</p>
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px">
-        <span style="color:#6b7280">이름</span><span style="font-weight:600">${escapeHtml(stu.name||'')}</span>
-        <span style="color:#6b7280">학교</span><span style="font-weight:600">${escapeHtml(stu.school||'—')}</span>
-        <span style="color:#6b7280">학년</span><span style="font-weight:600">${escapeHtml(stu.grade||'—')}</span>
-        <span style="color:#6b7280">아이디</span><span style="font-weight:600">${escapeHtml(stu.accountId||'')}</span>
-      </div>
+      <p class="mi-h">내 정보</p>
+      ${row('이름',escapeHtml(stu.name||''))}
+      ${row('학교',escapeHtml(stu.school||'—'))}
+      ${row('학년',escapeHtml(stu.grade||'—'))}
+      ${row('아이디',escapeHtml(stu.accountId||''))}
+      ${row('학생 연락처',fmtPhone(stu.studentPhone||'')||'—')}
+      ${row('보호자 연락처',fmtPhone(stu.guardianPhone||'')||'—')}
+      <p style="font-size:11px;color:var(--gray-400);margin-top:10px">연락처가 바뀌었다면 선생님에게 알려 주세요.</p>
     </div>
+
     <div class="card" style="margin-bottom:12px">
-      <p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:10px">연락처</p>
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px">
-        <span style="color:#6b7280">학생 연락처</span><span style="font-weight:600">${fmtPhone(stu.studentPhone||'')||'—'}</span>
-        <span style="color:#6b7280">보호자 연락처</span><span style="font-weight:600">${fmtPhone(stu.guardianPhone||'')||'—'}</span>
+      <p class="mi-h">토큰</p>
+      <div class="mi">
+        <span class="mi-k">보유 토큰</span>
+        <span class="mi-v">${bal===null||bal===undefined?'<span style="color:var(--gray-400);font-weight:500">불러오는 중…</span>':`<b style="color:var(--primary);font-size:15px">${bal}</b> 토큰`}</span>
       </div>
-      <div style="display:flex;gap:6px;align-items:flex-start;margin-top:10px">
-        <svg viewBox="0 0 512 512" fill="#f87171" style="width:12px;height:12px;flex-shrink:0;margin-top:2px"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM232 152c0-13.3 10.7-24 24-24s24 10.7 24 24V264c0 13.3-10.7 24-24 24s-24-10.7-24-24V152zm24 192a32 32 0 1 1 0 64 32 32 0 1 1 0-64z"/></svg>
-        <p style="font-size:11px;color:#9ca3af;line-height:1.45">연락처 변경은 선생님에게 문의해주세요.</p>
-      </div>
+      <button class="btn bs" style="width:100%;margin-top:10px" onclick="goQaTokens()">토큰 충전하기</button>
     </div>
+
     <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">비밀번호</p>
-        <p style="font-size:12px;color:#6b7280">보안을 위해 주기적으로 변경해주세요.</p></div>
-        <button class="btn bs bsm" onclick="openMyPwChange()">변경</button>
+      <p class="mi-h">계정</p>
+      <div class="mi">
+        <span class="mi-k">비밀번호</span>
+        <span class="mi-v" style="font-weight:400;color:var(--gray-500);font-size:12px">주기적으로 바꿔 주세요</span>
       </div>
+      <button class="btn bs" style="width:100%;margin-top:10px" onclick="openMyPwChange()">비밀번호 변경</button>
     </div>
-    <div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div><p style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:4px">멘토링 예약</p>
-        <p style="font-size:13px;font-weight:600">${myBooking?escapeHtml(myBooking.dateLabel||'')+' '+escapeHtml(myBooking.slot||''):'예약 없음'}</p></div>
-        <button class="btn bp bsm" onclick="goConsulting()">바로가기</button>
-      </div>
-    </div>`;
+
+    <button class="btn bs" style="width:100%;color:var(--danger)" onclick="doLogout()">로그아웃</button>`;
 }
 function openMyPwChange(){
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:14px">비밀번호 변경</p>
