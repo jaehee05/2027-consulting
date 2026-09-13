@@ -177,6 +177,31 @@ Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see
 
 **Tests**: `functions/test/`. `npm test` runs the pure pricing tests; `npm run test:emu` boots the Firestore emulator and runs everything (31 tests), including concurrency and double-grant. The emulator needs a Java runtime — this Mac has Temurin 21 at `~/.local/java/jdk-21.0.12.1+1/Contents/Home`; export `JAVA_HOME` to that and put its `bin` on `PATH` before running.
 
+### 학생·관리자 하단 내비 (`snav`)
+
+허브를 거쳐 화면을 옮기던 흐름(홈 → 카드 → `← 홈` → 카드)을 없앴다. `renderStuNav(viewId)` 가 `showView` 안에서 매번 돌며 `body.has-snav` 를 켜고 끈다.
+
+- **자리는 역할이 갈 수 있는 화면과 같다** (`SNAV_BY_ROLE`): 학생 5칸(홈·멘토링·질문·게시판·내 정보), 관리자 4칸(내 정보는 학생 전용), OP(viewer) 2칸(게시판·질문게시판을 아예 못 본다). 로그인 전 방문자와 태블릿은 갈 곳이 하나뿐이라 내비가 없다. **관리자·OP 의 '멘토링' 은 `vStu` 가 아니라 `vAdmin`** 이므로 `snavItems()` 가 그 자리만 바꿔 끼운다.
+- 휴대폰에서는 화면 아래에 붙이고(엄지가 닿는 자리), 641px 이상에서는 가운데에 띄운 알약이 된다. `.page` 아래 여백과 카카오 런처·글쓰기 FAB 의 `bottom` 을 `has-snav` 가 같이 밀어 올린다 — 안 밀면 내비에 가려진다.
+- 내비가 있으면 상단 `← 홈`(`.home-link`)은 군더더기라 CSS 로 감춘다.
+
+**탭을 다시 누르면 그 탭의 첫 화면으로 돌아간다** (`snavGo` → `snavReset`). 다른 자리를 누르면 그 화면에서 보던 자리로 가지만(상세를 열어 뒀으면 상세 그대로), 이미 그 자리에 있는데 또 누르면 상세·글쓰기를 닫고 목록으로 되돌린다 — 휴대폰 앱의 탭 재탭과 같다. **필터는 되돌리지 않는다**: 학생이 골라 둔 보기 방식이지 화면 위치가 아니다.
+
+### 목록 한 줄 (`.fr` / `.fm` / `fmStat`)
+
+자유게시판·질문게시판이 같은 틀을 쓴다. 메타 줄이 `👍3 💬2 ⭐1 조회12` 처럼 이모지마다 다른 색이라 정작 제목이 묻혔다 — **같은 굵기의 선 아이콘(`FM_ICONS`)에 한 가지 회색**으로 통일하고, 값이 있는 것만 `.on` 으로 진하게 한다. 이모지를 쓰지 않는 이유는 기기마다 모양·크기가 달라 줄이 들쭉날쭉해지기 때문이다. 420px 아래에서는 네 가지가 다 안 들어가므로 **가장 덜 쓰는 조회수(`fmStat(...,true)`)만 감춘다**. 아이콘 옆 숫자가 무슨 수인지는 `.sr-only` 라벨로 읽힌다.
+
+### 홈 카드 (`renderHomeCards`)
+
+`입장하기 →` 대신 **지금 상태**를 보여 준다: 다음 예약, 자유게시판 새 글 수, 보유 토큰. `enterHome()` 과 잔액 구독 양쪽에서 부르므로 카드 그리기는 이 함수 하나뿐이다(잔액이 바뀔 때 `enterHome()` 을 다시 부르면 방문 기록이 쌓인다).
+
+- **잔액은 `ensureMyBalanceListener()` 가 세션 내내 따로 본다.** 질문게시판 구독(`qaStartListeners`)은 `#vQa` 에서만 살아 있어서(원장·결제가 전교생 분량이라 그렇게 두었다) 홈에서는 잔액을 알 수 없었다. `tokenBalances/{me}` **문서 하나짜리** 구독이라 비용이 사실상 없다. `renderStuNav` 에서 부르는데, 로그인·세션 복원·관리자 미리보기로 학생 세션이 만들어지는 길이 여럿이라 화면이 바뀔 때 한 군데서 보장하는 편이 낫다. 학생이 바뀌면 갈아 끼우고 로그아웃에서 끊는다.
+- **잔액이 아직 안 왔으면(`null`) 0 이 아니라 고정 문구를 보여 준다** — 토큰이 있는 학생에게 0토큰이라고 잘못 말하면 안 된다.
+
+### 멘토링 화면의 속탭 (`STU_TABS`)
+
+공지+예약+멘토링 기록+등급 그래프+시험별 성적 카드가 한 스크롤에 쌓여 아래쪽이 사실상 안 보였다. **예약 / 성적 / 멘토링 기록** 셋으로 나누고 **공지는 탭 위에** 남긴다(어느 탭에 있든 봐야 하는 알림이다). 학생 문서가 없는 경로(`showBookForm`)는 예전 그대로다.
+
 ### 새로고침하면 보던 화면으로 돌아온다
 
 The SPA has one URL, so a reload re-runs `init()` and used to land everyone on the home hub. `history.state` survives the reload (same URL), so `bootLand()` — called at each of `init()`'s three landing points instead of `enterHome()` — replays it through `navApply(st)`, the same dispatcher `popstate` uses. Extracting that dispatcher is the point: back-navigation and reload must not drift apart.
