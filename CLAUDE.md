@@ -171,6 +171,7 @@ Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see
   - `closedReason` 이 `'idle'`(자동) / `'admin'`(관리자)를 구분한다 — 학생에게 보여 줄 안내 문구가 다르다. 다시 열면 `updatedAt` 이 지금으로 올라가 시계도 처음부터 다시 돈다.
 - **관리자가 답변(댓글)을 달면 학생에게 알림톡을 보낸다** (`questionAnswered`, `notifyQuestionAnswered`). **첫 답변만이 아니라 답변마다** 보낸다 — 24시간 안에 이어 물어야 하므로 매번 알아야 한다. 제목은 30자에서 자른다(템플릿 한 줄). 자동 종료 시간은 관리자가 바꿀 수 있으므로 **템플릿 본문에 "24시간"을 박지 않는다**; 남은 시간은 화면이 안내한다.
 - **질문 상태는 `pending` / `answered` / `closed`** 셋이다. 관리자가 스레드를 닫으면 학생도 관리자도 댓글을 달 수 없다(`addQuestionComment` 가 409). 다시 열 때는 관리자 답변이 있었는지 보고 `answered`/`pending` 중 맞는 쪽으로 되돌린다 — 무조건 `pending` 으로 두면 이미 답한 글이 답변대기로 다시 밀려 올라온다. 종료된 스레드는 댓글을 지워도 `pending` 으로 되돌아가지 않는다.
+- **종료된 스레드는 기본 목록에서 뺀다.** 필터는 `진행 중`(기본) / `답변대기` / `답변완료` / `종료` 고, 판정은 `qaFilterMatch(q,f)` 하나가 한다(`qaEffStatus` 를 쓰므로 스케줄러가 아직 안 돌아도 시간이 지난 스레드는 종료로 센다). 더 손댈 수 없는 글이 진행 중인 것과 섞이면 답변대기가 묻힌다. 예전 값 `'all'` 이 들어와도 전체로 받아 깨지지 않게 둔다.
 - The 질문 tab is a **feed → detail** pair like 자유게시판, not an accordion: `qaFeedRowHtml` shows 상태칩 + 제목 + a two-line `-webkit-line-clamp` body preview, and `qaDetailHtml` takes over the pane when `S.qa.openId` is set (cleared by `qaCloseDetail`, a sub-tab change, or opening the composer).
 - The Q&A listeners run **only while `#vQa` is open** (`showView` calls `qaStopListeners()` on any other view) — ledger and payment history are school-wide.
 

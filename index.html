@@ -949,7 +949,7 @@ const S = {
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
   posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
   bdFilter:'all', bdModalBookingId:null, bdOpenId:null, bdReplyTo:null, boardBans:{}, boardPledges:{},
-  qa:{policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',
+  qa:{policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'open',payFilter:'open',
       composerOpen:false,newProblems:1,openId:null,pendingOpen:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null}
 };
 
@@ -2123,7 +2123,7 @@ async function doLogout(){
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
   S.bdComposerOpen=false;S.bdPostEditId=null;S.bdDraftFiles={};S.bdCommentDraftFiles={};S.bdFilter='all';S.bdModalBookingId=null;S.bdOpenId=null;S.bdReplyTo=null;
-  S.qa={policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'all',payFilter:'open',composerOpen:false,newProblems:1,openId:null,pendingOpen:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null};
+  S.qa={policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'open',payFilter:'open',composerOpen:false,newProblems:1,openId:null,pendingOpen:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null};
   S.schedule={dates:JSON.parse(JSON.stringify(DFLT_DATES))};
   S.stuSelected=new Set();S.consultStuId=null;S.opScoreStuId=null;S.tab=null;S.classSub='list';S.classLectureId=null;
   S._pendingAdmin=null;
@@ -4096,8 +4096,16 @@ function renderQa(){
 }
 
 /* ── 질문 목록 (학생=내 것만, 관리자=전체) ── */
-const QA_FILTERS=[{id:'all',label:'전체'},{id:'pending',label:'답변대기'},{id:'answered',label:'답변완료'},{id:'closed',label:'종료'}];
-function qaSetFilter(f){S.qa.filter=f;renderQa();}
+/* 종료된 스레드는 기본 목록에서 뺀다 — 더 손댈 수 없는 글이라 진행 중인 것과 섞이면
+   답변대기가 묻힌다. 보려면 [종료] 를 눌러 따로 본다. */
+const QA_FILTERS=[{id:'open',label:'진행 중'},{id:'pending',label:'답변대기'},{id:'answered',label:'답변완료'},{id:'closed',label:'종료'}];
+function qaFilterMatch(q,f){
+  const st=qaEffStatus(q);
+  if(f==='open')return st!=='closed';
+  if(f==='all')return true;          // 예전에 저장돼 있던 값이 들어와도 깨지지 않게
+  return st===f;
+}
+function qaSetFilter(f){S.qa.filter=f;S.qa.openId=null;renderQa();}
 function qaOpen(id){S.qa.openId=id;S.qa.composerOpen=false;S.qa.cmtEdit=null;renderQa();try{window.scrollTo({top:0});}catch(_){}}
 function qaCloseDetail(){S.qa.openId=null;S.qa.cmtEdit=null;renderQa();}
 function qaClearNewDrafts(){for(let i=1;i<=QA_MAX_PROBLEMS;i++)delete S.bdDraftFiles[qaNewPhotoScope(i)];}
@@ -4112,20 +4120,21 @@ function qaQuestionsHtml(admin){
     S.qa.openId=null;
   }
 
-  const f=S.qa.filter||'all';
-  const list=S.qa.questions
-    .filter(q=>admin||q.authorId===S.studentDocId)
-    .filter(q=>f==='all'||qaEffStatus(q)===f)
+  const f=S.qa.filter||'open';
+  const mine=S.qa.questions.filter(q=>admin||q.authorId===S.studentDocId);
+  const list=mine
+    .filter(q=>qaFilterMatch(q,f))
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const cost=qaCost();
   const bal=qaMyBalance();
 
   let head;
   if(admin){
-    const pend=S.qa.questions.filter(q=>q.status==='pending').length;
+    const pend=mine.filter(q=>qaEffStatus(q)==='pending').length;
+    const open=mine.filter(q=>qaEffStatus(q)!=='closed').length;
     head=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <p style="font-size:15px;font-weight:700">질문 게시판</p>
-      <span style="font-size:11px;color:#6b7280">전체 ${S.qa.questions.length}${pend?` · 답변대기 ${pend}`:''}</span>
+      <span style="font-size:11px;color:#6b7280">진행 중 ${open} · 종료 ${mine.length-open}${pend?` · 답변대기 ${pend}`:''}</span>
     </div>`;
   }else{
     const canAsk=bal>=cost;
@@ -4140,8 +4149,8 @@ function qaQuestionsHtml(admin){
   }
 
   const filters=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${QA_FILTERS.map(x=>{
-    const on=f===x.id;
-    return `<button onclick="qaSetFilter('${x.id}')" style="border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#1C64F2':'#fff'};color:${on?'#fff':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${x.label}</button>`;
+    const on=f===x.id,n=mine.filter(q=>qaFilterMatch(q,x.id)).length;
+    return `<button onclick="qaSetFilter('${x.id}')" style="border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#1C64F2':'#fff'};color:${on?'#fff':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${x.label}${n?` <span style="opacity:.75">${n}</span>`:''}</button>`;
   }).join('')}</div>`;
 
   const composer=(!admin&&S.qa.composerOpen)?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
@@ -4164,7 +4173,9 @@ function qaQuestionsHtml(admin){
   </div>`:'';
 
   const empty=`<div style="padding:40px 18px;text-align:center;color:#9ca3af;font-size:13px">${
-    admin?'조건에 맞는 질문이 없습니다.':(f==='all'?'아직 남긴 질문이 없습니다.':'조건에 맞는 질문이 없습니다.')}</div>`;
+    f==='closed'?'종료된 질문이 없습니다.'
+    :(!mine.length?(admin?'아직 등록된 질문이 없습니다.':'아직 남긴 질문이 없습니다.')
+    :(f==='open'?'진행 중인 질문이 없습니다. 종료된 질문은 [종료] 에서 볼 수 있습니다.':'조건에 맞는 질문이 없습니다.'))}</div>`;
 
   return `<div class="card" style="margin-bottom:12px;padding-bottom:6px">
     ${head}${filters}${composer}
