@@ -134,7 +134,31 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .bd-fab:hover{background:var(--primary-hover)}
 .bd-fab:active{transform:translateY(1px)}
 @media(max-width:640px){.bd-fab{right:14px;bottom:78px;height:42px;padding:0 16px;font-size:13px}}
-/* ── 학생 하단 내비 ──
+/* 화면에서는 감추고 스크린리더에만 읽히는 라벨. 아이콘 옆 숫자가 무슨 수인지 알려 준다. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* ── 목록 메타 줄 ──
+   👍3 💬2 ⭐1 조회12 처럼 이모지가 저마다 다른 색으로 섞여 있어 정작 제목이 묻혔다.
+   같은 굵기의 선 아이콘에 한 가지 회색으로 통일하고, 값이 있는 것만 색을 준다. */
+.fm{display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--gray-400);flex-wrap:wrap;line-height:1}
+.fm i{display:inline-flex;align-items:center;gap:4px;font-style:normal}
+.fm svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.fm i.on{color:var(--gray-600)}
+.fm .fm-who{color:var(--gray-600);font-weight:600}
+.fm .fm-who.staff{color:var(--danger)}
+.fm .fm-sp{margin-left:auto}
+/* 아주 좁은 화면에서는 네 가지가 다 안 들어가 줄이 접힌다. 가장 덜 쓰는 조회수를 뺀다. */
+@media(max-width:420px){.fm{gap:10px}.fm i.fm-min{display:none}}
+/* 목록 한 줄 — 손가락이 닿는 넓이를 확보한다. */
+.fr{display:flex;gap:12px;align-items:flex-start;padding:15px 4px;border-bottom:1px solid var(--gray-100);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fr:active{background:var(--gray-50)}
+.fr-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.fr-t{font-size:14.5px;font-weight:700;color:var(--gray-900);line-height:1.4;word-break:break-word;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.fr-p{font-size:13px;color:var(--gray-500);line-height:1.55;word-break:break-word;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fr-p.lead{color:var(--gray-900)}
+.fr-th{width:58px;height:58px;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--gray-200);flex-shrink:0}
+
+/* ── 학생 하단 내비 ──/* ── 학생 하단 내비 ──
    허브를 거쳐 화면을 옮기던 흐름(홈 → 카드 → ← 홈 → 카드)을 없앤다. 학생 세션에서는
    어느 화면에 있든 다섯 자리로 바로 건너뛴다. 휴대폰에서는 화면 아래에 붙이고(엄지가 닿는 자리),
    넓은 화면에서는 가운데에 띄운 알약으로 둔다. */
@@ -3538,6 +3562,23 @@ function bdFilteredPosts(){
   return bdSorted(list);
 }
 
+/* ── 목록 메타 아이콘 ──
+   자유게시판·질문게시판이 같은 아이콘을 쓴다. 이모지는 기기마다 모양과 색이 달라
+   줄이 들쭉날쭉해진다 — 같은 굵기의 선 아이콘 하나로 맞춘다. */
+const FM_ICONS={
+  like:'M12 20s-7-4.3-7-9.2A3.8 3.8 0 0 1 12 8.4a3.8 3.8 0 0 1 7 2.4C19 15.7 12 20 12 20Z',
+  comment:'M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4V5.5Z',
+  scrap:'m12 3.8 2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5 2.7.9-5.6-4-3.9 5.6-.8L12 3.8Z',
+  view:'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Zm9.5 2.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z',
+  lock:'M7 10.5V8a5 5 0 0 1 10 0v2.5M5.5 10.5h13v9h-13v-9Z',
+  clock:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5.2l3.2 1.9',
+};
+function fmIco(name){return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${FM_ICONS[name]||''}"/></svg>`;}
+/* 0 이면 색을 빼고 숫자만 회색으로 둔다 — 없는 걸 굳이 눈에 띄게 할 이유가 없다. */
+function fmStat(name,n,label,minor){
+  return `<i class="${n>0?'on':''}${minor?' fm-min':''}" title="${label}"><span class="sr-only">${label} </span>${fmIco(name)}${n}</i>`;
+}
+
 /* ── 목록(피드) ── */
 function bdPreviewText(q){
   const t=(q.body||'').replace(/\s+/g,' ').trim();
@@ -3546,30 +3587,31 @@ function bdPreviewText(q){
 function bdFeedRowHtml(q){
   const id=q._docId;
   if(!bdCanRead(q)){
-    return `<div style="border-bottom:1px solid #f1f3f5;padding:14px 4px;display:flex;align-items:center;gap:8px;color:#9ca3af;font-size:13px">
-      <span>🔒</span><span>비밀글입니다.</span><span style="margin-left:auto;font-size:11px;color:#d1d5db">${bdFmtTs(q.createdAt)}</span></div>`;
+    return `<div class="fr" style="cursor:default;align-items:center">
+      <span class="fm" style="flex:1"><i>${fmIco('lock')}비밀글입니다.</i></span>
+      <span style="font-size:11px;color:var(--gray-300)">${bdFmtTs(q.createdAt)}</span></div>`;
   }
-  const cmts=bdComments(q).length;
   const thumb=(q.photos||[])[0];
   const isAdminPost=q.authorRole==='admin';
   const rpt=bdIsStaff()&&(bdReports(q).length||bdComments(q).some(c=>(c.reports||[]).length))
     ?'<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">신고</span>':'';
-  return `<div onclick="bdOpen('${id}')" style="border-bottom:1px solid #f1f3f5;padding:14px 4px;cursor:pointer;display:flex;gap:12px;align-items:flex-start">
-    <div style="flex:1;min-width:0">
-      ${q.title?`<p style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;word-break:break-word">${q.pinned?'📌 ':''}${escapeHtml(q.title)}${rpt}</p>`:''}
-      <p style="font-size:13px;color:${q.title?'#6b7280':'#111827'};line-height:1.5;margin-bottom:6px;word-break:break-word">${escapeHtml(bdPreviewText(q))||'<span style="color:#9ca3af">(사진)</span>'}</p>
-      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;flex-wrap:wrap">
-        <span style="color:${isAdminPost?'#dc2626':'#6b7280'};font-weight:600">${q.title?'':(q.pinned?'📌 ':'')}${bdShowName(q)}</span>
-        <span>·</span><span>${bdFmtTs(q.createdAt)}</span>
-        ${q.secret?'<span title="비밀글">🔒</span>':''}
-        ${q.title?'':rpt}
-        <span style="margin-left:4px;color:#dc2626;font-weight:600">👍 ${bdLikes(q).length}</span>
-        <span style="color:#1C64F2;font-weight:600">💬 ${cmts}</span>
-        ${bdScraps(q).length?`<span style="color:#f59e0b;font-weight:600">⭐ ${bdScraps(q).length}</span>`:''}
-        <span style="color:#9ca3af">조회 ${bdViews(q)}</span>
+  const chips=`${q.pinned?'<span class="bx" style="font-size:10px;font-weight:700;background:var(--primary-soft);color:var(--primary)">공지</span>':''}${q.secret?`<span class="bx" style="font-size:10px;font-weight:700;background:var(--gray-100);color:var(--gray-500)">비밀</span>`:''}${rpt}`;
+  const prev=escapeHtml(bdPreviewText(q));
+  return `<div class="fr" onclick="bdOpen('${id}')">
+    <div class="fr-b">
+      ${q.title?`<p class="fr-t">${chips}${escapeHtml(q.title)}</p>`:(chips?`<p class="fr-t">${chips}</p>`:'')}
+      <p class="fr-p ${q.title?'':'lead'}">${prev||'<span style="color:var(--gray-400)">(사진)</span>'}</p>
+      <div class="fm">
+        <span class="fm-who ${isAdminPost?'staff':''}">${bdShowName(q)}</span>
+        <span>${bdFmtTs(q.createdAt)}</span>
+        <span class="fm-sp"></span>
+        ${fmStat('like',bdLikes(q).length,'공감')}
+        ${fmStat('comment',bdComments(q).length,'댓글')}
+        ${fmStat('scrap',bdScraps(q).length,'스크랩')}
+        ${fmStat('view',bdViews(q),'조회',true)}
       </div>
     </div>
-    ${thumb?`<img src="${thumb.url}" alt="" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;flex-shrink:0">`:''}
+    ${thumb?`<img class="fr-th" src="${thumb.url}" alt="" loading="lazy">`:''}
   </div>`;
 }
 function bdListHtml(){
@@ -4262,22 +4304,24 @@ function qaFeedRowHtml(q,admin){
   const id=q._docId;
   const cmts=(Array.isArray(q.comments)?q.comments:[]).length;
   const thumb=(q.photos||[])[0];
-  const who=admin?`<span style="font-weight:600;color:#6b7280">${escapeHtml(q.authorName||'')}${q.authorGrade?' '+escapeHtml(q.authorGrade):''}</span><span>·</span>`:'';
-  return `<div onclick="qaOpen('${id}')" style="border-bottom:1px solid #f1f3f5;padding:14px 4px;cursor:pointer;display:flex;gap:12px;align-items:flex-start">
-    <div style="flex:1;min-width:0">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">
-        ${qaChip(QA_Q_STATUS,qaEffStatus(q))}${qaSubjChip(q)}
-        ${(()=>{const n=qaProblemLabel(q);return n?`<span class="bx" style="font-size:10px;font-weight:700;background:#eef2ff;color:#4338ca">문제 ${n}개</span>`:'';})()}
-        <b style="font-size:14px;color:#111827;word-break:break-word">${escapeHtml(q.title||'')}</b>
-      </div>
-      <p class="qa-body" style="font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word">${qaBodyHtml(q.body)}</p>
-      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9ca3af;flex-wrap:wrap">
+  const who=admin?`<span class="fm-who">${escapeHtml(q.authorName||'')}${q.authorGrade?' '+escapeHtml(q.authorGrade):''}</span>`:'';
+  const np=qaProblemLabel(q);
+  const left=qaIdleLeft(q);
+  return `<div class="fr" onclick="qaOpen('${id}')">
+    <div class="fr-b">
+      <p class="fr-t">
+        ${qaChip(QA_Q_STATUS,qaEffStatus(q))}${qaSubjChip(q)}${np?`<span class="bx" style="font-size:10px;font-weight:700;background:#eef2ff;color:#4338ca">문제 ${np}개</span>`:''}
+        <span style="flex:1;min-width:0">${escapeHtml(q.title||'')}</span>
+      </p>
+      <p class="fr-p qa-body">${qaBodyHtml(q.body)}</p>
+      <div class="fm">
         ${who}<span>${bdFmtTs(q.createdAt)}</span>
-        ${cmts?`<span style="color:#1C64F2;font-weight:600">💬 ${cmts}</span>`:''}
-        ${(()=>{const left=qaIdleLeft(q);return left?`<span style="color:#b45309">⏳ 자동 종료 ${left}</span>`:'';})()}
+        <span class="fm-sp"></span>
+        ${fmStat('comment',cmts,'댓글')}
+        ${left?`<i style="color:var(--warning-text)" title="자동 종료까지">${fmIco('clock')}${left}</i>`:''}
       </div>
     </div>
-    ${thumb?`<img src="${thumb.url}" alt="" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;flex-shrink:0">`:''}
+    ${thumb?`<img class="fr-th" src="${thumb.url}" alt="" loading="lazy">`:''}
   </div>`;
 }
 
@@ -9796,15 +9840,15 @@ async function editChip(key,defaultValue){
    허브를 거치지 않고 화면을 바로 옮긴다. 갈 곳이 둘 이상인 세션에만 띄운다 —
    로그인 전 방문자와 태블릿은 한 화면뿐이라 내비가 군더더기다. */
 const SNAV_ITEMS=[
-  {id:'home',label:'홈',view:'vHome',go:'goHome()',
+  {id:'home',label:'홈',view:'vHome',go:'goHome',
    d:'M3 10.5 12 3l9 7.5M5.5 9.5V20a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9.5'},
-  {id:'stu',label:'멘토링',view:'vStu',go:'goConsulting()',
+  {id:'stu',label:'멘토링',view:'vStu',go:'goConsulting',
    d:'M8 3.5h8a2 2 0 0 1 2 2V20l-6-3-6 3V5.5a2 2 0 0 1 2-2ZM9.5 9h5M9.5 12.5h3'},
-  {id:'qa',label:'질문',view:'vQa',go:'goQa()',
+  {id:'qa',label:'질문',view:'vQa',go:'goQa',
    d:'M21 12a8.5 8.5 0 0 1-12.4 7.6L3.5 21l1.4-5.1A8.5 8.5 0 1 1 21 12ZM9.8 9.6a2.3 2.3 0 0 1 4.4.8c0 1.5-2.2 2-2.2 3.1M12 16.2h.01'},
-  {id:'board',label:'게시판',view:'vBoard',go:'goBoard()',
+  {id:'board',label:'게시판',view:'vBoard',go:'goBoard',
    d:'M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4V5.5ZM8 8.5h8M8 12h5'},
-  {id:'my',label:'내 정보',view:'vMy',go:'goMyPage()',
+  {id:'my',label:'내 정보',view:'vMy',go:'goMyPage',
    d:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 20.5a7.5 7.5 0 0 1 15 0'},
 ];
 /* 자리는 역할이 갈 수 있는 화면과 같아야 한다. 관리자의 멘토링은 vAdmin 이고,
@@ -9823,6 +9867,31 @@ function snavItems(){
     return id==='stu'&&adminSide?{...it,view:'vAdmin'}:it;
   });
 }
+/* 다른 자리를 누르면 그 화면에서 보던 자리로 간다(상세를 열어 뒀으면 상세 그대로).
+   **이미 그 자리에 있는데 또 누르면 그 탭의 첫 화면으로 되돌린다** — 상세·글쓰기를 닫고 목록으로.
+   휴대폰 앱에서 탭을 다시 누르는 동작과 같다: 한 번 더 누르는 것 말고 목록으로 빠져나올 길이 마땅치 않다. */
+function snavGo(id){
+  const it=snavItems().find(x=>x.id===id);
+  if(!it)return;
+  const here=!_(it.view)?.classList.contains('hidden');
+  if(here)snavReset(id);
+  try{window.scrollTo({top:0});}catch(_){}
+  if(!here)window[it.go]();
+}
+function snavReset(id){
+  if(id==='qa'){
+    /* 필터는 되돌리지 않는다 — 학생이 골라 둔 보기 방식이지 화면 위치가 아니다. */
+    S.qa.openId=null;S.qa.composerOpen=false;S.qa.cmtEdit=null;S.qa.sub='q';
+    qaClearNewDrafts();renderQa();
+  }else if(id==='board'){
+    S.bdOpenId=null;S.bdComposerOpen=false;S.bdPostEditId=null;S.bdReplyTo=null;
+    bdRerender();
+  }else if(id==='stu'){
+    if(S.user?.type==='student'){S.stuTab='book';renderStu();}
+    else setTab(S.user?.type==='admin'?'students':'bookings');
+  }
+  /* 홈·내 정보는 한 화면뿐이라 되돌릴 자리가 없다 — 맨 위로 올리는 것으로 끝난다. */
+}
 function renderStuNav(viewId){
   ensureMyBalanceListener();
   const items=snavItems();
@@ -9831,7 +9900,7 @@ function renderStuNav(viewId){
   const box=_('snavInner');
   if(!box||!on)return;
   const dot=bdStuNewCount()>0;
-  box.innerHTML=items.map(it=>`<a role="button" tabindex="0" class="${it.view===viewId?'on':''}" onclick="${it.go}" aria-label="${it.label}" ${it.view===viewId?'aria-current="page"':''}>
+  box.innerHTML=items.map(it=>`<a role="button" tabindex="0" class="${it.view===viewId?'on':''}" onclick="snavGo('${it.id}')" aria-label="${it.label}" ${it.view===viewId?'aria-current="page"':''}>
     <svg class="sn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${it.d}"/></svg>
     <span>${it.label}</span>${it.id==='board'&&dot?'<span class="sn-dot"></span>':''}
   </a>`).join('');
