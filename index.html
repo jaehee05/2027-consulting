@@ -90,6 +90,10 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .bs{background:var(--surface);color:var(--gray-700);border:1px solid var(--gray-200)}.bs:hover{background:var(--gray-50)}
 .bd{background:var(--danger-soft);color:var(--danger)}.bd:hover{background:var(--danger-soft-hover)}
 .bsm{height:32px;padding:0 12px;font-size:12px;border-radius:var(--radius-md)}
+/* 버튼 안에 아이콘을 넣을 때 — 글자 크기에 맞춰 한 군데서 정한다. */
+.btn svg{width:15px;height:15px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* 사진 첨부 라벨은 inline-block 으로 쓰여 아이콘과 글자가 어긋난다 — 라벨도 버튼과 같이 정렬한다. */
+label.btn{display:inline-flex!important}
 .bfw{width:100%;justify-content:center}
 .btn[disabled],.btn.is-disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
 .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
@@ -132,6 +136,7 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 /* 자유게시판 플로팅 글쓰기 버튼. 카카오톡 채널 런처와 겹치지 않게 그 위에 앉힌다. */
 .bd-fab{position:fixed;right:20px;bottom:88px;z-index:880;height:44px;padding:0 18px;border-radius:999px;border:none;background:var(--primary);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(28,100,242,.32);display:inline-flex;align-items:center;gap:6px}
 .bd-fab:hover{background:var(--primary-hover)}
+.bd-fab svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .bd-fab:active{transform:translateY(1px)}
 @media(max-width:640px){.bd-fab{right:14px;bottom:78px;height:42px;padding:0 16px;font-size:13px}}
 /* 화면에서는 감추고 스크린리더에만 읽히는 라벨. 아이콘 옆 숫자가 무슨 수인지 알려 준다. */
@@ -158,7 +163,42 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .fr-p.lead{color:var(--gray-900)}
 .fr-th{width:58px;height:58px;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--gray-200);flex-shrink:0}
 
-/* ── 학생 하단 내비 ──/* ── 학생 하단 내비 ──
+/* ── 글 상세 · 댓글 (자유게시판·질문게시판 공용) ──
+   두 게시판이 서로 다른 규칙으로 그려져 있었다: 한쪽은 이모지 카운터에 테두리 없는 댓글,
+   다른 쪽은 좌측 강조선이 있는 카드형 댓글. 여기로 모아 둔다. */
+.pd-t{font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word}
+.pd-b{font-size:14px;color:var(--gray-900);white-space:pre-wrap;line-height:1.75;word-break:break-word}
+/* 공감·스크랩처럼 누르는 자리. 손가락이 닿게 40px 을 확보한다. */
+.act{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 16px;
+  border:1px solid var(--gray-200);background:var(--gray-50);color:var(--gray-500);border-radius:var(--radius-md);
+  font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.act:hover{background:var(--gray-100)}
+.act svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.act.on svg{fill:currentColor}
+.act.like.on{border-color:#fca5a5;background:var(--danger-soft);color:var(--danger)}
+.act.scrap.on{border-color:#fcd34d;background:var(--warning-soft);color:var(--warning-text)}
+/* 댓글 한 덩이 — 선생님 답변만 왼쪽에 강조선을 둔다(학생이 답을 찾기 쉬우라고). */
+.cm{border-top:1px solid var(--gray-100);padding:13px 0}
+.cm.reply{padding-left:22px}
+.cm.staff{border-left:3px solid var(--danger);padding-left:11px;background:#fffbfb}
+.cm.reply.staff{padding-left:33px}
+.cm-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px}
+.cm-h b{font-size:12px;font-weight:700}
+.cm-b{font-size:13px;color:var(--gray-900);white-space:pre-wrap;line-height:1.65;word-break:break-word;margin-top:5px}
+.cm-t{font-size:11px;color:var(--gray-400);margin-top:6px}
+/* 필터 알약 줄 — 두 게시판이 같은 모양을 각자 인라인으로 그리고 있었다. */
+.chipbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip-f{border:1px solid var(--gray-200);background:var(--surface);color:var(--gray-500);border-radius:var(--radius-pill);
+  min-height:32px;padding:0 13px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.chip-f:hover{border-color:var(--gray-300);color:var(--gray-700)}
+.chip-f.on{background:var(--primary);border-color:var(--primary);color:var(--surface)}
+.chip-f span{opacity:.75;font-weight:600}
+/* 글·댓글에 딸린 작은 텍스트 버튼(대댓글·공감·신고·삭제) */
+.cm-a{background:none;border:none;color:var(--gray-400);font-family:inherit;font-size:12px;cursor:pointer;padding:4px 5px;border-radius:var(--radius-sm)}
+.cm-a:hover{background:var(--gray-100);color:var(--gray-600)}
+.cm-a.on{color:var(--danger);font-weight:700}
+
+/* ── 학생 하단 내비 ──
    허브를 거쳐 화면을 옮기던 흐름(홈 → 카드 → ← 홈 → 카드)을 없앤다. 학생 세션에서는
    어느 화면에 있든 다섯 자리로 바로 건너뛴다. 휴대폰에서는 화면 아래에 붙이고(엄지가 닿는 자리),
    넓은 화면에서는 가운데에 띄운 알약으로 둔다. */
@@ -3387,8 +3427,8 @@ function bdPostHtml(q,ctx){
   let bodyHtml;
   if(isEditing){
     const keep=Array.isArray(S.bdPostEditId.keepPhotos)?S.bdPostEditId.keepPhotos:[];
-    const opts=isStudentPost?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-edit-secret-${id}" ${q.secret?'checked':''}> 🔒 비밀글 (나와 선생님만 볼 수 있어요)</label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-edit-real-${id}" ${q.anon?'':'checked'} onchange="_('bd-edit-nick-${id}').style.display=this.checked?'none':''"> 🙋 실명으로 표시</label>
+    const opts=isStudentPost?`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-edit-secret-${id}" ${q.secret?'checked':''}> 비밀글 (나와 선생님만 볼 수 있어요)</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-edit-real-${id}" ${q.anon?'':'checked'} onchange="_('bd-edit-nick-${id}').style.display=this.checked?'none':''"> 실명으로 표시</label>
       <input class="fi" id="bd-edit-nick-${id}" style="margin-top:6px;display:${q.anon?'':'none'}" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(q.authorNick||bdMyNick())}">`:'';
     bodyHtml=`<div>
       <input class="fi" id="bd-edit-title-${id}" maxlength="60" placeholder="제목" value="${escapeHtml(q.title||'')}" style="margin-bottom:8px;font-weight:700">
@@ -3397,7 +3437,7 @@ function bdPostHtml(q,ctx){
       <div style="margin-top:8px;font-size:11px;color:#6b7280">기존 사진:</div>
       ${keep.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${keep.map((ph,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb"><img src="${ph.url}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="bdRemoveExistingPhoto('${id}',${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('')}</div>`:'<p style="font-size:11px;color:#9ca3af;margin-top:4px">없음</p>'}
       <div style="margin-top:8px">
-        <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 추가<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${editScope}','post')"></label>
+        <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">${fmIco('photo')}사진 추가<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${editScope}','post')"></label>
       </div>
       <div id="bd-draft-anchor-post-${editScope}">${bdDraftPreviewHtml(editScope,'post')}</div>
       <div style="display:flex;gap:6px;margin-top:10px">
@@ -3406,8 +3446,8 @@ function bdPostHtml(q,ctx){
       </div>
     </div>`;
   }else{
-    bodyHtml=`${q.title?`<h2 style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0 10px;word-break:break-word">${escapeHtml(q.title)}</h2>`:''}
-      <p style="font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word">${escapeHtml(q.body||'')}</p>${bdPhotosHtml(q.photos)}`;
+    bodyHtml=`${q.title?`<h2 class="pd-t">${escapeHtml(q.title)}</h2>`:''}
+      <p class="pd-b">${escapeHtml(q.body||'')}</p>${bdPhotosHtml(q.photos)}`;
   }
 
   const editBtn=mine?`<button class="btn bs bsm" style="font-size:11px;padding:4px 10px" onclick="bdStartEdit('${id}')">수정</button>`:'';
@@ -3427,10 +3467,10 @@ function bdPostHtml(q,ctx){
     ${BD_AVATAR}
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        ${q.pinned?'<span style="font-size:11px;color:#b45309;font-weight:700">📌 고정</span>':''}
+        ${q.pinned?'<span class="bx" style="font-size:10px;font-weight:700;background:var(--primary-soft);color:var(--primary)">공지</span>':''}
         <b style="font-size:13px;color:${isStudentPost?'#111827':'#dc2626'}">${bdShowName(q)}</b>
         ${(()=>{const g=bdIsBanned(q.authorId)?'':(q.anon?(staff?(S.students.find(x=>x._docId===q.authorId)?.grade||''):''):(q.authorGrade||''));return isStudentPost&&g?`<span style="font-size:11px;color:#6b7280">${escapeHtml(g)}</span>`:'';})()}
-        ${q.secret?'<span title="비밀글" style="font-size:11px">🔒</span>':''}
+        ${q.secret?'<span class="bx" style="font-size:10px;font-weight:700;background:var(--gray-100);color:var(--gray-500)">비밀</span>':''}
         ${reportMark}
       </div>
       <p style="font-size:11px;color:#9ca3af;margin-top:2px">${bdAbsTs(q.createdAt)}${q.updatedAt&&q.updatedAt>(q.createdAt||0)?' · 수정됨':''}</p>
@@ -3438,15 +3478,13 @@ function bdPostHtml(q,ctx){
     ${isEditing?'':`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${reportBtn}${modBtn}${pinBtn}${editBtn}${delBtn}</div>`}
   </div>${modPanel}`;
 
-  const counters=`<div style="display:flex;align-items:center;gap:14px;margin-top:14px;font-size:13px;font-weight:600">
-    <span style="color:#dc2626">👍 ${likeCount}</span>
-    <span style="color:#1C64F2">💬 ${comments.length}</span>
-    <span style="color:#f59e0b">⭐ ${scrapCount}</span>
-    <span style="color:#9ca3af;font-weight:500">조회 ${bdViews(q)}</span>
+  const counters=`<div class="fm" style="margin-top:14px">
+    ${fmStat('like',likeCount,'공감')}${fmStat('comment',comments.length,'댓글')}
+    ${fmStat('scrap',scrapCount,'스크랩')}${fmStat('view',bdViews(q),'조회')}
   </div>
   <div style="display:flex;gap:8px;margin-top:10px">
-    <button onclick="bdToggleLike('${id}',event)" style="border:1px solid ${liked?'#fca5a5':'#e5e7eb'};background:${liked?'#fee2e2':'#f9fafb'};color:${liked?'#dc2626':'#6b7280'};border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">👍 공감</button>
-    <button onclick="bdToggleScrap('${id}',event)" style="border:1px solid ${scrapped?'#fcd34d':'#e5e7eb'};background:${scrapped?'#fef3c7':'#f9fafb'};color:${scrapped?'#b45309':'#6b7280'};border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer">⭐ 스크랩</button>
+    <button class="act like${liked?' on':''}" onclick="bdToggleLike('${id}',event)">${fmIco('like')}공감</button>
+    <button class="act scrap${scrapped?' on':''}" onclick="bdToggleScrap('${id}',event)">${fmIco('scrap')}스크랩</button>
   </div>`;
 
   return `<div style="padding:4px 2px">
@@ -3467,23 +3505,25 @@ function bdCommentRowHtml(q,c,staff,depth){
   const liked=likes.includes(me);
   const reported=(c.reports||[]).some(r=>r.byId===me);
   const rptMark=staff&&(c.reports||[]).length?`<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">신고 ${c.reports.length}</span>`:'';
-  return `<div class="bd-cmt" style="padding:12px 0 12px ${depth?'22px':'0'};border-top:1px solid #f1f3f5">
+  /* 선생님 답변만 왼쪽에 강조선을 둔다 — 질문게시판과 같은 규칙이라야 두 게시판이 따로 놀지 않는다. */
+  const isStaffCmt=c.role==='admin';
+  return `<div class="cm${depth?' reply':''}${isStaffCmt?' staff':''}">
     <div class="bd-cmt-row" style="display:flex;align-items:flex-start;gap:8px">
       ${BD_AVATAR_SM}
       <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          ${depth?'<span style="color:#9ca3af;font-size:12px">↳</span>':''}
-          <b style="font-size:12px">${bdCommentName(q,c)}</b>${rptMark}
+        <div class="cm-h">
+          ${depth?'<span style="color:var(--gray-400)">↳</span>':''}
+          <b>${bdCommentName(q,c)}</b>${isStaffCmt?`<span class="bx" style="font-size:10px;font-weight:700;background:var(--danger-soft);color:#991b1b">${staffWord()}</span>`:''}${rptMark}
         </div>
-        <p style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.65;margin-top:5px;word-break:break-word">${escapeHtml(c.body||'')}</p>
+        <p class="cm-b">${escapeHtml(c.body||'')}</p>
         ${bdPhotosHtml(c.photos)}
-        <p style="font-size:11px;color:#9ca3af;margin-top:6px">${bdAbsTs(c.ts)}</p>
+        <p class="cm-t">${bdAbsTs(c.ts)}</p>
       </div>
-      <div class="bd-cmt-acts" style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-        ${depth?'':`<button onclick="bdStartReply('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:12px;cursor:pointer;padding:2px 3px">대댓글</button>`}
-        <button onclick="bdToggleCommentLike('${id}','${c._id}')" style="background:none;border:none;color:${liked?'#dc2626':'#9ca3af'};font-size:12px;cursor:pointer;padding:2px 3px;font-weight:${liked?'700':'400'}">공감${likes.length?' '+likes.length:''}</button>
-        ${mine?'':`<button onclick="bdOpenReport('${id}','${c._id}')" style="background:none;border:none;color:${reported?'#dc2626':'#9ca3af'};font-size:12px;cursor:pointer;padding:2px 3px">신고</button>`}
-        ${canDel?`<button onclick="bdDelComment('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 3px" title="삭제">×</button>`:''}
+      <div class="bd-cmt-acts" style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+        ${depth?'':`<button class="cm-a" onclick="bdStartReply('${id}','${c._id}')">대댓글</button>`}
+        <button class="cm-a${liked?' on':''}" onclick="bdToggleCommentLike('${id}','${c._id}')">공감${likes.length?' '+likes.length:''}</button>
+        ${mine?'':`<button class="cm-a${reported?' on':''}" onclick="bdOpenReport('${id}','${c._id}')">신고</button>`}
+        ${canDel?`<button class="cm-a" style="font-size:14px" onclick="bdDelComment('${id}','${c._id}')" title="삭제">×</button>`:''}
       </div>
     </div>
   </div>`;
@@ -3505,7 +3545,7 @@ function bdCommentsHtml(q,staff){
     ${replyTo?`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#1C64F2;margin-bottom:6px"><span>↳ ${bdCommentName(q,replyTo)}에게 대댓글</span><button onclick="bdCancelReply()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:12px">취소</button></div>`:''}
     <textarea class="fi ta" id="bd-cmt-input-${id}" rows="2" placeholder="댓글을 입력하세요."></textarea>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${cScope}','comment')"></label>
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">${fmIco('photo')}<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${cScope}','comment')"></label>
       ${anonRow}
       <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="bdAddComment('${id}')">등록</button>
     </div>
@@ -3522,8 +3562,8 @@ function bdComposerHtml(){
   const staff=bdIsStaff();
   const scope='new';
   if(!S.bdComposerOpen)return '';
-  const opts=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-new-secret"> 🔒 비밀글로 올리기 (나와 선생님만 볼 수 있어요)</label>
-    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-new-real" onchange="_('bd-new-nick').style.display=this.checked?'none':''"> 🙋 실명으로 올리기 (내 이름이 공개됩니다)</label>
+  const opts=staff?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:8px;cursor:pointer"><input type="checkbox" id="bd-new-secret"> 비밀글로 올리기 (나와 선생님만 볼 수 있어요)</label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;cursor:pointer"><input type="checkbox" id="bd-new-real" onchange="_('bd-new-nick').style.display=this.checked?'none':''"> 실명으로 올리기 (내 이름이 공개됩니다)</label>
     <input class="fi" id="bd-new-nick" style="margin-top:6px" maxlength="12" placeholder="닉네임 (비워 두면 '익명')" value="${escapeHtml(bdMyNick())}">
     <p style="font-size:11px;color:#9ca3af;margin-top:6px">기본은 익명입니다. 실명으로 올리려면 위를 체크하세요.</p>`;
   return `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
@@ -3532,7 +3572,7 @@ function bdComposerHtml(){
     <textarea class="fi ta" id="bd-new-input" rows="5" placeholder="${staff?'학생들에게 안내할 내용을 입력하세요':'자유롭게 이야기해 보세요'}"></textarea>
     ${opts}
     <div style="margin-top:8px">
-      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${scope}','post')"></label>
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">${fmIco('photo')}사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${scope}','post')"></label>
       <span style="font-size:11px;color:#9ca3af;margin-left:8px">최대 8MB, JPEG/PNG</span>
     </div>
     <div id="bd-draft-anchor-post-${scope}">${bdDraftPreviewHtml(scope,'post')}</div>
@@ -3546,10 +3586,7 @@ function bdComposerHtml(){
 const BD_FILTERS=[{id:'all',label:'전체'},{id:'mine',label:'내 글'},{id:'scrap',label:'스크랩'},{id:'reported',label:'신고됨',staffOnly:true}];
 function bdFilterBarHtml(){
   const cur=S.bdFilter||'all';
-  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${BD_FILTERS.filter(f=>!f.staffOnly||bdIsStaff()).map(f=>{
-    const on=cur===f.id;
-    return `<button onclick="bdSetFilter('${f.id}')" style="border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#1C64F2':'#fff'};color:${on?'#fff':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${f.label}</button>`;
-  }).join('')}</div>`;
+  return chipBarHtml(BD_FILTERS.filter(f=>!f.staffOnly||bdIsStaff()),cur,'bdSetFilter');
 }
 function bdFilteredPosts(){
   const me=bdMyId();
@@ -3570,10 +3607,18 @@ const FM_ICONS={
   comment:'M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4V5.5Z',
   scrap:'m12 3.8 2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5 2.7.9-5.6-4-3.9 5.6-.8L12 3.8Z',
   view:'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Zm9.5 2.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z',
+  photo:'M4 8.5h3.2l1.4-2h6.8l1.4 2H20v10H4v-10Zm8 7.6a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Z',
+  pin:'M9 3.5h6l-.8 5.2 3.3 3.3H6.5l3.3-3.3L9 3.5ZM12 12v8',
+  pencil:'M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3ZM15 6l3 3',
   lock:'M7 10.5V8a5 5 0 0 1 10 0v2.5M5.5 10.5h13v9h-13v-9Z',
   clock:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5.2l3.2 1.9',
 };
 function fmIco(name){return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${FM_ICONS[name]||''}"/></svg>`;}
+/* 필터 알약 줄. 자유게시판·질문게시판이 같은 모양을 각자 인라인으로 그리고 있었다. */
+function chipBarHtml(items,cur,fnName){
+  return `<div class="chipbar">${items.map(x=>
+    `<button class="chip-f${cur===x.id?' on':''}" onclick="${fnName}('${x.id}')">${x.label}${x.n?` <span>${x.n}</span>`:''}</button>`).join('')}</div>`;
+}
 /* 0 이면 색을 빼고 숫자만 회색으로 둔다 — 없는 걸 굳이 눈에 띄게 할 이유가 없다. */
 function fmStat(name,n,label,minor){
   return `<i class="${n>0?'on':''}${minor?' fm-min':''}" title="${label}"><span class="sr-only">${label} </span>${fmIco(name)}${n}</i>`;
@@ -3626,13 +3671,13 @@ function bdListHtml(){
       <p style="font-size:15px;font-weight:700">자유게시판</p>
       <span style="font-size:11px;color:#6b7280">글 ${total}</span>
     </div>
-    ${staff?'':`<p style="font-size:11px;color:#9ca3af;margin-bottom:10px">모든 학생이 볼 수 있는 공개 게시판입니다. 개인적인 내용은 🔒 비밀글로 올려주세요. <button onclick="bdOpenRules()" style="background:none;border:none;color:#1C64F2;font-size:11px;font-weight:700;cursor:pointer;padding:0;text-decoration:underline">이용규칙</button></p>`}
+    ${staff?'':`<p style="font-size:11px;color:#9ca3af;margin-bottom:10px">모든 학생이 볼 수 있는 공개 게시판입니다. 개인적인 내용은 비밀글로 올려주세요. <button onclick="bdOpenRules()" style="background:none;border:none;color:#1C64F2;font-size:11px;font-weight:700;cursor:pointer;padding:0;text-decoration:underline">이용규칙</button></p>`}
     ${banned?bdBanNoticeHtml():''}
     ${bdFilterBarHtml()}
     ${banned?'':bdComposerHtml()}
     ${posts.length?posts.map(bdFeedRowHtml).join(''):empty}
   </div>
-  ${(S.bdComposerOpen||banned)?'':`<button class="bd-fab" onclick="bdOpenComposer()" aria-label="글쓰기" title="글쓰기">✏️ 글쓰기</button>`}`;
+  ${(S.bdComposerOpen||banned)?'':`<button class="bd-fab" onclick="bdOpenComposer()" aria-label="글쓰기" title="글쓰기">${fmIco('pencil')}글쓰기</button>`}`;
 }
 
 function bdDetailHtml(q){
@@ -3918,7 +3963,7 @@ function qaNewBodyColHtml(i){
     <textarea class="fi ta" id="${id}" rows="14" style="min-height:280px" placeholder="${ph}" oninput="qaOnBodyInput('${id}')"></textarea>
     ${qaPrevBoxHtml(id)}
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
-      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block;flex-shrink:0">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${sc}','post')"></label>
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block;flex-shrink:0">${fmIco('photo')}사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${sc}','post')"></label>
       <span style="font-size:11px;color:#9ca3af">최대 8MB, JPEG/PNG</span>
     </div>
     <div id="bd-draft-anchor-post-${sc}">${bdDraftPreviewHtml(sc,'post')}</div>
@@ -4264,10 +4309,7 @@ function qaQuestionsHtml(admin){
     ${canAsk?'':`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">토큰이 부족해 질문을 작성할 수 없습니다. (보유 ${bal}개 / 필요 ${cost}개)</p><p style="font-size:11px;color:#92400e;margin-top:4px">[토큰·결제] 탭에서 토큰을 구매할 수 있습니다.</p></div>`}`;
   }
 
-  const filters=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${QA_FILTERS.map(x=>{
-    const on=f===x.id,n=mine.filter(q=>qaFilterMatch(q,x.id)).length;
-    return `<button onclick="qaSetFilter('${x.id}')" style="border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#1C64F2':'#fff'};color:${on?'#fff':'#6b7280'};border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">${x.label}${n?` <span style="opacity:.75">${n}</span>`:''}</button>`;
-  }).join('')}</div>`;
+  const filters=chipBarHtml(QA_FILTERS.map(x=>({...x,n:mine.filter(q=>qaFilterMatch(q,x.id)).length})),f,'qaSetFilter');
 
   const composer=(!admin&&S.qa.composerOpen)?`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px">
     <p style="font-size:11px;color:#6b7280;margin-bottom:6px">새 질문 · 문제 1개에 ${cost}토큰이 차감됩니다${qaIdleHours()?` · 답변 후 ${qaIdleHours()}시간 동안 댓글이 없으면 자동 종료됩니다`:''}</p>
@@ -4336,7 +4378,6 @@ function qaDetailHtml(q,admin){
 
   const cmtHtml=cmts.map(c=>{
     const isAdm=c.role==='admin';
-    const accent=isAdm?'#dc2626':'#3b82f6';
     const badge=isAdm
       ?`<span class="bx" style="font-size:10px;font-weight:700;background:#fee2e2;color:#991b1b">${staffWord()}</span>`
       :'<span class="bx bb" style="font-size:10px;font-weight:700">학생</span>';
@@ -4356,19 +4397,19 @@ function qaDetailHtml(q,admin){
         <div style="margin-top:6px;font-size:11px;color:#6b7280">기존 사진:</div>
         ${keep.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${keep.map((ph,i)=>`<div style="position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb"><img src="${ph.url}" style="width:100%;height:100%;object-fit:cover"><button type="button" onclick="qaRemoveCmtPhoto('${c._id}',${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0">×</button></div>`).join('')}</div>`:'<p style="font-size:11px;color:#9ca3af;margin-top:4px">없음</p>'}
         <div style="margin-top:6px">
-          <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진 추가<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${escope}','comment')"></label>
+          <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">${fmIco('photo')}사진 추가<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${escope}','comment')"></label>
         </div>
         <div id="bd-draft-anchor-comment-${escope}">${bdDraftPreviewHtml(escope,'comment')}</div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="btn bs bsm" style="flex:1" onclick="qaCancelEditComment()">취소</button>
           <button class="btn bp bsm" style="flex:1" onclick="qaSaveEditComment('${id}','${c._id}')">저장</button>
         </div>`
-      :`<p class="qa-body" style="font-size:13px;color:#111827;white-space:pre-wrap;line-height:1.6">${qaBodyHtml(c.body)}</p>
+      :`<p class="qa-body cm-b">${qaBodyHtml(c.body)}</p>
         ${bdPhotosHtml(c.photos)}`;
-    return `<div style="border-left:3px solid ${accent};background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px">${badge}<b>${nm}</b><span style="color:#9ca3af">· ${bdFmtTs(c.ts)}</span>${c.editedAt&&!isAdm?'<span style="color:#9ca3af;font-size:11px">(수정됨)</span>':''}
-        ${canEditC&&!editing?`<button onclick="qaStartEditComment('${id}','${c._id}')" style="background:none;border:none;color:#6b7280;font-size:11px;cursor:pointer;padding:2px 6px;line-height:1;margin-left:auto">수정</button>`:''}
-        ${canDelC&&!editing?`<button onclick="qaDelComment('${id}','${c._id}')" style="background:none;border:none;color:#9ca3af;font-size:14px;cursor:pointer;padding:2px 6px;line-height:1;${canEditC?'':'margin-left:auto'}" title="삭제">×</button>`:''}
+    return `<div class="cm${isAdm?' staff':''}">
+      <div class="cm-h">${badge}<b>${nm}</b><span style="color:var(--gray-400)">${bdFmtTs(c.ts)}</span>${c.editedAt&&!isAdm?'<span style="color:var(--gray-400);font-size:11px">(수정됨)</span>':''}
+        ${canEditC&&!editing?`<button class="cm-a" style="margin-left:auto" onclick="qaStartEditComment('${id}','${c._id}')">수정</button>`:''}
+        ${canDelC&&!editing?`<button class="cm-a" style="font-size:14px;${canEditC?'':'margin-left:auto'}" onclick="qaDelComment('${id}','${c._id}')" title="삭제">×</button>`:''}
       </div>
       ${bodyBlock}
     </div>`;
@@ -4380,17 +4421,16 @@ function qaDetailHtml(q,admin){
       ${qaChip(QA_Q_STATUS,qaEffStatus(q))}${qaSubjChip(q)}${(()=>{const n=qaProblemLabel(q);return n?`<span class="bx" style="font-size:10px;font-weight:700;background:#eef2ff;color:#4338ca">문제 ${n}개</span>`:'';})()}${who}
       <span style="font-size:11px;color:#9ca3af;margin-left:auto">${qaFmtDateTime(q.createdAt)}</span>
     </div>
-    <h2 class="qa-body" style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word">${escapeHtml(q.title||'')}</h2>
+    <h2 class="qa-body pd-t">${escapeHtml(q.title||'')}</h2>
     ${(()=>{
       const bs=qaBodies(q),bp=qaBodyPhotos(q);
-      const sty='font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word';
-      if(bs.length<2)return `<p class="qa-body" style="${sty}">${qaBodyHtml(bs[0])}</p>${bdPhotosHtml(q.photos)}`;
+      if(bs.length<2)return `<p class="qa-body pd-b">${qaBodyHtml(bs[0])}</p>${bdPhotosHtml(q.photos)}`;
       /* 작성 화면과 같이 나란히 둔다 — 좁으면 flex-wrap 이 위아래로 접는다.
          관리자가 두 문제를 함께 보면서 답할 수 있어야 한다. */
       const cols=`<div style="display:flex;gap:10px;flex-wrap:wrap">${bs.map((b,i)=>`
         <div style="flex:1 1 260px;min-width:0;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;background:#fafafa">
           <p style="font-size:11px;color:#4338ca;font-weight:700;margin-bottom:5px">문제 ${i+1}</p>
-          <p class="qa-body" style="${sty}">${qaBodyHtml(b)}</p>
+          <p class="qa-body pd-b">${qaBodyHtml(b)}</p>
           ${bp?bdPhotosHtml(bp[i]):''}
         </div>`).join('')}</div>`;
       /* 문제별 사진이 없는 예전 글은 두 본문 아래에 통째로 보여 준다. */
@@ -4409,7 +4449,7 @@ function qaDetailHtml(q,admin){
       ${qaPrevBoxHtml('qa-cmt-'+id)}
       <p style="font-size:11px;color:#9ca3af;margin-top:4px">수식은 <code>$x^2$</code> 처럼 쓰면 그려집니다.</p>
       <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-        <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">📷 사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_c_${id}','comment')"></label>
+        <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block">${fmIco('photo')}사진<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_c_${id}','comment')"></label>
         <button class="btn bp bsm" style="flex:1;margin-left:auto" onclick="qaAddComment('${id}')">${admin?'답변 등록':'댓글 등록'}</button>
       </div>
       <div id="bd-draft-anchor-comment-qa_c_${id}">${bdDraftPreviewHtml('qa_c_'+id,'comment')}</div>
