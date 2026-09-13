@@ -192,6 +192,15 @@ label.btn{display:inline-flex!important}
 .cm-h b{font-size:12px;font-weight:700}
 .cm-b{font-size:13px;color:var(--gray-900);white-space:pre-wrap;line-height:1.65;word-break:break-word;margin-top:5px}
 .cm-t{font-size:11px;color:var(--gray-400);margin-top:6px}
+/* 아직 아무것도 없는 화면. 28px 이모지를 크게 띄우던 자리를 선 아이콘으로 바꾼다 —
+   기기마다 모양이 달라 같은 화면이 기기별로 다르게 보였다. */
+.es{text-align:center;padding:34px 20px;margin-bottom:12px}
+.es-ico{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:var(--radius-xl);background:var(--gray-100);color:var(--gray-400);margin-bottom:12px}
+.es-ico svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.es-t{font-size:15px;font-weight:700;color:var(--gray-900)}
+.es-b{font-size:13px;color:var(--gray-500);line-height:1.6;margin-top:6px}
+.es-b .sub{font-size:12px;color:var(--gray-400)}
+.es .btn{margin-top:14px}
 /* 내 정보의 항목 줄. 항목마다 카드를 하나씩 두면 휴대폰에서 상자만 잔뜩 보인다. */
 .mi{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-top:1px solid var(--gray-100);font-size:13px}
 .mi:first-of-type{border-top:none;padding-top:0}
@@ -2295,9 +2304,16 @@ async function createFirstAdmin(){
 const STU_TABS=[{id:'book',label:'예약'},{id:'score',label:'성적'},{id:'note',label:'멘토링 기록'}];
 function stuTab(){return STU_TABS.some(t=>t.id===S.stuTab)?S.stuTab:'book';}
 function setStuTab(id){S.stuTab=id;renderStu();try{window.scrollTo({top:0});}catch(_){}}
-function stuEmptyPane(msg){
-  return `<div class="card" style="text-align:center;padding:36px 20px;color:var(--gray-400);font-size:13px">${msg}</div>`;
+/* 아직 아무것도 없는 화면. 학생 화면이 쓰는 빈 상태는 전부 이걸 거친다. */
+function emptyStateHtml(icon,title,body,action){
+  return `<div class="card es">
+    <span class="es-ico">${fmIco(icon)}</span>
+    <p class="es-t">${title}</p>
+    ${body?`<div class="es-b">${body}</div>`:''}
+    ${action||''}
+  </div>`;
 }
+
 function stuTabsHtml(){
   const cur=stuTab();
   return `<div class="tabs">${STU_TABS.map(t=>
@@ -2313,8 +2329,8 @@ function renderStu(){
   /* 탭에 담을 몫만 그린다. 예약 카드는 아래에서 상황별로 만들어 넘긴다. */
   const pane=(bookHtml)=>{
     const t=stuTab();
-    const inner=t==='score'?(graphCard+examCards||stuEmptyPane('아직 입력한 성적이 없습니다.'))
-      :t==='note'?(consultCard||stuEmptyPane('아직 남은 멘토링 기록이 없습니다.'))
+    const inner=t==='score'?(graphCard+examCards||emptyStateHtml('chart','아직 입력한 성적이 없습니다','성적 입력 기간이 열리면 여기에서 입력할 수 있습니다.'))
+      :t==='note'?(consultCard||emptyStateHtml('note','아직 남은 멘토링 기록이 없습니다','멘토링을 받고 나면 선생님이 남긴 기록이 여기에 보입니다.'))
       :bookHtml;
     return noticeCard+stuTabsHtml()+inner;
   };
@@ -2325,7 +2341,9 @@ function renderStu(){
     let emptyCard;
     if(bOpen){
       clearBookCountdown();
-      emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">지금 예약하거나, [성적] 탭에서 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`;
+      emptyCard=emptyStateHtml('calendar','아직 멘토링 예약이 없습니다',
+        '지금 예약하거나, [성적] 탭에서 먼저 성적을 입력할 수 있습니다.',
+        '<button class="btn bp" onclick="showBookForm(false)">예약하기</button>');
     }else{
       const adminDisabled=bookingAdminDisabled();
       const st=adminDisabled?{kind:'disabled'}:bookPeriodStatus();
@@ -2341,7 +2359,8 @@ function renderStu(){
       }else{
         bodyHtml=`<p style="color:#6b7280;font-size:13px">선생님이 예약 기간을 설정하면 예약할 수 있어요.</p>`;
       }
-      emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간이면 [성적] 탭에서 입력할 수 있습니다.</p></div>`;
+      emptyCard=emptyStateHtml('clock','예약 신청 기간이 아닙니다',
+        `${bodyHtml}<p class="sub" style="margin-top:10px">성적 입력 기간이면 [성적] 탭에서 입력할 수 있습니다.</p>`);
     }
     _('stuC').innerHTML=pane(emptyCard);
     if(!bOpen){const st=bookPeriodStatus();if(st.kind==='before')startBookCountdown(st.startAt);}
@@ -3621,8 +3640,10 @@ const FM_ICONS={
   scrap:'m12 3.8 2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5 2.7.9-5.6-4-3.9 5.6-.8L12 3.8Z',
   view:'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Zm9.5 2.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z',
   photo:'M4 8.5h3.2l1.4-2h6.8l1.4 2H20v10H4v-10Zm8 7.6a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Z',
-  pin:'M9 3.5h6l-.8 5.2 3.3 3.3H6.5l3.3-3.3L9 3.5ZM12 12v8',
   pencil:'M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3ZM15 6l3 3',
+  calendar:'M4.5 6.5A1.5 1.5 0 0 1 6 5h12a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 18 20H6a1.5 1.5 0 0 1-1.5-1.5v-12ZM8 3v4M16 3v4M4.5 10h15',
+  chart:'M4 20V4M4 20h16M8 16.5V11M12.5 16.5V7.5M17 16.5v-4',
+  note:'M8 3.5h8a2 2 0 0 1 2 2V20l-6-3-6 3V5.5a2 2 0 0 1 2-2ZM9.5 9h5M9.5 12.5h3',
   lock:'M7 10.5V8a5 5 0 0 1 10 0v2.5M5.5 10.5h13v9h-13v-9Z',
   clock:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5.2l3.2 1.9',
 };
@@ -5523,9 +5544,10 @@ async function saveExamScore(examId){
 
 function showBookForm(isChange){
   const c=_('stuC');
-  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'':(pl?'예약 가능 기간: '+pl:'선생님이 예약 기간을 설정하면 예약할 수 있어요.');c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 기간이 아닙니다</p>${sub?`<p style="color:#6b7280;font-size:13px">${sub}</p>`:''}${isChange?'<div style="margin-top:16px"><button class="btn bs" onclick="renderStu()">← 돌아가기</button></div>':''}</div>`;return;}
+  if(!isBookingOpen()){const adminDisabled=bookingAdminDisabled();const pl=adminDisabled?'':bookPeriodLabel();const sub=adminDisabled?'':(pl?'예약 가능 기간: '+pl:'선생님이 예약 기간을 설정하면 예약할 수 있어요.');c.innerHTML=emptyStateHtml('clock','예약 기간이 아닙니다',sub||'',
+      isChange?'<button class="btn bs" onclick="renderStu()">← 돌아가기</button>':'');return;}
   const avail=S.schedule.dates.filter(d=>d.slots.length>0);
-  if(!avail.length){c.innerHTML=`<div class="card" style="text-align:center;padding:40px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">예약 가능한 일정이 없습니다</p><p style="color:#6b7280;font-size:13px">선생님이 일정을 등록하면 예약할 수 있어요.</p></div>`;return;}
+  if(!avail.length){c.innerHTML=emptyStateHtml('calendar','예약 가능한 일정이 없습니다','선생님이 일정을 등록하면 예약할 수 있어요.');return;}
   if(!S.selDate||!avail.find(d=>d.id===S.selDate))S.selDate=avail[0].id;
   const sel=avail.find(d=>d.id===S.selDate),taken=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).map(b=>b.slot),myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const dtabs=avail.map(d=>`<button class="dt ${d.id===S.selDate?'on':''}" onclick="selDate('${d.id}')">${d.label}</button>`).join('');
