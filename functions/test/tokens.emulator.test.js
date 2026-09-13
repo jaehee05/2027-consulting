@@ -421,6 +421,92 @@ describe("질문 댓글 권한", () => {
   });
 });
 
+describe("문제별 댓글", () => {
+  const me = { id: student.id, name: student.name, role: "student" };
+  async function twoProblems() {
+    await setBalance(student.id, 5);
+    return (await tokens.createQuestion(fs, {
+      student, title: "t", bodies: ["18번", "20번"], problems: 2,
+    })).id;
+  }
+  const commentsOf = async (id) => (await fs.doc(`questions/${id}`).get()).data().comments;
+  const statusOf = async (id) => (await fs.doc(`questions/${id}`).get()).data().status;
+
+  test("어느 문제에 단 댓글인지 남는다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "18번요", problemIndex: 1 });
+    expect((await commentsOf(id))[0].pi).toBe(1);
+  });
+
+  test("문제를 가리지 않은 댓글에는 칸 자체가 없다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "그냥" });
+    expect((await commentsOf(id))[0]).not.toHaveProperty("pi");
+  });
+
+  test("범위를 벗어난 값은 문제를 가리지 않은 것으로 본다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "x", problemIndex: 7 });
+    expect((await commentsOf(id))[0]).not.toHaveProperty("pi");
+  });
+
+  test("한 문제에만 답하면 아직 답변대기다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "18번 답", problemIndex: 0 });
+    expect(await statusOf(id)).toBe("pending");
+  });
+
+  test("두 문제에 다 답해야 답변완료가 된다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "18번 답", problemIndex: 0 });
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "20번 답", problemIndex: 1 });
+    const q = (await fs.doc(`questions/${id}`).get()).data();
+    expect(q.status).toBe("answered");
+    expect(typeof q.answeredAt).toBe("number");
+  });
+
+  test("같은 문제에 두 번 답해도 나머지 한 문제가 남으면 답변대기다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답1", problemIndex: 0 });
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답2", problemIndex: 0 });
+    expect(await statusOf(id)).toBe("pending");
+  });
+
+  // 번들 앱이 문제를 가리지 않고 보낸 답변. 둘 다 답한 것으로 봐야 답변대기에 영원히 남지 않는다.
+  test("문제를 가리지 않은 관리자 답변 하나면 답변완료다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "둘 다 답합니다" });
+    expect(await statusOf(id)).toBe("answered");
+  });
+
+  test("한 문제의 답변을 지우면 답변대기로 되돌아간다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답1", problemIndex: 0 });
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답2", problemIndex: 1 });
+    expect(await statusOf(id)).toBe("answered");
+    const cid = (await commentsOf(id)).find((c) => c.pi === 1)._id;
+    await tokens.deleteQuestionComment(fs, { questionId: id, commentId: cid, actor: adminActor });
+    expect(await statusOf(id)).toBe("pending");
+  });
+
+  test("수정해도 어느 문제의 댓글인지는 그대로다", async () => {
+    const id = await twoProblems();
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "처음", problemIndex: 1 });
+    const cid = (await commentsOf(id))[0]._id;
+    await tokens.editQuestionComment(fs, { questionId: id, commentId: cid, actor: me, body: "고침" });
+    const c = (await commentsOf(id))[0];
+    expect(c.body).toBe("고침");
+    expect(c.pi).toBe(1);
+  });
+
+  test("문제가 하나면 한 번의 답변으로 답변완료다", async () => {
+    await setBalance(student.id, 5);
+    const id = (await tokens.createQuestion(fs, { student, title: "t", body: "b" })).id;
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "답", problemIndex: 0 });
+    expect(await statusOf(id)).toBe("answered");
+  });
+});
+
 describe("스레드 닫기", () => {
   async function makeQuestion() {
     await setBalance(student.id, 5);

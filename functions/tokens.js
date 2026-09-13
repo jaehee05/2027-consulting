@@ -225,6 +225,31 @@ function normProblems(v) {
   return Math.min(n, MAX_PROBLEMS);
 }
 
+/* 문제가 둘이면 댓글도 문제마다 따로 달린다. 어느 문제에 달렸는지는 `pi`(0부터)로 남긴다.
+   값이 없는 댓글은 두 문제에 함께 달린 것으로 본다 — 이 기능 이전의 댓글과, index.html 을
+   번들로 들고 있어 이 칸 없이 보내는 스토어 배포본이 그렇다. 거부하지 않는다. */
+function normProblemIndex(v, count) {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n) || n < 0 || n >= count) return null;
+  return n;
+}
+
+/* 문제마다 답을 받아야 답변완료다. 하나만 답하고 답변완료가 되면 남은 문제가 답변대기
+   필터에서 사라지는 데다, 자동 종료 시계까지 돌기 시작해 답을 못 받은 채 닫힌다. */
+function allAnswered(comments, problems) {
+  const adm = (Array.isArray(comments) ? comments : []).filter((c) => c.role === "admin");
+  if (!adm.length) return false;
+  const count = normProblems(problems);
+  if (count <= 1) return true;
+  // 문제를 가리지 않은 관리자 댓글은 둘 다 답한 것으로 본다.
+  if (adm.some((c) => normProblemIndex(c.pi, count) === null)) return true;
+  for (let i = 0; i < count; i++) {
+    if (!adm.some((c) => c.pi === i)) return false;
+  }
+  return true;
+}
+
 /**
  * 질문 작성 + 토큰 차감을 한 트랜잭션으로.
  * 잔액 확인과 차감이 같은 트랜잭션 안에 있어야 동시 작성으로 음수가 되지 않는다.
@@ -299,7 +324,7 @@ async function createQuestion(fs, { student, title, body, bodies, photos, bodyPh
  * 토큰은 질문 스레드를 열 때 한 번만 부과되므로 댓글은 무료다. 학생은 자기 질문에만 달 수 있고, 그 판정은 여기(서버)서 한다.
  * 관리자가 댓글을 달면 질문이 답변완료로 넘어간다.
  */
-async function addQuestionComment(fs, { questionId, actor, body, photos }) {
+async function addQuestionComment(fs, { questionId, actor, body, photos, problemIndex }) {
   const b = String(body || "").trim();
   const ph = normPhotos(photos);
   if (!b && !ph.length) throw new ApiError(400, "내용 또는 사진을 입력해 주세요.");
@@ -323,6 +348,7 @@ async function addQuestionComment(fs, { questionId, actor, body, photos }) {
     if (actor.role !== "admin" && q.authorId !== actor.id) {
       throw new ApiError(403, "본인 질문에만 댓글을 달 수 있습니다.");
     }
+    const pi = normProblemIndex(problemIndex, normProblems(q.problems));
     const comment = {
       _id: `c_${now.toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       role: actor.role === "admin" ? "admin" : "student",
@@ -330,13 +356,13 @@ async function addQuestionComment(fs, { questionId, actor, body, photos }) {
       authorId: actor.id,
       body: b,
       photos: ph,
+      // Firestore 는 undefined 를 거부한다 — 문제를 가리지 않은 댓글에는 칸 자체를 두지 않는다.
+      ...(pi === null ? {} : { pi }),
       ts: now,
     };
-    const upd = {
-      comments: [...(Array.isArray(q.comments) ? q.comments : []), comment],
-      updatedAt: now,
-    };
-    if (actor.role === "admin" && q.status !== "answered") {
+    const list = [...(Array.isArray(q.comments) ? q.comments : []), comment];
+    const upd = { comments: list, updatedAt: now };
+    if (actor.role === "admin" && q.status !== "answered" && allAnswered(list, q.problems)) {
       upd.status = "answered";
       upd.answeredAt = now;
     }
@@ -417,9 +443,9 @@ async function deleteQuestionComment(fs, { questionId, commentId, actor }) {
     }
     const next = list.filter((c) => c._id !== commentId);
     const upd = { comments: next, updatedAt: now };
-    // 관리자 댓글이 다 지워지면 다시 답변대기로 돌린다 — 아니면 답변 없는 글이 답변완료로 남는다.
+    // 답이 빈 문제가 생기면 다시 답변대기로 돌린다 — 아니면 답변 없는 문제가 답변완료로 남는다.
     // 단 종료된 스레드는 건드리지 않는다. 닫아 둔 걸 댓글 삭제로 다시 열면 안 된다.
-    if (q.status !== "closed" && !next.some((c) => c.role === "admin")) {
+    if (q.status !== "closed" && !allAnswered(next, q.problems)) {
       upd.status = "pending";
       upd.answeredAt = null;
     }

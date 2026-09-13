@@ -1041,6 +1041,7 @@ exports.tokenApi = onRequest(async (req, res) => {
         if (!isAdmin) await requireStudent();
         const r = await tokens.addQuestionComment(fs, {
           questionId: p.questionId, actor, body: p.body, photos: p.photos,
+          problemIndex: p.problemIndex,
         });
         // 관리자 답변만 알린다. 학생이 자기 스레드에 남긴 댓글까지 자기한테 보낼 이유가 없다.
         if (isAdmin && r.authorId) {
