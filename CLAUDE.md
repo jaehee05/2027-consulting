@@ -178,11 +178,25 @@ Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see
 
 **Tests**: `functions/test/`. `npm test` runs the pure pricing tests; `npm run test:emu` boots the Firestore emulator and runs everything (31 tests), including concurrency and double-grant. The emulator needs a Java runtime — this Mac has Temurin 21 at `~/.local/java/jdk-21.0.12.1+1/Contents/Home`; export `JAVA_HOME` to that and put its `bin` on `PATH` before running.
 
+### 관리자 화면의 두 단 구조 (`ADMIN_AREAS`)
+
+예전에는 탭 10개가 한 줄에 늘어서 있었고 그 화면 전체가 `멘토링 관리` 라는 이름을 달고 있었다. **로그인 현황·계정 관리·알림톡·공지사항은 멘토링이 아니라 앱 전체에 딸린 것들인데** 멘토링 아래 묻혀 있었다. 지금은 두 단이다.
+
+- **하단 내비가 영역을 고른다**: `학생`(학생 관리·학생 성적·멘토링) / `예약`(예약 현황·일정 관리) / `더보기`(운영 — 시험 관리·공지사항·알림톡·**로그인 현황**·계정 관리 + 자유게시판 바로가기). 운영은 화면이 다섯이라 자리 하나로 묶고 시트(`openTabSheet`)로 연다.
+- **상단 탭은 그 영역 안의 화면만** 보여 준다(`updateAdminTabs` → `adminAreaTabs(adminCurArea())`). 두세 개뿐이라 가로 스크롤도, 우측 `☰` 버튼도 없앴다 — 그 역할은 내비의 `더보기` 가 한다.
+- 영역은 `ADMIN_TABS[].group`(`stu`/`book`/`ops`)이고 `ADMIN_AREAS` 가 순서·이름·아이콘을 갖는다. **topbar 의 화면 이름(`#adminAreaName`)도 영역을 따라간다** — 어느 화면에 있든 `멘토링 관리` 라고 쓰여 있던 것이 문제였다.
+- 내비 자리의 켜짐은 `snavIsOn()` 이 정한다. `vAdmin` 이라고 다 켜지면 안 되고 **지금 영역과 맞을 때만** 켜진다. 영역 자리를 다시 누르면 그 영역의 첫 화면으로 돌아간다(학생 화면의 탭 재탭과 같다).
+- OP(viewer)는 운영 화면이 없고 게시판·질문게시판도 못 보므로 `홈 · 학생 · 예약` 세 자리만 남는다.
+
+### 학생 목록에 연락처·계정 ID 를 두지 않는다
+
+관리자 학생 목록은 **좌석·학년·이름·학교**까지만 보여 주고, 연락처와 계정 ID 는 `[수정]`(`openStuModal`)에서 본다. 목록을 열어 두기만 해도 전교생 연락처가 화면에 깔리던 것을 좁힌 것이다. 검색(`stuSrch`)은 그대로 연락처·계정 ID 로도 걸린다 — 표시와 검색은 별개다. **표의 `<th>` 와 행의 `<td>` 개수는 반드시 같이 맞춘다**(빈 행의 `colspan` 도). OP 목록은 상세 화면이 없어 연락처를 그대로 두었다.
+
 ### 학생·관리자 하단 내비 (`snav`)
 
 허브를 거쳐 화면을 옮기던 흐름(홈 → 카드 → `← 홈` → 카드)을 없앴다. `renderStuNav(viewId)` 가 `showView` 안에서 매번 돌며 `body.has-snav` 를 켜고 끈다.
 
-- **자리는 역할이 갈 수 있는 화면과 같다** (`SNAV_BY_ROLE`): 학생 5칸(홈·멘토링·질문·게시판·내 정보), 관리자 4칸(내 정보는 학생 전용), OP(viewer) 2칸(게시판·질문게시판을 아예 못 본다). 로그인 전 방문자와 태블릿은 갈 곳이 하나뿐이라 내비가 없다. **관리자·OP 의 '멘토링' 은 `vStu` 가 아니라 `vAdmin`** 이므로 `snavItems()` 가 그 자리만 바꿔 끼운다.
+- **자리는 역할이 갈 수 있는 화면과 같다** (`SNAV_BY_ROLE`): 학생 5칸(홈·멘토링·질문·게시판·내 정보), 관리자 5칸(홈·학생·예약·질문·더보기 — 내 정보는 학생 전용), OP(viewer) 3칸. 로그인 전 방문자와 태블릿은 갈 곳이 하나뿐이라 내비가 없다. **관리자 자리는 화면이 아니라 영역**이라 `SNAV_AREA_ITEMS` 에 따로 있다(위의 두 단 구조 참고).
 - 휴대폰에서는 화면 아래에 붙이고(엄지가 닿는 자리), 641px 이상에서는 가운데에 띄운 알약이 된다. `.page` 아래 여백과 카카오 런처·글쓰기 FAB 의 `bottom` 을 `has-snav` 가 같이 밀어 올린다 — 안 밀면 내비에 가려진다.
 - 내비가 있으면 상단 `← 홈`(`.home-link`)은 군더더기라 CSS 로 감춘다.
 

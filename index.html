@@ -113,6 +113,7 @@ label.btn{display:inline-flex!important}
 .tabs::-webkit-scrollbar{display:none}
 .tab{padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray-500);border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;flex-shrink:0;white-space:nowrap}
 .tab.on{color:var(--primary);border-bottom-color:var(--primary)}.tab:hover{color:var(--gray-900)}
+.tab-n{display:inline-block;background:var(--danger);color:#fff;border-radius:var(--radius-pill);padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px}
 .tw{overflow-x:auto}
 /* ── 질문게시판 본문 글꼴 ──
    관리자가 [토큰 설정]에서 고른 글꼴이 --qa-font 로 들어온다. @font-face 는 넷 다 선언해 두지만
@@ -379,16 +380,6 @@ tr.selected>td:last-child{box-shadow:inset -1px 1px 0 var(--primary-soft-border)
 .tabs-wrap::before{left:0;background:linear-gradient(to left,transparent,var(--surface))}
 .tabs-wrap::after{right:0;background:linear-gradient(to right,transparent,var(--surface))}
 .tabs-wrap.can-l::before,.tabs-wrap.can-r::after{opacity:1}
-/* 탭이 10개라 모바일에선 스트립 탐색이 부담스럽다.
-   우측 고정 버튼으로 그룹별 시트를 열어 한 번에 점프. */
-.tabs-more{display:none;position:absolute;right:0;top:0;bottom:1px;width:46px;z-index:2;align-items:center;justify-content:center;border:none;border-left:1px solid var(--gray-200);background:var(--surface);color:var(--gray-500);font-size:16px;font-family:inherit;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
-.tabs-more:active{background:var(--gray-100)}
-.tabs-more .tm-dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:1.5px solid var(--surface)}
-@media(max-width:640px){
-  .tabs-more{display:inline-flex}
-  .tabs-wrap>.tabs{padding-right:46px}
-  .tabs-wrap::after{right:46px}
-}
 /* 목록 검색 */
 .srch{position:relative;flex:1;min-width:180px}
 .srch>input{height:34px;width:100%;padding:0 30px 0 30px;border:1px solid var(--gray-200);border-radius:var(--radius-lg);font-family:inherit;font-size:13px;color:var(--gray-900);background:var(--surface);outline:none;transition:.15s}
@@ -907,11 +898,11 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <!-- 관리자/뷰어 뷰 -->
 <div id="vAdmin" class="hidden">
   <div class="topbar np">
-    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="adminChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname">멘토링 관리</span><span class="trole" id="adminRoleLabel"></span></div>
+    <div class="tl"><button class="home-link" onclick="goHome()" title="홈">← 홈</button><span class="chip" id="adminChip" onclick="editChip('consultingChip','2027 6평')" title="">2027 6평</span><span class="tname" id="adminAreaName">학생</span><span class="trole" id="adminRoleLabel"></span></div>
     <div class="tr"><span class="uname" id="adminUname"></span><button class="btn bs bsm" onclick="doLogout()">로그아웃</button></div>
   </div>
   <div class="page">
-    <div class="tabs-wrap np"><div class="tabs" id="adminTabs"></div><button class="tabs-more" id="adminTabsMore" onclick="openTabSheet()" aria-label="전체 메뉴" title="전체 메뉴">☰</button></div>
+    <div class="tabs-wrap np"><div class="tabs" id="adminTabs"></div></div>
     <div id="adminC"></div>
   </div>
 </div>
@@ -1450,22 +1441,50 @@ var _bkListener=null, _bkSeedDone=false;
 function pendingReqCountForAdmin(){return S.requests.filter(r=>r.status==='pending'&&r.type!=='admin_change'&&r.type!=='add_student').length;}
 function pendingAddStudentCount(){return S.requests.filter(r=>r.type==='add_student'&&r.status==='pending').length;}
 /* 관리자 탭 정의 — 탭바와 전체 메뉴 시트가 같은 목록을 쓴다. */
+/* ── 관리자 화면의 두 단 구조 ──
+   예전에는 탭 10개가 한 줄에 늘어서 있었고, 그 화면 전체가 '멘토링 관리' 라는 이름을 달고 있었다.
+   로그인 현황·계정·알림톡·공지는 멘토링이 아니라 앱 전체에 딸린 것들인데 멘토링 아래 묻혀 있었다.
+   지금은 **하단 내비가 영역(학생·예약·운영)** 을 고르고, **상단 탭이 그 영역 안의 화면**을 고른다.
+   `group` 이 영역이고 `ADMIN_AREAS` 가 그 순서·이름·아이콘을 갖는다. */
 const ADMIN_TABS=[
-  {id:'students', label:'학생 관리', opLabel:'학생 목록', group:'학생',  icon:'users', desc:'등록·수정·퇴원, 알림톡 발송'},
-  {id:'scores',   label:'학생 성적', group:'학생',  icon:'chart', desc:'시험별 성적 입력 및 등급'},
-  {id:'consult',  label:'멘토링',   group:'학생',  icon:'speech', desc:'상담 기록과 성적 그래프'},
-  {id:'logins',   label:'로그인 현황', group:'학생', icon:'key', desc:'학생 접속 여부 확인'},
-  {id:'bookings', label:'예약 현황', group:'예약',  icon:'ticket', desc:'시간대별 예약, 변경/취소 요청'},
-  {id:'schedule', label:'일정 관리', group:'예약',  icon:'calendar', desc:'날짜·시간대와 예약 기간 설정'},
-  {id:'exams',    label:'시험 관리', group:'운영',  icon:'note', desc:'시험 추가와 등급컷'},
-  {id:'notices',  label:'공지사항',  group:'운영',  icon:'megaphone', desc:'학생에게 보이는 공지'},
-  {id:'alimtalk', label:'알림톡',    group:'운영',  icon:'mail', desc:'템플릿과 발송 설정'},
-  {id:'accounts', label:'계정 관리', group:'운영',  icon:'gear', desc:'ADMIN / OP / TEST 계정'},
+  {id:'students', label:'학생 관리', opLabel:'학생 목록', group:'stu',  icon:'users', desc:'등록·수정·퇴원, 알림톡 발송'},
+  {id:'scores',   label:'학생 성적', group:'stu',  icon:'chart', desc:'시험별 성적 입력 및 등급'},
+  {id:'consult',  label:'멘토링',   group:'stu',  icon:'speech', desc:'상담 기록과 성적 그래프'},
+  {id:'bookings', label:'예약 현황', group:'book', icon:'ticket', desc:'시간대별 예약, 변경/취소 요청'},
+  {id:'schedule', label:'일정 관리', group:'book', icon:'calendar', desc:'날짜·시간대와 예약 기간 설정'},
+  {id:'exams',    label:'시험 관리', group:'ops',  icon:'note', desc:'시험 추가와 등급컷'},
+  {id:'notices',  label:'공지사항',  group:'ops',  icon:'megaphone', desc:'학생에게 보이는 공지'},
+  {id:'alimtalk', label:'알림톡',    group:'ops',  icon:'mail', desc:'템플릿과 발송 설정'},
+  /* 로그인 현황은 학생 상담이 아니라 계정 이야기라 운영에 둔다. */
+  {id:'logins',   label:'로그인 현황', group:'ops', icon:'key', desc:'학생 접속 여부 확인'},
+  {id:'accounts', label:'계정 관리', group:'ops',  icon:'gear', desc:'ADMIN / OP / TEST 계정'},
+];
+const ADMIN_AREAS=[
+  {id:'stu',  label:'학생', icon:'users'},
+  {id:'book', label:'예약', icon:'ticket'},
+  {id:'ops',  label:'운영', icon:'gear'},
 ];
 const OP_TAB_IDS=['students','scores','bookings'];
 function adminTabList(){
   const isAdmin=S.user?.type==='admin';
   return isAdmin?ADMIN_TABS:OP_TAB_IDS.map(id=>ADMIN_TABS.find(t=>t.id===id));
+}
+/* 지금 영역. 저장된 탭이 그 역할에게 없으면 첫 영역으로 떨어진다. */
+function adminAreaOf(tabId){return (adminTabList().find(t=>t.id===tabId)||{}).group||'';}
+function adminAreaTabs(areaId){return adminTabList().filter(t=>t.group===areaId);}
+function adminAreaList(){return ADMIN_AREAS.filter(a=>adminAreaTabs(a.id).length);}
+function adminCurArea(){return adminAreaOf(S.tab)||(adminAreaList()[0]||{}).id||'';}
+/* 내비에서 영역을 고르면 그 영역의 첫 화면을 연다. 이미 그 영역에 있으면 그대로 둔다. */
+function goAdminArea(areaId){
+  const tabs=adminAreaTabs(areaId);
+  if(!tabs.length)return;
+  if(_('vAdmin')?.classList.contains('hidden')){
+    _('adminUname').textContent=S.user?.name||'';
+    _('adminRoleLabel').textContent=S.user?.type==='admin'?'ADMIN':'OP';
+    showView('vAdmin');applyChips();
+  }
+  if(adminAreaOf(S.tab)!==areaId)setTab(tabs[0].id);
+  else updateAdminTabs();
 }
 function adminTabBadge(id){
   if(id==='bookings')return pendingReqCountForAdmin();
@@ -1476,16 +1495,16 @@ function adminTabLabel(t){return (S.user?.type==='admin'?t.label:(t.opLabel||t.l
 function updateAdminTabs(){
   if(!S.user||S.user.type==='student')return;
   const el=_('adminTabs');if(!el)return;
-  const tabs=adminTabList();
-  let totalBadge=0;
+  /* 열 개를 한 줄에 늘어놓지 않는다 — 지금 영역의 화면만 보여 준다(영역은 하단 내비가 고른다). */
+  const tabs=adminAreaTabs(adminCurArea());
   el.innerHTML=tabs.map(t=>{
-    const c=adminTabBadge(t.id);totalBadge+=c;
-    const badge=c>0?` <span style="display:inline-block;background:#dc2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">${c}</span>`:'';
+    const c=adminTabBadge(t.id);
+    const badge=c>0?` <span class="tab-n">${c}</span>`:'';
     return `<button class="tab ${S.tab===t.id?'on':''}" onclick="setTab('${t.id}')" data-tab="${t.id}">${adminTabLabel(t)}${badge}</button>`;
   }).join('');
-  /* 시트를 열지 않아도 처리할 일이 있다는 걸 알 수 있게 더보기 버튼에 점 표시 */
-  const more=_('adminTabsMore');
-  if(more)more.innerHTML='☰'+(totalBadge>0?'<span class="tm-dot"></span>':'');
+  const area=ADMIN_AREAS.find(a=>a.id===adminCurArea());
+  const nm=_('adminAreaName');if(nm&&area)nm.textContent=area.label;
+  renderStuNav('vAdmin');
   syncTabScroll();
 }
 /* 전체 메뉴 시트 — 탭 10개를 그룹으로 묶어 한 번에 이동 */
@@ -1493,8 +1512,9 @@ function openTabSheet(){
   const tabs=adminTabList();
   const groups=[];
   for(const t of tabs){
-    let g=groups.find(x=>x.name===t.group);
-    if(!g){g={name:t.group,items:[]};groups.push(g);}
+    const gname=(ADMIN_AREAS.find(a=>a.id===t.group)||{}).label||t.group;
+    let g=groups.find(x=>x.name===gname);
+    if(!g){g={name:gname,items:[]};groups.push(g);}
     g.items.push(t);
   }
   const body=groups.map(g=>`<p class="tab-sheet-group">${g.name}</p><div class="sheet-list">${g.items.map(t=>{
@@ -1505,9 +1525,14 @@ function openTabSheet(){
       ${c>0?`<span class="sheet-badge">${c}</span>`:''}
       <span class="sheet-arrow" ${S.tab===t.id?'style="color:var(--primary);font-weight:700"':''}>${S.tab===t.id?'✓':'›'}</span>
     </button>`;}).join('')}</div>`).join('');
+  const extra=(S.user?.type==='admin')?`<p class="tab-sheet-group">바로가기</p><div class="sheet-list">
+    <button class="sheet-item" onclick="closeModal();goBoard()">
+      <span class="sheet-icon">${fmIco('comment')}</span>
+      <span class="sheet-text"><b>자유게시판</b><span>학생 익명 게시판 · 신고와 제재</span></span>
+      <span class="sheet-arrow">›</span></button></div>`:'';
   _('mCt').innerHTML=`<p class="mtitle">전체 메뉴</p>
     <p class="msub">이동할 화면을 선택하세요.</p>
-    ${body}
+    ${body}${extra}
     <div class="mactions"><button class="btn bs bfw" onclick="closeModal()">닫기</button></div>`;
   openModal();
 }
@@ -1519,8 +1544,6 @@ function syncTabScroll(){
   const wrap=el.parentElement;
   const on=el.querySelector('.tab.on');
   if(on){
-    /* 모바일에선 우측에 ☰ 버튼이 얹혀 있어 .tabs 에 padding-right 가 붙는다.
-       그만큼 빼지 않으면 마지막 탭이 버튼 뒤에 가린다. */
     const padR=parseFloat(getComputedStyle(el).paddingRight)||0;
     const l=on.offsetLeft,r=l+on.offsetWidth;
     const viewR=el.scrollLeft+el.clientWidth-padR;
@@ -6551,9 +6574,6 @@ function _stuRowHtml(s,inMode){
     <td data-label="학년" class="cell-hide"><span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${escapeHtml(s.grade||'')}</span></td>
     <td data-label="" class="cell-head" style="font-weight:600"><span>${escapeHtml(s.name||'')}${s.consultExcluded?' <span class="bx" style="background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:600" title="컨설팅 제외 학생">컨설팅 제외</span>':''}</span><span class="head-meta">${s.seat?`<span class="seat-chip">#${s.seat}</span>`:''}<span class="bx ${s.grade==='고3'?'br':s.grade==='고2'?'bb':'bg'}">${escapeHtml(s.grade||'')}</span>${s.consultExcluded?'<span class="bx" style="background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:600">제외</span>':''}</span></td>
     <td data-label="학교">${escapeHtml(s.school||'')}</td>
-    <td data-label="학생 연락처">${stuPhone}</td>
-    <td data-label="보호자 연락처">${escapeHtml(s.guardianPhone||'')}</td>
-    <td data-label="계정 ID"><code>${escapeHtml(s.accountId||'')}</code></td>
     <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn bs bsm" onclick="previewAsStudent('${s._docId}')" title="이 학생의 화면을 미리봅니다">학생뷰</button><button class="btn bs bsm" onclick="openStuModal('${s._docId}')">수정</button><button class="btn bd bsm" onclick="withdrawStu('${s._docId}')">퇴원</button></div></td>
   </tr>`;
 }
@@ -6599,8 +6619,8 @@ function renderAdminStudents(){
     <span style="font-size:12px;color:#6b7280;font-weight:600">정렬:</span>${sortBtns}
   </div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table>
-    <thead><tr><th style="width:36px;text-align:center"><input id="stuSelAll" type="checkbox" ${allSelected?'checked':''} ${selectableIds.length===0?'disabled':''} onchange="toggleStuSelectAll(this.checked)"></th><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>학생 연락처</th><th>보호자 연락처</th><th>계정 ID</th><th>관리</th></tr></thead>
-    <tbody id="stuTbody">${rows||`<tr class="empty-row"><td colspan="9" class="empty">${q?'검색 결과가 없습니다.':'등록된 학생이 없습니다.'}</td></tr>`}</tbody>
+    <thead><tr><th style="width:36px;text-align:center"><input id="stuSelAll" type="checkbox" ${allSelected?'checked':''} ${selectableIds.length===0?'disabled':''} onchange="toggleStuSelectAll(this.checked)"></th><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>관리</th></tr></thead>
+    <tbody id="stuTbody">${rows||`<tr class="empty-row"><td colspan="6" class="empty">${q?'검색 결과가 없습니다.':'등록된 학생이 없습니다.'}</td></tr>`}</tbody>
   </table></div></div>
   <div style="text-align:right;margin-top:16px"><button class="btn bs" style="font-size:11px;padding:6px 10px" onclick="S.stuSubView='withdrawn';renderAdminStudents()">퇴원 학생 관리 (${wCount})</button></div>`;}
 
@@ -9937,21 +9957,34 @@ const SNAV_ITEMS=[
   {id:'my',label:'내 정보',view:'vMy',go:'goMyPage',
    d:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 20.5a7.5 7.5 0 0 1 15 0'},
 ];
-/* 자리는 역할이 갈 수 있는 화면과 같아야 한다. 관리자의 멘토링은 vAdmin 이고,
-   OP(viewer)는 게시판·질문게시판을 아예 못 보므로 두 자리만 남는다(내 정보는 학생 전용). */
+/* 자리는 역할이 갈 수 있는 화면과 같아야 한다.
+   **관리자는 '멘토링' 한 자리가 아니라 영역(학생·예약·운영)으로 나뉜다** — 로그인 현황·계정·
+   알림톡·공지는 멘토링이 아니라 앱 전체에 딸린 것들인데 예전엔 멘토링 아래 묻혀 있었다.
+   OP(viewer)는 게시판·질문게시판을 아예 못 보고 운영 화면도 없어 두 영역만 남는다. */
 const SNAV_BY_ROLE={
   student:['home','stu','qa','board','my'],
-  admin:['home','stu','qa','board'],
-  viewer:['home','stu'],
+  admin:['home','a_stu','a_book','qa','more'],
+  viewer:['home','a_stu','a_book'],
+};
+/* 관리자 영역 자리 — 누르면 그 영역의 첫 화면으로 간다. */
+const SNAV_AREA_ITEMS={
+  a_stu:{id:'a_stu',label:'학생',view:'vAdmin',area:'stu',
+    d:'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M17.5 14.2A6.5 6.5 0 0 1 21.5 20'},
+  a_book:{id:'a_book',label:'예약',view:'vAdmin',area:'book',
+    d:'M3.5 8.5A1.5 1.5 0 0 1 5 7h14a1.5 1.5 0 0 1 1.5 1.5V10a2 2 0 0 0 0 4v1.5A1.5 1.5 0 0 1 19 17H5a1.5 1.5 0 0 1-1.5-1.5V14a2 2 0 0 0 0-4V8.5ZM9.5 7v10'},
+  /* 운영은 화면이 다섯이라 자리 하나로 묶고 시트로 연다. 자유게시판도 여기 들어간다. */
+  more:{id:'more',label:'더보기',view:'__sheet__',
+    d:'M4 7h16M4 12h16M4 17h16'},
 };
 function snavItems(){
   const ids=SNAV_BY_ROLE[S.user?.type]||[];
-  const adminSide=S.user?.type!=='student';
-  return ids.map(id=>{
-    const it=SNAV_ITEMS.find(x=>x.id===id);
-    /* 관리자·OP 의 멘토링은 학생 화면(vStu)이 아니라 관리 화면(vAdmin)이다. */
-    return id==='stu'&&adminSide?{...it,view:'vAdmin'}:it;
-  });
+  return ids.map(id=>SNAV_AREA_ITEMS[id]||SNAV_ITEMS.find(x=>x.id===id)).filter(Boolean);
+}
+/* 영역 자리는 지금 그 영역을 보고 있을 때만 켜진다 — vAdmin 이라고 다 켜지면 안 된다. */
+function snavIsOn(it,viewId){
+  if(it.area)return viewId==='vAdmin'&&adminCurArea()===it.area;
+  if(it.id==='more')return viewId==='vAdmin'&&adminCurArea()==='ops';
+  return it.view===viewId;
 }
 /* 다른 자리를 누르면 그 화면에서 보던 자리로 간다(상세를 열어 뒀으면 상세 그대로).
    **이미 그 자리에 있는데 또 누르면 그 탭의 첫 화면으로 되돌린다** — 상세·글쓰기를 닫고 목록으로.
@@ -9959,9 +9992,19 @@ function snavItems(){
 function snavGo(id){
   const it=snavItems().find(x=>x.id===id);
   if(!it)return;
+  const top=()=>{try{window.scrollTo({top:0});}catch(_){}};
+  /* 운영은 화면이 다섯이라 자리 하나로 묶고 시트로 연다. */
+  if(it.id==='more'){openTabSheet();return;}
+  if(it.area){
+    const here=!_('vAdmin')?.classList.contains('hidden')&&adminCurArea()===it.area;
+    /* 이미 그 영역이면 그 영역의 첫 화면으로 되돌린다(학생 화면의 탭 재탭과 같다). */
+    if(here){const t=adminAreaTabs(it.area)[0];if(t&&t.id!==S.tab)setTab(t.id);}
+    else goAdminArea(it.area);
+    top();return;
+  }
   const here=!_(it.view)?.classList.contains('hidden');
   if(here)snavReset(id);
-  try{window.scrollTo({top:0});}catch(_){}
+  top();
   if(!here)window[it.go]();
 }
 function snavReset(id){
@@ -9973,8 +10016,7 @@ function snavReset(id){
     S.bdOpenId=null;S.bdComposerOpen=false;S.bdPostEditId=null;S.bdReplyTo=null;
     bdRerender();
   }else if(id==='stu'){
-    if(S.user?.type==='student'){S.stuTab='book';renderStu();}
-    else setTab(S.user?.type==='admin'?'students':'bookings');
+    S.stuTab='book';renderStu();
   }
   /* 홈·내 정보는 한 화면뿐이라 되돌릴 자리가 없다 — 맨 위로 올리는 것으로 끝난다. */
 }
@@ -9986,10 +10028,12 @@ function renderStuNav(viewId){
   const box=_('snavInner');
   if(!box||!on)return;
   const dot=bdStuNewCount()>0;
-  box.innerHTML=items.map(it=>`<a role="button" tabindex="0" class="${it.view===viewId?'on':''}" onclick="snavGo('${it.id}')" aria-label="${it.label}" ${it.view===viewId?'aria-current="page"':''}>
+  box.innerHTML=items.map(it=>{
+    const cur=snavIsOn(it,viewId);
+    return `<a role="button" tabindex="0" class="${cur?'on':''}" onclick="snavGo('${it.id}')" aria-label="${it.label}" ${cur?'aria-current="page"':''}>
     <svg class="sn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${it.d}"/></svg>
     <span>${it.label}</span>${it.id==='board'&&dot?'<span class="sn-dot"></span>':''}
-  </a>`).join('');
+  </a>`;}).join('');
 }
 
 /* ── 내 토큰 잔액 ──
@@ -10026,9 +10070,9 @@ function renderHomeCards(){
        아직 안 왔으면(null) 0 이 아니라 고정 문구를 보여 준다 — 0토큰이라고 잘못 말하면 안 된다. */
     const myB=isStu?S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b)):null;
     const items=[
-      {ico:'stu',color:'green',title:'멘토링',onclick:'goConsulting()',
+      {ico:'stu',color:'green',title:isAdmin?'학생 관리':'멘토링',onclick:'goConsulting()',
        desc:myB?`다음 예약 <b>${escapeHtml(myB.dateLabel||'')} ${escapeHtml(myB.slot||'')}</b>`
-            :(isStu?'예약 · 성적 · 멘토링 기록':'성적으로 방향을 잡는 1:1 멘토링')},
+            :(isStu?'예약 · 성적 · 멘토링 기록':(isAdmin?'학생 · 성적 · 멘토링':'성적으로 방향을 잡는 1:1 멘토링'))},
     ];
     if(isStu||isAdmin)items.push({ico:'board',color:'blue',title:'자유게시판',onclick:'goBoard()',new:bdNew>0,
       desc:bdNew>0?`새 글 <b>${bdNew}개</b>`:'익명으로 편하게 이야기하는 공간'});
