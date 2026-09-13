@@ -168,21 +168,16 @@ label.btn{display:inline-flex!important}
    다른 쪽은 좌측 강조선이 있는 카드형 댓글. 여기로 모아 둔다. */
 .pd-t{font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word}
 .pd-b{font-size:14px;color:var(--gray-900);white-space:pre-wrap;line-height:1.75;word-break:break-word}
-/* 공감·스크랩처럼 누르는 자리. 손가락이 닿게 40px 을 확보한다. */
-.act{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 16px;
-  border:1px solid var(--gray-200);background:var(--gray-50);color:var(--gray-500);border-radius:var(--radius-md);
-  font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+/* 공감·스크랩처럼 누르는 자리. 글을 읽는 걸 방해하지 않게 작게 두되 34px 은 남긴다. */
+.act{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:0 12px;
+  border:1px solid var(--gray-200);background:var(--gray-50);color:var(--gray-500);border-radius:var(--radius-pill);
+  font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
 .act:hover{background:var(--gray-100)}
-.act svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.act svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .act.on svg{fill:currentColor}
 .act.like.on{border-color:#fca5a5;background:var(--danger-soft);color:var(--danger)}
 .act.scrap.on{border-color:#fcd34d;background:var(--warning-soft);color:var(--warning-text)}
 .act b{font-weight:700;font-variant-numeric:tabular-nums}
-/* 좁은 화면에서는 두 버튼이 한 줄을 나눠 가져 엄지로 누르기 쉽게 넓어진다. */
-@media(max-width:480px){
-  .act.like,.act.scrap{flex:1;min-width:0;padding:0 10px}
-  .act.like~.fm,.act.scrap~.fm{width:100%;margin-left:0!important;margin-top:8px}
-}
 /* 댓글 한 덩이 — 선생님 답변만 왼쪽에 강조선을 둔다(학생이 답을 찾기 쉬우라고). */
 .cm{border-top:1px solid var(--gray-100);padding:13px 0}
 .cm.reply{padding-left:22px}
