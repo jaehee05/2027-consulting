@@ -134,6 +134,38 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .bd-fab:hover{background:var(--primary-hover)}
 .bd-fab:active{transform:translateY(1px)}
 @media(max-width:640px){.bd-fab{right:14px;bottom:78px;height:42px;padding:0 16px;font-size:13px}}
+/* ── 학생 하단 내비 ──
+   허브를 거쳐 화면을 옮기던 흐름(홈 → 카드 → ← 홈 → 카드)을 없앤다. 학생 세션에서는
+   어느 화면에 있든 다섯 자리로 바로 건너뛴다. 휴대폰에서는 화면 아래에 붙이고(엄지가 닿는 자리),
+   넓은 화면에서는 가운데에 띄운 알약으로 둔다. */
+.snav{position:fixed;left:0;right:0;bottom:0;z-index:950;display:none;
+  padding:6px calc(8px + var(--sar)) calc(6px + var(--sab)) calc(8px + var(--sal));
+  background:rgba(255,255,255,.92);-webkit-backdrop-filter:saturate(180%) blur(12px);backdrop-filter:saturate(180%) blur(12px);
+  border-top:1px solid var(--gray-200)}
+body.has-snav .snav{display:flex}
+.snav-inner{display:flex;width:100%;max-width:560px;margin:0 auto;gap:2px}
+.snav a{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-height:52px;padding:6px 2px;border-radius:var(--radius-lg);text-decoration:none;color:var(--gray-500);
+  font-size:11px;font-weight:600;position:relative;-webkit-tap-highlight-color:transparent;transition:color .15s,background .15s;cursor:pointer}
+.snav a:active{background:var(--gray-100)}
+.snav a.on{color:var(--primary)}
+.snav .sn-ico{width:22px;height:22px;display:block;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.snav a.on .sn-ico{stroke-width:2.1}
+.snav .sn-dot{position:absolute;top:6px;left:50%;margin-left:6px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:1.5px solid var(--surface)}
+/* 내비에 가려지지 않게 본문 아래를 비운다. */
+body.has-snav .page{padding-bottom:calc(84px + var(--sab))}
+@media(min-width:641px){
+  .snav{background:transparent;border-top:none;backdrop-filter:none;-webkit-backdrop-filter:none;padding-bottom:calc(14px + var(--sab))}
+  .snav-inner{background:rgba(255,255,255,.92);-webkit-backdrop-filter:saturate(180%) blur(12px);backdrop-filter:saturate(180%) blur(12px);
+    border:1px solid var(--gray-200);border-radius:var(--radius-pill);padding:4px 6px;box-shadow:0 8px 28px rgba(17,24,39,.12)}
+  .snav a{border-radius:var(--radius-pill)}
+  .snav a.on{background:var(--primary-soft)}
+}
+/* 내비가 있으면 상단의 [← 홈] 은 군더더기다. 관리자는 내비가 없으므로 그대로 둔다. */
+body.has-snav .home-link{display:none}
+/* 카카오 런처는 내비 위로 올린다. */
+body.has-snav #kakaoCh{bottom:calc(84px + var(--sab))}
+@media(max-width:640px){body.has-snav #kakaoCh{bottom:calc(78px + var(--sab))}}
 /* 카카오톡 채널 문의 버튼 — 채널톡 런처 자리를 그대로 이어받는다(파스텔 블루). */
 #kakaoCh{position:fixed;right:20px;bottom:20px;z-index:900;width:56px;height:56px;border-radius:50%;background:linear-gradient(140deg,#e3edff,#c3d9ff);border:1px solid rgba(28,100,242,.16);display:none;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(28,100,242,.22);transition:transform .15s,box-shadow .15s,background .15s;-webkit-tap-highlight-color:transparent}
 #kakaoCh.on{display:flex}
@@ -591,21 +623,29 @@ tr:last-child td{border-bottom:none}
 .po{display:none}
 code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px;font-family:monospace}
 .empty{text-align:center;padding:36px 20px;color:var(--gray-400);font-size:13px}
-.home-grid{display:grid;grid-template-columns:repeat(var(--home-cols,3),minmax(0,1fr));gap:16px;margin-top:24px}
-.hc-ico.purple{background:#f5f3ff;color:#7c3aed}
+.home-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:18px}
+@media(min-width:720px){.home-grid{grid-template-columns:1fr 1fr;gap:12px}}
 #vHome{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
 #vHome .page{flex:1;width:100%}
 .home-footer{padding:20px 16px 16px;font-size:11px;color:var(--gray-400);line-height:1.7;word-break:keep-all}
 .home-footer-inner{max-width:780px;margin:0 auto}
-.home-card{background:var(--surface);border:1px solid var(--gray-200);border-radius:var(--radius-hero);padding:28px 24px;cursor:pointer;transition:.2s;text-align:left;display:flex;flex-direction:column;gap:12px;min-height:180px}
-.home-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-hero);border-color:var(--primary)}
-.home-card .hc-ico{width:44px;height:44px;border-radius:var(--radius-xl);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
+/* 카드는 '입장하기 →' 대신 지금 상태를 보여 준다 — 들어가 보지 않아도 할 일이 있는지 알 수 있어야 한다. */
+.home-card{background:var(--surface);border:1px solid var(--gray-200);border-radius:var(--radius-card);padding:18px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;text-align:left;display:flex;align-items:center;gap:14px;min-height:0;width:100%;font-family:inherit}
+.home-card:hover{border-color:var(--primary);box-shadow:var(--shadow-card);transform:translateY(-1px)}
+.home-card:active{transform:translateY(0)}
+.home-card .hc-ico{width:42px;height:42px;flex-shrink:0;border-radius:var(--radius-xl);display:flex;align-items:center;justify-content:center}
+.home-card .hc-ico svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .home-card .hc-ico.blue{background:var(--primary-soft);color:var(--primary)}
 .home-card .hc-ico.green{background:#ecfdf5;color:#059669}
-.home-card .hc-ico.red{background:#fef2f2;color:#dc2626}
-.home-card .hc-title{font-size:18px;font-weight:800;color:var(--gray-900)}
-.home-card .hc-desc{font-size:12px;color:var(--gray-500);line-height:1.5;margin-top:-4px}
-.home-card .hc-cta{margin-top:auto;font-size:12px;font-weight:600;color:var(--primary);display:flex;align-items:center;gap:4px}
+.home-card .hc-ico.red{background:#fff7ed;color:#c2410c}
+.home-card .hc-ico.purple{background:#f5f3ff;color:#7c3aed}
+.home-card .hc-body{flex:1;min-width:0}
+.home-card .hc-title{font-size:15px;font-weight:700;color:var(--gray-900);display:flex;align-items:center;gap:6px}
+.home-card .hc-desc{display:block;font-size:12.5px;color:var(--gray-500);line-height:1.5;margin-top:3px;word-break:keep-all}
+.home-card .hc-desc b{color:var(--gray-700);font-weight:700}
+.home-card .hc-go{flex-shrink:0;color:var(--gray-300);font-size:18px;line-height:1}
+.home-card:hover .hc-go{color:var(--primary)}
+.hc-new{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);flex-shrink:0}
 .home-link{background:none;border:none;padding:4px 8px;font-family:inherit;font-size:13px;font-weight:600;color:var(--gray-500);cursor:pointer;border-radius:var(--radius-sm);transition:.15s}
 .home-link:hover{color:var(--primary);background:var(--gray-100)}
 .lec-card{background:var(--surface);border:1px solid var(--gray-200);border-radius:var(--radius-card);padding:16px;margin-bottom:14px}
@@ -627,7 +667,7 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 .app-badge.pending{background:var(--warning-soft);color:var(--warning-text)}
 .app-badge.approved{background:var(--success-soft);color:var(--success)}
 .app-badge.rejected{background:var(--danger-soft);color:var(--danger)}
-@media(max-width:640px){.home-grid{grid-template-columns:1fr}.home-card{padding:20px;min-height:auto}}
+@media(max-width:640px){.home-card{padding:15px;gap:12px}}
 /* 요약 통계 3열 — 좁은 화면에서 값이 잘리지 않게 압축 */
 .stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
 .stat3>div{border-radius:14px;padding:14px 14px 12px;min-width:0}
@@ -855,6 +895,9 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 </div>
 
 <!-- 카카오톡 채널 문의 버튼 (학생·비로그인 화면에서만 노출) -->
+<!-- 학생 하단 내비 (renderStuNav 가 채운다) -->
+<nav id="snav" class="snav np" aria-label="주요 메뉴"><div class="snav-inner" id="snavInner"></div></nav>
+
 <a id="kakaoCh" class="np" href="#" target="_blank" rel="noopener noreferrer" aria-label="카카오톡 채널로 문의하기" title="카카오톡 채널로 문의하기">
   <svg viewBox="0 0 28 28" aria-hidden="true" focusable="false"><path d="M7.4 4h13.2A4.4 4.4 0 0 1 25 8.4v6.9a4.4 4.4 0 0 1-4.4 4.4h-7.4l-4.9 3.72a.8.8 0 0 1-1.28-.64V19.7h-.02A4.4 4.4 0 0 1 3 15.3V8.4A4.4 4.4 0 0 1 7.4 4z"/></svg>
 </a>
@@ -949,6 +992,7 @@ const S = {
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
   posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
   bdFilter:'all', bdModalBookingId:null, bdOpenId:null, bdReplyTo:null, boardBans:{}, boardPledges:{},
+  stuTab:'book',
   qa:{policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'open',payFilter:'open',
       composerOpen:false,newProblems:1,openId:null,pendingOpen:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null}
 };
@@ -1826,6 +1870,7 @@ function showView(id){
   if(id!=='vQa')qaStopListeners();
   /* 게시판 화면은 화면 아래에 버튼이 몰려 카카오 런처와 겹친다. */
   document.body.classList.toggle('has-fab',id==='vBoard'||id==='vQa');
+  renderStuNav(id);
   applyChannelIOVisibility();
 }
 
@@ -2119,6 +2164,7 @@ async function doLogout(){
   stopCallsListener();
   stopTabletSessionListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
+  S.stuTab='book';
   S.students=[];S.bookings=[];S.admins=[];S.requests=[];S.reqSlots=[];S.lectures=[];S.notices=[];S.posts=[];S.boardBans={};S.boardPledges={};
   S.popups=[];S.popupEditId=null;S.popupComposerOpen=false;S.popupShown=false;_popupsLoaded=false;
   S.noticeEditId=null;S.noticeComposerOpen=false;
@@ -2162,6 +2208,20 @@ async function createFirstAdmin(){
 }
 
 /* ── STUDENT ── */
+/* ── 멘토링 화면의 속탭 ──
+   예약·성적·멘토링 기록이 한 스크롤에 쌓여 있어 아래쪽 카드는 사실상 안 보였다. 셋으로 나눈다.
+   공지는 탭 위에 그대로 둔다 — 어느 탭에 있든 봐야 하는 알림이다. */
+const STU_TABS=[{id:'book',label:'예약'},{id:'score',label:'성적'},{id:'note',label:'멘토링 기록'}];
+function stuTab(){return STU_TABS.some(t=>t.id===S.stuTab)?S.stuTab:'book';}
+function setStuTab(id){S.stuTab=id;renderStu();try{window.scrollTo({top:0});}catch(_){}}
+function stuEmptyPane(msg){
+  return `<div class="card" style="text-align:center;padding:36px 20px;color:var(--gray-400);font-size:13px">${msg}</div>`;
+}
+function stuTabsHtml(){
+  const cur=stuTab();
+  return `<div class="tabs">${STU_TABS.map(t=>
+    `<button class="tab ${cur===t.id?'on':''}" onclick="setStuTab('${t.id}')">${t.label}</button>`).join('')}</div>`;
+}
 function renderStu(){
   const myB=S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b));
   const myStu=S.students.find(s=>s._docId===S.studentDocId);
@@ -2169,14 +2229,22 @@ function renderStu(){
   const consultCard=myStu?stuConsultNotesCardHtml(myStu):'';
   const graphCard=myStu?stuGradeGraphCardHtml(myStu):'';
   const noticeCard=noticeStudentCardHtml();
-  if(myB){clearBookCountdown();_('stuC').innerHTML=noticeCard+bookCardHtml(myB)+consultCard+graphCard+examCards;}
+  /* 탭에 담을 몫만 그린다. 예약 카드는 아래에서 상황별로 만들어 넘긴다. */
+  const pane=(bookHtml)=>{
+    const t=stuTab();
+    const inner=t==='score'?(graphCard+examCards||stuEmptyPane('아직 입력한 성적이 없습니다.'))
+      :t==='note'?(consultCard||stuEmptyPane('아직 남은 멘토링 기록이 없습니다.'))
+      :bookHtml;
+    return noticeCard+stuTabsHtml()+inner;
+  };
+  if(myB){clearBookCountdown();_('stuC').innerHTML=pane(bookCardHtml(myB));}
   else if(myStu){
     const bOpen=isBookingOpen();
     const pl=bookPeriodLabel();
     let emptyCard;
     if(bOpen){
       clearBookCountdown();
-      emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">아래에서 예약하거나, 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`;
+      emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">📅</p><p style="font-weight:700;font-size:15px;margin-bottom:6px">아직 상담 예약이 없습니다</p><p style="color:#6b7280;font-size:13px;margin-bottom:14px">지금 예약하거나, [성적] 탭에서 먼저 성적을 입력할 수 있습니다.</p><button class="btn bp" onclick="showBookForm(false)">예약하기</button></div>`;
     }else{
       const adminDisabled=bookingAdminDisabled();
       const st=adminDisabled?{kind:'disabled'}:bookPeriodStatus();
@@ -2192,9 +2260,9 @@ function renderStu(){
       }else{
         bodyHtml=`<p style="color:#6b7280;font-size:13px">선생님이 예약 기간을 설정하면 예약할 수 있어요.</p>`;
       }
-      emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간일 경우, 아래에서 입력 가능합니다.</p></div>`;
+      emptyCard=`<div class="card" style="text-align:center;padding:30px;margin-bottom:12px"><p style="font-size:28px;margin-bottom:10px">⏰</p><p style="font-weight:700;font-size:15px;margin-bottom:10px">예약 신청 기간이 아닙니다</p>${bodyHtml}<p style="color:#9ca3af;font-size:11px;margin-top:12px">성적 입력 기간이면 [성적] 탭에서 입력할 수 있습니다.</p></div>`;
     }
-    _('stuC').innerHTML=noticeCard+emptyCard+consultCard+graphCard+examCards;
+    _('stuC').innerHTML=pane(emptyCard);
     if(!bOpen){const st=bookPeriodStatus();if(st.kind==='before')startBookCountdown(st.startAt);}
   }
   else{clearBookCountdown();showBookForm(false);
@@ -9718,6 +9786,32 @@ async function editChip(key,defaultValue){
     applyChips();
   }catch(e){toast('저장 실패: '+e.message,'error');}
 }
+/* ── 학생 하단 내비 ──
+   허브를 거치지 않고 화면을 바로 옮긴다. 학생 세션(관리자 미리보기 포함)에서만 보이고,
+   로그인 전 방문자는 갈 곳이 하나뿐이라 띄우지 않는다. */
+const SNAV_ITEMS=[
+  {id:'home',label:'홈',view:'vHome',go:'goHome()',
+   d:'M3 10.5 12 3l9 7.5M5.5 9.5V20a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9.5'},
+  {id:'stu',label:'멘토링',view:'vStu',go:'goConsulting()',
+   d:'M8 3.5h8a2 2 0 0 1 2 2V20l-6-3-6 3V5.5a2 2 0 0 1 2-2ZM9.5 9h5M9.5 12.5h3'},
+  {id:'qa',label:'질문',view:'vQa',go:'goQa()',
+   d:'M21 12a8.5 8.5 0 0 1-12.4 7.6L3.5 21l1.4-5.1A8.5 8.5 0 1 1 21 12ZM9.8 9.6a2.3 2.3 0 0 1 4.4.8c0 1.5-2.2 2-2.2 3.1M12 16.2h.01'},
+  {id:'board',label:'게시판',view:'vBoard',go:'goBoard()',
+   d:'M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4V5.5ZM8 8.5h8M8 12h5'},
+  {id:'my',label:'내 정보',view:'vMy',go:'goMyPage()',
+   d:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 20.5a7.5 7.5 0 0 1 15 0'},
+];
+function renderStuNav(viewId){
+  const on=S.user?.type==='student'&&SNAV_ITEMS.some(x=>x.view===viewId);
+  document.body.classList.toggle('has-snav',on);
+  const box=_('snavInner');
+  if(!box||!on)return;
+  const dot=bdStuNewCount()>0;
+  box.innerHTML=SNAV_ITEMS.map(it=>`<a role="button" tabindex="0" class="${it.view===viewId?'on':''}" onclick="${it.go}" aria-label="${it.label}" ${it.view===viewId?'aria-current="page"':''}>
+    <svg class="sn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${it.d}"/></svg>
+    <span>${it.label}</span>${it.id==='board'&&dot?'<span class="sn-dot"></span>':''}
+  </a>`).join('');
+}
 function enterHome(){
   const tr=_('homeTr'),hdr=_('homeHeader'),cards=_('homeCards');
   if(S.user){
@@ -9730,21 +9824,31 @@ function enterHome(){
     if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">KJHEDU</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
   }
   if(cards){
-    const items=[
-      {ico:'🗓️',color:'green',title:'멘토링',desc:'성적 기반 멘토링을<br>진행합니다.',onclick:'goConsulting()'},
-    ];
     const isStu=S.user?.type==='student';
     const isAdmin=S.user?.type==='admin';
     const bdNew=bdStuNewCount();
-    if(isStu||isAdmin)items.push({ico:'💬',color:'blue',title:'자유게시판'+(bdNew>0?' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle"></span>':''),desc:'익명으로 자유롭게<br>이야기하는 공간입니다.',onclick:'goBoard()'});
-    if(isStu||isAdmin)items.push({ico:'❓',color:'red',title:'질문게시판',desc:'1:1로 질문하고<br>답변을 주고받습니다.',onclick:'goQa()'});
-    if(isStu)items.push({ico:'👤',color:'purple',title:'내 정보',desc:'내 정보 조회·수정 및<br>비밀번호 변경.',onclick:'goMyPage()'});
-    cards.style.setProperty('--home-cols',String(items.length===4?2:Math.min(items.length,3)));
+    /* 카드 설명은 고정 문구 대신 지금 상태를 보여 준다 — 들어가 보지 않아도 할 일이 있는지 알 수 있어야 한다.
+       홈에서 받아 둔 자료(예약·자유게시판)만 쓴다. 질문게시판 자료는 #vQa 에서만 구독하므로 여기서는 셀 수 없다. */
+    const myB=isStu?S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b)):null;
+    const items=[
+      {ico:'stu',color:'green',title:'멘토링',onclick:'goConsulting()',
+       desc:myB?`다음 예약 <b>${escapeHtml(myB.dateLabel||'')} ${escapeHtml(myB.slot||'')}</b>`
+            :(isStu?'예약·성적 입력과 멘토링 기록':'성적 기반 멘토링을 진행합니다.')},
+    ];
+    if(isStu||isAdmin)items.push({ico:'board',color:'blue',title:'자유게시판',onclick:'goBoard()',new:bdNew>0,
+      desc:bdNew>0?`새 글 <b>${bdNew}개</b>`:'익명으로 자유롭게 이야기하는 공간'});
+    if(isStu||isAdmin)items.push({ico:'qa',color:'red',title:'질문게시판',onclick:'goQa()',
+      desc:'1:1로 질문하고 답변을 주고받습니다'});
+    if(isStu)items.push({ico:'my',color:'purple',title:'내 정보',onclick:'goMyPage()',
+      desc:'내 정보 조회·수정과 비밀번호 변경'});
+    const icoPath=id=>(SNAV_ITEMS.find(x=>x.id===id)||{}).d||'';
     cards.innerHTML=items.map(it=>`<button class="home-card" onclick="${it.onclick}">
-      <div class="hc-ico ${it.color}">${it.ico}</div>
-      <div class="hc-title">${it.title}</div>
-      <div class="hc-desc">${it.desc}</div>
-      <div class="hc-cta">입장하기 →</div>
+      <span class="hc-ico ${it.color}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icoPath(it.ico)}"/></svg></span>
+      <span class="hc-body">
+        <span class="hc-title">${it.title}${it.new?'<i class="hc-new"></i>':''}</span>
+        <span class="hc-desc">${it.desc}</span>
+      </span>
+      <span class="hc-go">›</span>
     </button>`).join('');
   }
   showView('vHome');
