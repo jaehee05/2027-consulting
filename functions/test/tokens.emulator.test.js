@@ -151,6 +151,45 @@ describe("질문 작성 토큰 차감", () => {
     expect(q.data().body).toBe("29번 풀이\n\n30번 풀이");
   });
 
+  test("사진이 문제별로 담기고 photos 에는 전부가 이어 붙는다", async () => {
+    await setPolicy({ questionCost: 1 });
+    await setBalance(student.id, 10);
+    const p = (n) => ({ url: `u${n}`, path: `p${n}`, name: `n${n}` });
+    const r = await tokens.createQuestion(fs, {
+      student, title: "t", bodies: ["b1", "b2"], problems: 2,
+      bodyPhotos: [[p(1)], [p(2), p(3)]],
+    });
+    const d = (await fs.doc(`questions/${r.id}`).get()).data();
+    // Firestore 는 배열 안의 배열을 못 담으므로 한 겹 감싸 둔다
+    expect(d.bodyPhotos).toEqual([
+      { photos: [p(1)] },
+      { photos: [p(2), p(3)] },
+    ]);
+    expect(d.photos).toEqual([p(1), p(2), p(3)]);
+  });
+
+  test("사진을 안 붙인 문제는 빈 칸으로 남는다", async () => {
+    await setPolicy({ questionCost: 1 });
+    await setBalance(student.id, 10);
+    const p1 = { url: "u1", path: "p1", name: "" };
+    const r = await tokens.createQuestion(fs, {
+      student, title: "t", bodies: ["b1", "b2"], problems: 2, bodyPhotos: [[p1]],
+    });
+    const d = (await fs.doc(`questions/${r.id}`).get()).data();
+    expect(d.bodyPhotos).toEqual([{ photos: [p1] }, { photos: [] }]);
+    expect(d.photos).toEqual([p1]);
+  });
+
+  test("bodyPhotos 없이 photos 만 보내는 예전 앱도 그대로 담긴다", async () => {
+    await setPolicy({ questionCost: 1 });
+    await setBalance(student.id, 5);
+    const p1 = { url: "u1", path: "p1", name: "사진" };
+    const r = await tokens.createQuestion(fs, { student, title: "t", body: "b", photos: [p1] });
+    const d = (await fs.doc(`questions/${r.id}`).get()).data();
+    expect(d.photos).toEqual([p1]);
+    expect(d.bodyPhotos).toEqual([{ photos: [p1] }]);
+  });
+
   test("문제 2개인데 한 칸이 비면 400 이고 토큰도 안 나간다", async () => {
     await setPolicy({ questionCost: 2 });
     await setBalance(student.id, 10);

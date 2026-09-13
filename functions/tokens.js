@@ -229,7 +229,7 @@ function normProblems(v) {
  * 질문 작성 + 토큰 차감을 한 트랜잭션으로.
  * 잔액 확인과 차감이 같은 트랜잭션 안에 있어야 동시 작성으로 음수가 되지 않는다.
  */
-async function createQuestion(fs, { student, title, body, bodies, photos, problems, subject }) {
+async function createQuestion(fs, { student, title, body, bodies, photos, bodyPhotos, problems, subject }) {
   const t = String(title || "").trim();
   /* 과목 목록을 서버에 다시 두지 않는다 — 과목이 늘 때마다 두 군데가 어긋나고,
      학생 자기 질문에 붙는 표시 라벨일 뿐이라 막아서 지킬 게 없다. 고르게 하는 건 화면 몫이고,
@@ -247,6 +247,14 @@ async function createQuestion(fs, { student, title, body, bodies, photos, proble
     throw new ApiError(400, count > 1 ? "문제마다 내용을 입력해 주세요." : "내용을 입력해 주세요.");
   }
   const b = list.join("\n\n");
+  /* 사진도 문제마다 따로 붙는다. `photos` 에는 전부를 이어 붙여 남긴다 —
+     목록의 썸네일이 그 한 필드만 본다. 들어올 때는 [[…],[…]] 지만 담을 때는
+     [{photos:[…]},…] 로 한 겹 감싼다 — Firestore 는 배열 안에 배열을 담지 못한다. */
+  const rawPh = Array.isArray(bodyPhotos)
+    ? bodyPhotos.map((x) => normPhotos(Array.isArray(x) ? x : x && x.photos))
+    : [];
+  const phList = (rawPh.length ? rawPh : [normPhotos(photos)]).slice(0, count);
+  while (phList.length < count) phList.push([]);
 
   const policy = await getPolicy(fs);
   const cost = policy.questionCost * count;
@@ -263,7 +271,8 @@ async function createQuestion(fs, { student, title, body, bodies, photos, proble
       title: t.slice(0, 120),
       body: b,
       bodies: list,
-      photos: normPhotos(photos),
+      photos: phList.flat(),
+      bodyPhotos: phList.map((ps) => ({ photos: ps })),
       authorId: student.id,
       authorName: student.name || "",
       authorGrade: student.grade || "",

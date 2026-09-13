@@ -3769,6 +3769,12 @@ function qaBodies(q){
   const a=Array.isArray(q&&q.bodies)?q.bodies.map(x=>String(x||'').trim()).filter(Boolean):[];
   return a.length?a:[String(q&&q.body||'')];
 }
+/* 사진도 문제마다 하나씩. Firestore 가 배열 안의 배열을 담지 못해 [{photos:[…]},…] 로 들어 있다.
+   이 칸이 없는 예전 글은 null 을 돌려주고, 부르는 쪽이 사진을 본문 아래에 통째로 보여 준다. */
+function qaBodyPhotos(q){
+  const a=q&&q.bodyPhotos;
+  return Array.isArray(a)&&a.length?a.map(x=>bdNormPhotos(x&&x.photos)):null;
+}
 function qaSubjChip(q){
   const v=String(q&&q.subject||'').trim();
   return v?`<span class="bx" style="font-size:10px;font-weight:700;background:#f1f5f9;color:#475569">${escapeHtml(v)}</span>`:'';
@@ -3783,8 +3789,10 @@ function qaProblemLabel(q){const n=Math.floor(Number(q&&q.problems)||1);return n
 /* 본문은 문제마다 한 칸씩 나란히 둔다(넓으면 좌우, 좁으면 위아래로 접힌다 — flex-wrap).
    두 칸을 늘 그려 두고 보이고 감추기만 한다: 1개로 되돌렸다가 다시 2개를 골라도 쳐 둔 글이 남는다. */
 function qaNewBodyId(i){return i===1?'qa-new-body':`qa-new-body${i}`;}
+/* 사진도 문제마다 따로 붙는다. 첫 칸은 예전 스코프('qa_new')를 그대로 써서 초안 버킷이 어긋나지 않게 한다. */
+function qaNewPhotoScope(i){return i===1?'qa_new':`qa_new${i}`;}
 function qaNewBodyColHtml(i){
-  const id=qaNewBodyId(i),two=qaNewProblems()>=2;
+  const id=qaNewBodyId(i),sc=qaNewPhotoScope(i),two=qaNewProblems()>=2;
   /* 두 칸은 하는 일이 같으므로 안내도 같다. 어느 칸인지는 위의 [문제 N] 이 말해 준다 —
      칸마다 다르게 적으면 둘째 칸에는 문제를 옮겨 적으라는 말처럼 읽힌다. */
   const ph='궁금한 점을 자세히 적어 주세요.';
@@ -3793,6 +3801,11 @@ function qaNewBodyColHtml(i){
     ${qaFmtBar(id)}
     <textarea class="fi ta" id="${id}" rows="14" style="min-height:280px" placeholder="${ph}" oninput="qaOnBodyInput('${id}')"></textarea>
     ${qaPrevBoxHtml(id)}
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block;flex-shrink:0">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'${sc}','post')"></label>
+      <span style="font-size:11px;color:#9ca3af">최대 8MB, JPEG/PNG</span>
+    </div>
+    <div id="bd-draft-anchor-post-${sc}">${bdDraftPreviewHtml(sc,'post')}</div>
   </div>`;
 }
 /* 문제 수를 바꿔도 renderQa() 를 부르지 않는다 — 컴포저를 다시 그리면 이미 쳐 둔
@@ -4087,8 +4100,9 @@ const QA_FILTERS=[{id:'all',label:'전체'},{id:'pending',label:'답변대기'},
 function qaSetFilter(f){S.qa.filter=f;renderQa();}
 function qaOpen(id){S.qa.openId=id;S.qa.composerOpen=false;S.qa.cmtEdit=null;renderQa();try{window.scrollTo({top:0});}catch(_){}}
 function qaCloseDetail(){S.qa.openId=null;S.qa.cmtEdit=null;renderQa();}
-function qaOpenComposer(){S.qa.composerOpen=true;S.qa.newProblems=1;S.qa.openId=null;renderQa();}
-function qaCloseComposer(){S.qa.composerOpen=false;S.qa.newProblems=1;delete S.bdDraftFiles['qa_new'];renderQa();}
+function qaClearNewDrafts(){for(let i=1;i<=QA_MAX_PROBLEMS;i++)delete S.bdDraftFiles[qaNewPhotoScope(i)];}
+function qaOpenComposer(){S.qa.composerOpen=true;S.qa.newProblems=1;qaClearNewDrafts();S.qa.openId=null;renderQa();}
+function qaCloseComposer(){S.qa.composerOpen=false;S.qa.newProblems=1;qaClearNewDrafts();renderQa();}
 
 function qaQuestionsHtml(admin){
   /* 상세는 자유게시판과 같이 목록을 밀어내고 한 화면을 차지한다. */
@@ -4143,11 +4157,6 @@ function qaQuestionsHtml(admin){
       ${qaNewBodyColHtml(1)}${qaNewBodyColHtml(2)}
     </div>
     <p style="font-size:11px;color:#9ca3af;margin-top:6px">수식은 <code>$x^2$</code> 처럼 달러 기호로 감싸면 됩니다. 가운데 정렬하려면 <code>$$ … $$</code>.</p>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
-      <label class="btn bs bsm" style="font-size:11px;padding:6px 10px;cursor:pointer;display:inline-block;flex-shrink:0">📷 사진 첨부<input type="file" accept="image/*" multiple style="display:none" onchange="bdHandleFileInput(this,'qa_new','post')"></label>
-      <span style="font-size:11px;color:#9ca3af">최대 8MB, JPEG/PNG · 문제 2개면 어느 쪽 사진인지 본문에 적어 주세요</span>
-    </div>
-    <div id="bd-draft-anchor-post-qa_new">${bdDraftPreviewHtml('qa_new','post')}</div>
     <div style="display:flex;gap:6px;margin-top:10px">
       <button class="btn bs bsm" style="flex:1" onclick="qaCloseComposer()">취소</button>
       <button class="btn bp bsm" id="qa-new-submit" style="flex:1" onclick="qaCreateQuestion()">${qaNewCost()}토큰 쓰고 등록</button>
@@ -4244,18 +4253,20 @@ function qaDetailHtml(q,admin){
     </div>
     <h2 class="qa-body" style="font-size:20px;font-weight:800;line-height:1.35;margin:10px 0;word-break:break-word">${escapeHtml(q.title||'')}</h2>
     ${(()=>{
-      const bs=qaBodies(q);
+      const bs=qaBodies(q),bp=qaBodyPhotos(q);
       const sty='font-size:14px;color:#111827;white-space:pre-wrap;line-height:1.75;word-break:break-word';
-      if(bs.length<2)return `<p class="qa-body" style="${sty}">${qaBodyHtml(bs[0])}</p>`;
+      if(bs.length<2)return `<p class="qa-body" style="${sty}">${qaBodyHtml(bs[0])}</p>${bdPhotosHtml(q.photos)}`;
       /* 작성 화면과 같이 나란히 둔다 — 좁으면 flex-wrap 이 위아래로 접는다.
          관리자가 두 문제를 함께 보면서 답할 수 있어야 한다. */
-      return `<div style="display:flex;gap:10px;flex-wrap:wrap">${bs.map((b,i)=>`
+      const cols=`<div style="display:flex;gap:10px;flex-wrap:wrap">${bs.map((b,i)=>`
         <div style="flex:1 1 260px;min-width:0;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;background:#fafafa">
           <p style="font-size:11px;color:#4338ca;font-weight:700;margin-bottom:5px">문제 ${i+1}</p>
           <p class="qa-body" style="${sty}">${qaBodyHtml(b)}</p>
+          ${bp?bdPhotosHtml(bp[i]):''}
         </div>`).join('')}</div>`;
+      /* 문제별 사진이 없는 예전 글은 두 본문 아래에 통째로 보여 준다. */
+      return bp?cols:`${cols}${bdPhotosHtml(q.photos)}`;
     })()}
-    ${bdPhotosHtml(q.photos)}
     ${cmts.length?`<p style="font-size:12px;color:#6b7280;font-weight:600;margin:18px 0 6px">댓글 (${cmts.length})</p>${cmtHtml}`
       :'<p style="font-size:12px;color:#9ca3af;text-align:center;padding:18px 0;margin-top:14px;border-top:1px solid #f1f3f5">아직 댓글이 없습니다.</p>'}
     <div style="margin-top:10px;padding-top:12px;border-top:1px solid #e5e7eb">
@@ -4711,9 +4722,11 @@ async function qaCreateQuestion(){
   if(miss>=0){toast(problems>1?`문제 ${miss+1}의 내용을 입력하세요.`:'내용을 입력하세요.','warn');return;}
   showLoad(true);
   try{
-    const photos=await qaUploadDrafts('qa_new','post');
-    const r=await qaCall('createQuestion',{title,bodies,photos,problems,subject});
-    delete S.bdDraftFiles['qa_new'];
+    /* 칸마다 따로 올린다. 감춰 둔 둘째 칸의 사진은 본문과 같이 빠진다. */
+    const bodyPhotos=[];
+    for(let i=1;i<=problems;i++)bodyPhotos.push(await qaUploadDrafts(qaNewPhotoScope(i),'post'));
+    const r=await qaCall('createQuestion',{title,bodies,bodyPhotos,problems,subject});
+    qaClearNewDrafts();
     S.qa.composerOpen=false;S.qa.newProblems=1;S.qa.openId=r.id;
     toast(`질문이 등록되었습니다. (남은 토큰 ${r.balance}개)`,'success');
     renderQa();
