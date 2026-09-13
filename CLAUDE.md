@@ -194,7 +194,12 @@ Token-gated 1:1 Q&A, reached from the home hub (`#vQa` / `goQa()`). Students see
 
 ### 상단에 붙는 것들 (`--stick-top`)
 
-탭 줄(`.tabs-wrap`)은 topbar 아래에 `sticky` 로 붙는다. **붙는 높이를 CSS 변수로 다시 계산하면 안 된다** — 테두리·안전영역 때문에 1~2px 어긋나 스크롤할 때 탭 줄이 살짝 튄다. `syncStickTop()` 이 **실제로 그려진 topbar 높이**를 재서 `--stick-top` 에 넣고, `showView`·`resize`·`orientationchange` 에서 다시 잰다.
+탭 줄(`.tabs-wrap`)은 topbar 아래에 `sticky` 로 붙는다. 스크롤할 때 **한 픽셀도 움직이지 않아야** 하고, 그러려면 둘이 맞아야 한다.
+
+1. **처음부터 붙어 있어야 한다.** 탭 줄이 `.page` 의 위 여백 아래에서 시작하면 그 여백만큼 올라간 뒤에야 붙는다 — 그 구간이 '스크롤하면 움직인다' 로 보인다. `--page-pt` 를 두고 `.page` 의 위 여백과 `.tabs-wrap` 의 `margin-top:calc(-1 * var(--page-pt))` 이 **합쳐서 0** 이 되게 한다. 여백은 `.tabs-wrap` 자신의 `padding-top` 이 대신 낸다.
+2. **붙는 높이는 재서 쓴다.** CSS 변수로 다시 계산하면 테두리·안전영역 때문에 1~2px 어긋난다. `syncStickTop()` 이 **실제로 그려진 topbar 높이**를 `--stick-top` 에 넣고 `showView`·`resize`·`orientationchange` 에서 다시 잰다.
+
+값을 건드릴 땐 스크롤하며 `.tabs-wrap` 의 `getBoundingClientRect().top` 이 내내 같은 수인지 재 볼 것.
 
 **칩 문구(`applyChips`)도 `showView` 에서 매번 맞춘다.** 새로고침이나 뒤로가기로 관리 화면에 바로 들어오면 `navApply` 가 `applyChips` 를 부르지 않아, 마크업에 박혀 있는 기본값(`2027 6평`)이 설정한 값 대신 그대로 보였다.
 

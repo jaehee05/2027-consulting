@@ -68,9 +68,12 @@
   --sar:env(safe-area-inset-right,0px);
   /* 상단바 높이 — sticky 오프셋 계산 기준 */
   --topbar-h:52px;
+  /* 페이지 위 여백. 탭 줄이 이만큼 올라간 뒤에야 붙으면 그 사이가 '움직임'으로 보이므로,
+     탭 줄은 이 값만큼 위로 당겨 처음부터 붙어 있게 한다. */
+  --page-pt:24px;
   --tabs-h:0px;
 }
-@media(max-width:640px){:root{--topbar-h:48px;--tabs-h:34px}}
+@media(max-width:640px){:root{--topbar-h:48px;--tabs-h:34px;--page-pt:16px}}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--bg);min-height:100vh;min-height:100dvh}
 .hidden{display:none!important}
@@ -79,7 +82,7 @@ body{font-family:'Pretendard',sans-serif;color:var(--gray-900);background:var(--
 .chip{background:var(--primary);color:var(--surface);font-size:10px;font-weight:700;padding:3px 8px;border-radius:var(--radius-pill)}
 .tname{font-size:15px;font-weight:700}.trole{font-size:11px;color:var(--gray-500);margin-left:2px}
 .tr{display:flex;align-items:center;gap:10px}.uname{font-size:13px;color:var(--gray-500)}
-.page{padding:24px calc(16px + var(--sar)) calc(24px + var(--sab)) calc(16px + var(--sal));max-width:960px;margin:0 auto}
+.page{padding:var(--page-pt) calc(16px + var(--sar)) calc(24px + var(--sab)) calc(16px + var(--sal));max-width:960px;margin:0 auto}
 .page-sm{max-width:440px;margin:0 auto;padding:40px 16px}
 .lwrap{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);padding:calc(20px + var(--sat)) calc(20px + var(--sar)) calc(20px + var(--sab)) calc(20px + var(--sal))}
 .lwrap>.lwrap-body{margin:auto 0}
@@ -386,7 +389,8 @@ tr.selected>td:first-child{box-shadow:inset 1px 1px 0 var(--primary-soft-border)
 tr.selected>td:last-child{box-shadow:inset -1px 1px 0 var(--primary-soft-border),inset 0 -1px 0 var(--primary-soft-border)}
 /* 탭바 좌우 스크롤 힌트 */
 /* 탭 줄은 화면 위에 붙어 있어 표를 길게 내려도 다른 화면으로 바로 건너뛸 수 있다. */
-.tabs-wrap{position:sticky;top:var(--stick-top,calc(var(--topbar-h) + var(--sat)));z-index:90;background:var(--bg);padding:10px 0;margin-bottom:10px}
+.tabs-wrap{position:sticky;top:var(--stick-top,calc(var(--topbar-h) + var(--sat)));z-index:90;background:var(--bg);
+  margin-top:calc(-1 * var(--page-pt));padding:var(--page-pt) 0 10px;margin-bottom:10px}
 .tabs-wrap>.tabs{margin-bottom:0}
 /* 목록 검색 */
 .srch{position:relative;flex:1;min-width:180px}
@@ -533,7 +537,7 @@ tr:last-child td{border-bottom:none}
   .topbar{height:calc(var(--topbar-h) + var(--sat));padding:var(--sat) calc(12px + var(--sar)) 0 calc(12px + var(--sal))}
   .tname{font-size:13px}.chip{font-size:9px;padding:2px 6px}
   .uname{font-size:11px}
-  .page{padding:16px calc(10px + var(--sar)) calc(16px + var(--sab)) calc(10px + var(--sal))}.page-sm{padding:24px 12px calc(24px + var(--sab))}
+  .page{padding:var(--page-pt) calc(10px + var(--sar)) calc(16px + var(--sab)) calc(10px + var(--sal))}.page-sm{padding:24px 12px calc(24px + var(--sab))}
   .card{padding:14px;border-radius:var(--radius-xl)}
   .modal{padding:18px;border-radius:var(--radius-card);max-width:100%}
   .overlay{padding:10px}
