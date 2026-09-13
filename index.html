@@ -163,9 +163,13 @@ body.has-snav .page{padding-bottom:calc(84px + var(--sab))}
 }
 /* 내비가 있으면 상단의 [← 홈] 은 군더더기다. 관리자는 내비가 없으므로 그대로 둔다. */
 body.has-snav .home-link{display:none}
-/* 카카오 런처는 내비 위로 올린다. */
+/* 카카오 런처와 글쓰기 버튼은 내비 위로 올린다. */
 body.has-snav #kakaoCh{bottom:calc(84px + var(--sab))}
-@media(max-width:640px){body.has-snav #kakaoCh{bottom:calc(78px + var(--sab))}}
+body.has-snav .bd-fab{bottom:calc(88px + var(--sab))}
+@media(max-width:640px){
+  body.has-snav #kakaoCh{bottom:calc(78px + var(--sab))}
+  body.has-snav .bd-fab{bottom:calc(78px + var(--sab))}
+}
 /* 카카오톡 채널 문의 버튼 — 채널톡 런처 자리를 그대로 이어받는다(파스텔 블루). */
 #kakaoCh{position:fixed;right:20px;bottom:20px;z-index:900;width:56px;height:56px;border-radius:50%;background:linear-gradient(140deg,#e3edff,#c3d9ff);border:1px solid rgba(28,100,242,.16);display:none;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(28,100,242,.22);transition:transform .15s,box-shadow .15s,background .15s;-webkit-tap-highlight-color:transparent}
 #kakaoCh.on{display:flex}
@@ -992,7 +996,7 @@ const S = {
   akExamId:null, akSubj:'', akDraft:null, akSrcUrl:'', cprintOpts:null,
   posts:[], bdComposerOpen:false, bdPostEditId:null, bdDraftFiles:{}, bdCommentDraftFiles:{},
   bdFilter:'all', bdModalBookingId:null, bdOpenId:null, bdReplyTo:null, boardBans:{}, boardPledges:{},
-  stuTab:'book',
+  stuTab:'book', myBalance:null,
   qa:{policy:null,policyLoaded:false,questions:[],payments:[],balances:{},sub:'q',filter:'open',payFilter:'open',
       composerOpen:false,newProblems:1,openId:null,pendingOpen:null,stuQuery:'',draft:null,draftDirty:false,loaded:false,cmtEdit:null}
 };
@@ -2161,6 +2165,7 @@ async function doLogout(){
   stopPostsListener();
   stopBansListener();
   qaStopListeners();
+  stopMyBalanceListener();
   stopCallsListener();
   stopTabletSessionListener();
   S.user=null;S.studentDocId=null;S.editingExamId=null;S.lang2Open=false;S.scoreWizardExamId=null;S.scoreStep=0;S.scoreWizard={};
@@ -3807,7 +3812,8 @@ function qaChip(map,key){
 }
 function qaIsAdmin(){return S.user?.type==='admin';}
 function qaMyId(){return qaIsAdmin()?(S.user?.id||''):(S.studentDocId||'');}
-function qaMyBalance(){return S.qa.balances[S.studentDocId]||0;}
+/* 질문게시판 구독이 아직 안 붙었어도(막 들어온 참) 세션 내내 보고 있는 값으로 메운다. */
+function qaMyBalance(){const b=S.qa.balances[S.studentDocId];return b===undefined?(S.myBalance||0):b;}
 function qaPolicy(){return S.qa.policy||{signupGrant:1,questionCost:1,unitPrice:1000,packages:[]};}
 const QA_PAY_METHOD={ppurio:'결제선생',bank:'계좌이체'};
 function qaPpurioOn(){return qaPolicy().ppurioEnabled!==false;}
@@ -9786,9 +9792,9 @@ async function editChip(key,defaultValue){
     applyChips();
   }catch(e){toast('저장 실패: '+e.message,'error');}
 }
-/* ── 학생 하단 내비 ──
-   허브를 거치지 않고 화면을 바로 옮긴다. 학생 세션(관리자 미리보기 포함)에서만 보이고,
-   로그인 전 방문자는 갈 곳이 하나뿐이라 띄우지 않는다. */
+/* ── 하단 내비 ──
+   허브를 거치지 않고 화면을 바로 옮긴다. 갈 곳이 둘 이상인 세션에만 띄운다 —
+   로그인 전 방문자와 태블릿은 한 화면뿐이라 내비가 군더더기다. */
 const SNAV_ITEMS=[
   {id:'home',label:'홈',view:'vHome',go:'goHome()',
    d:'M3 10.5 12 3l9 7.5M5.5 9.5V20a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V9.5'},
@@ -9801,34 +9807,67 @@ const SNAV_ITEMS=[
   {id:'my',label:'내 정보',view:'vMy',go:'goMyPage()',
    d:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 20.5a7.5 7.5 0 0 1 15 0'},
 ];
+/* 자리는 역할이 갈 수 있는 화면과 같아야 한다. 관리자의 멘토링은 vAdmin 이고,
+   OP(viewer)는 게시판·질문게시판을 아예 못 보므로 두 자리만 남는다(내 정보는 학생 전용). */
+const SNAV_BY_ROLE={
+  student:['home','stu','qa','board','my'],
+  admin:['home','stu','qa','board'],
+  viewer:['home','stu'],
+};
+function snavItems(){
+  const ids=SNAV_BY_ROLE[S.user?.type]||[];
+  const adminSide=S.user?.type!=='student';
+  return ids.map(id=>{
+    const it=SNAV_ITEMS.find(x=>x.id===id);
+    /* 관리자·OP 의 멘토링은 학생 화면(vStu)이 아니라 관리 화면(vAdmin)이다. */
+    return id==='stu'&&adminSide?{...it,view:'vAdmin'}:it;
+  });
+}
 function renderStuNav(viewId){
-  const on=S.user?.type==='student'&&SNAV_ITEMS.some(x=>x.view===viewId);
+  ensureMyBalanceListener();
+  const items=snavItems();
+  const on=items.some(x=>x.view===viewId);
   document.body.classList.toggle('has-snav',on);
   const box=_('snavInner');
   if(!box||!on)return;
   const dot=bdStuNewCount()>0;
-  box.innerHTML=SNAV_ITEMS.map(it=>`<a role="button" tabindex="0" class="${it.view===viewId?'on':''}" onclick="${it.go}" aria-label="${it.label}" ${it.view===viewId?'aria-current="page"':''}>
+  box.innerHTML=items.map(it=>`<a role="button" tabindex="0" class="${it.view===viewId?'on':''}" onclick="${it.go}" aria-label="${it.label}" ${it.view===viewId?'aria-current="page"':''}>
     <svg class="sn-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${it.d}"/></svg>
     <span>${it.label}</span>${it.id==='board'&&dot?'<span class="sn-dot"></span>':''}
   </a>`).join('');
 }
-function enterHome(){
-  const tr=_('homeTr'),hdr=_('homeHeader'),cards=_('homeCards');
-  if(S.user){
-    const greet=S.user.name||'';
-    const unameTxt=S.user.isTest?greet+' (테스트)':(S.user.type==='student'?greet+' 학생':greet);
-    if(tr)tr.innerHTML=`<span class="uname">${escapeHtml(unameTxt)}</span><button class="btn bs bsm" onclick="doLogout()" style="margin-left:10px">로그아웃</button>`;
-    if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">안녕하세요, ${escapeHtml(greet)} 님</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
-  }else{
-    if(tr)tr.innerHTML=`<button class="btn bp bsm" onclick="goLoginView()">로그인</button>`;
-    if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">KJHEDU</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
-  }
-  if(cards){
+
+/* ── 내 토큰 잔액 ──
+   홈에서도 잔액을 보여 주려면 #vQa 밖에서도 값이 있어야 한다. 질문게시판 구독은 그 화면에서만
+   살아 있으므로(원장·결제가 전교생 분량이라 그렇게 두었다), 내 잔액 문서 하나만 세션 내내 따로 본다.
+   문서 하나짜리 구독이라 비용이 사실상 없다. */
+let _myBalUnsub=null,_myBalFor=null;
+function ensureMyBalanceListener(){
+  const me=S.user?.type==='student'?S.studentDocId:null;
+  if(_myBalFor===me)return;                 // 같은 학생이면 그대로 둔다
+  stopMyBalanceListener();
+  if(!me)return;
+  _myBalFor=me;
+  _myBalUnsub=db.doc('tokenBalances/'+me).onSnapshot(snap=>{
+    S.myBalance=snap.exists?Math.floor(Number(snap.data().balance)||0):0;
+    /* 홈에 떠 있으면 숫자를 갈아 끼운다. enterHome() 을 다시 부르면 방문 기록이 쌓인다. */
+    if(!_('vHome')?.classList.contains('hidden'))renderHomeCards();
+  },err=>console.error('balance listener error',err));
+}
+function stopMyBalanceListener(){
+  if(_myBalUnsub){try{_myBalUnsub();}catch(e){}}
+  _myBalUnsub=null;_myBalFor=null;S.myBalance=null;
+}
+function renderHomeCards(){
+  const cards=_('homeCards');
+  if(!cards)return;
+  {
     const isStu=S.user?.type==='student';
     const isAdmin=S.user?.type==='admin';
     const bdNew=bdStuNewCount();
     /* 카드 설명은 고정 문구 대신 지금 상태를 보여 준다 — 들어가 보지 않아도 할 일이 있는지 알 수 있어야 한다.
-       홈에서 받아 둔 자료(예약·자유게시판)만 쓴다. 질문게시판 자료는 #vQa 에서만 구독하므로 여기서는 셀 수 없다. */
+       잔액은 ensureMyBalanceListener() 가 세션 내내 따로 보고 있으므로 홈에서도 쓸 수 있다.
+       아직 안 왔으면(null) 0 이 아니라 고정 문구를 보여 준다 — 0토큰이라고 잘못 말하면 안 된다. */
     const myB=isStu?S.bookings.find(b=>b.studentId===S.studentDocId&&!isNoShow(b)):null;
     const items=[
       {ico:'stu',color:'green',title:'멘토링',onclick:'goConsulting()',
@@ -9837,8 +9876,10 @@ function enterHome(){
     ];
     if(isStu||isAdmin)items.push({ico:'board',color:'blue',title:'자유게시판',onclick:'goBoard()',new:bdNew>0,
       desc:bdNew>0?`새 글 <b>${bdNew}개</b>`:'익명으로 자유롭게 이야기하는 공간'});
+    const bal=isStu?S.myBalance:null;
     if(isStu||isAdmin)items.push({ico:'qa',color:'red',title:'질문게시판',onclick:'goQa()',
-      desc:'1:1로 질문하고 답변을 주고받습니다'});
+      desc:bal===null||bal===undefined?'1:1로 질문하고 답변을 주고받습니다'
+           :(bal>0?`보유 <b>${bal}토큰</b>`:'토큰이 없습니다 · 충전하고 질문하기')});
     if(isStu)items.push({ico:'my',color:'purple',title:'내 정보',onclick:'goMyPage()',
       desc:'내 정보 조회·수정과 비밀번호 변경'});
     const icoPath=id=>(SNAV_ITEMS.find(x=>x.id===id)||{}).d||'';
@@ -9851,6 +9892,19 @@ function enterHome(){
       <span class="hc-go">›</span>
     </button>`).join('');
   }
+}
+function enterHome(){
+  const tr=_('homeTr'),hdr=_('homeHeader');
+  if(S.user){
+    const greet=S.user.name||'';
+    const unameTxt=S.user.isTest?greet+' (테스트)':(S.user.type==='student'?greet+' 학생':greet);
+    if(tr)tr.innerHTML=`<span class="uname">${escapeHtml(unameTxt)}</span><button class="btn bs bsm" onclick="doLogout()" style="margin-left:10px">로그아웃</button>`;
+    if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">안녕하세요, ${escapeHtml(greet)} 님</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
+  }else{
+    if(tr)tr.innerHTML=`<button class="btn bp bsm" onclick="goLoginView()">로그인</button>`;
+    if(hdr)hdr.innerHTML=`<p style="font-size:22px;font-weight:800">KJHEDU</p><p style="font-size:13px;color:#6b7280;margin-top:6px">이용하실 서비스를 선택해주세요.</p>`;
+  }
+  renderHomeCards();
   showView('vHome');
   applyChips();
   if(!_skipPush)navPush({v:'vHome'});
