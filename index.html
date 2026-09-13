@@ -113,16 +113,18 @@ label.btn{display:inline-flex!important}
    밑줄 스트립이던 것을 세그먼트(알약 묶음)로 바꿨다. 한 영역에 두세 개뿐이라 가로로 나눠 가지면
    어디에 있는지가 한눈에 보이고, 손가락이 닿는 넓이도 같이 커진다.
    관리자 화면 탭·학생 멘토링 속탭·질문게시판 속탭이 모두 이걸 쓴다. */
-.tabs{display:flex;gap:3px;background:var(--gray-100);border-radius:var(--radius-pill);padding:3px;margin-bottom:18px;
+.tabs{display:flex;gap:6px;margin-bottom:18px;
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
-.tab{flex:1 1 0;min-width:0;padding:9px 10px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray-500);
+.tab{flex:0 0 auto;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray-500);
   border:none;border-radius:var(--radius-pill);background:none;font-family:inherit;transition:.15s;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-tap-highlight-color:transparent}
-.tab:hover{color:var(--gray-900)}
-.tab.on{color:var(--primary);background:var(--surface);box-shadow:0 1px 3px rgba(17,24,39,.1);font-weight:700}
-@media(max-width:420px){.tab{font-size:12px;padding:9px 6px}}
+  white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.tab:hover{background:var(--gray-100);color:var(--gray-900)}
+.tab.on{color:var(--surface);background:var(--primary);font-weight:700}
+.tab.on:hover{background:var(--primary-hover);color:var(--surface)}
+@media(max-width:420px){.tab{font-size:12.5px;padding:8px 13px}}
 .tab-n{display:inline-block;background:var(--danger);color:#fff;border-radius:var(--radius-pill);padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px}
+.tab.on .tab-n{background:rgba(255,255,255,.28)}
 .tw{overflow-x:auto}
 /* ── 질문게시판 본문 글꼴 ──
    관리자가 [토큰 설정]에서 고른 글꼴이 --qa-font 로 들어온다. @font-face 는 넷 다 선언해 두지만
@@ -390,7 +392,8 @@ tr.selected>td:last-child{box-shadow:inset -1px 1px 0 var(--primary-soft-border)
 .srch{position:relative;flex:1;min-width:180px}
 .srch>input{height:34px;width:100%;padding:0 30px 0 30px;border:1px solid var(--gray-200);border-radius:var(--radius-lg);font-family:inherit;font-size:13px;color:var(--gray-900);background:var(--surface);outline:none;transition:.15s}
 .srch>input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(28,100,242,.1)}
-.srch>.srch-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:13px;pointer-events:none;line-height:1}
+.srch>.srch-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--gray-400);pointer-events:none;line-height:0}
+.srch>.srch-ico svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:block}
 .srch>.srch-x{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--gray-400);font-size:15px;cursor:pointer;font-family:inherit;padding:3px 5px;border-radius:var(--radius-sm);line-height:1}
 .srch>.srch-x:hover{color:var(--gray-700);background:var(--gray-100)}
 @media(max-width:640px){.srch{min-width:0;flex-basis:100%}}
@@ -574,6 +577,10 @@ tr:last-child td{border-bottom:none}
   .tw-cards .head-meta{display:inline-flex;gap:5px;align-items:center;font-size:11px;color:var(--gray-500);font-weight:500}
   .tw-cards td.cell-actions{margin-top:6px;padding:6px 0 0!important;border-top:1px solid var(--gray-100)!important;justify-content:flex-end}
   .tw-cards td.cell-actions .btn{height:28px;padding:0 10px;font-size:11px}
+  /* 칸이 이름과 버튼뿐인 표(학생 목록). 구분선 둘이 붙어 카드가 텅 비어 보였다 — 선을 빼고 붙인다. */
+  .tw-slim>table>tbody>tr{padding:11px 12px}
+  .tw-slim td.cell-head{border-bottom:none!important;margin:0 0 6px!important;padding:0!important}
+  .tw-slim td.cell-actions{border-top:none!important;margin-top:0!important;padding:0!important}
   .tw-cards td.cell-hide{display:none!important}
   .only-mobile{display:inline}
   .tw-cards td.cell-full{display:block;text-align:left!important;padding:4px 0!important}
@@ -753,7 +760,8 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 .lec-embed{position:relative;padding-top:56.25%;background:#000;border-radius:var(--radius-lg);overflow:hidden}
 .lec-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .apply-hero{text-align:center;padding:40px 20px;background:var(--surface);border:1px solid var(--gray-200);border-radius:var(--radius-modal)}
-.apply-hero .ah-ico{width:60px;height:60px;border-radius:var(--radius-modal);background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px}
+.apply-hero .ah-ico{width:60px;height:60px;border-radius:var(--radius-modal);background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.apply-hero .ah-ico svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .apply-hero h2{font-size:18px;font-weight:800;margin-bottom:6px}
 .apply-hero p{font-size:13px;color:var(--gray-500);margin-bottom:18px;line-height:1.6}
 .apply-hero .btn{min-width:160px}
@@ -1749,7 +1757,7 @@ function startCallsListener(){
         if(d.status==='acknowledged'){
           toast(`✓ ${ackBy}님이 ${sname} 학생 호출을 확인했습니다.`,'success',{duration:5000});
         }else{
-          toast(`⚠ ${ackBy}: ${sname} 학생이 자리에 없거나 미등원입니다.`,'warn',{duration:6000});
+          toast(`${ackBy}: ${sname} 학생이 자리에 없거나 미등원입니다.`,'warn',{duration:6000});
         }
       });
     },err=>console.error('admin calls listener error',err));
@@ -1779,7 +1787,7 @@ function showCallModal(c){
   const caller=escapeHtml(c.calledByName||'관리자');
   const seat=c.studentSeat?`<span style="display:inline-block;background:var(--primary);color:#fff;border-radius:8px;padding:3px 10px;font-size:14px;font-weight:800;margin-right:8px;vertical-align:middle">좌석 ${escapeHtml(String(c.studentSeat))}</span>`:'';
   renderModal({
-    title:'📢 학생 호출',
+    title:'학생 호출',
     sub:`${seat}<b style="color:var(--primary);font-size:18px">${escapeHtml(c.studentName||'')}</b> 학생을 호출했습니다.`,
     body:`<div style="font-size:12px;color:var(--gray-500);margin-top:6px">${caller}${when?` · ${when}`:''}</div>`,
     actions:[
@@ -1872,7 +1880,7 @@ function renderTablet(){
   const sess=S.tabletSession;
   if(!sess||!sess.studentId){
     _('tabletC').innerHTML=`<div class="card np" style="text-align:center;padding:80px 24px;background:linear-gradient(135deg,#f9fafb,#f3f4f6);border:1px solid var(--gray-200)">
-      <p style="font-size:68px;line-height:1;margin-bottom:18px">🎓</p>
+      <p style="font-size:0;line-height:0;margin-bottom:18px"><span style="display:inline-flex;width:72px;height:72px;border-radius:var(--radius-modal);background:var(--primary-soft);color:var(--primary);align-items:center;justify-content:center">${fmIco('cap')}</span></p>
       <p style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:10px">멘토링 대기 중</p>
       <p style="font-size:14px;color:var(--gray-500);line-height:1.65">선생님이 학생을 선택하면<br>이곳에 학생 정보가 자동으로 표시됩니다.</p>
     </div>`;
@@ -1880,7 +1888,7 @@ function renderTablet(){
   }
   const stu=S.students.find(x=>x._docId===sess.studentId);
   if(!stu){
-    _('tabletC').innerHTML=`<div class="card" style="padding:40px 20px;text-align:center"><p style="font-size:16px;font-weight:700;color:var(--danger);margin-bottom:8px">⚠ 학생 정보를 불러오는 중</p><p style="font-size:13px;color:var(--gray-500)">잠시만 기다려주세요.</p></div>`;
+    _('tabletC').innerHTML=`<div class="card" style="padding:40px 20px;text-align:center"><p style="font-size:16px;font-weight:700;color:var(--danger);margin-bottom:8px">학생 정보를 불러오는 중</p><p style="font-size:13px;color:var(--gray-500)">잠시만 기다려주세요.</p></div>`;
     return;
   }
   renderTabletConsult(stu);
@@ -1958,7 +1966,7 @@ async function startTabletSession(stuId){
     await db.collection('sessions').doc('tablet').set(data);
     S.tabletSession=data;
     if(S.tab==='consult'&&S.consultStuId===stuId&&typeof renderConsultDetail==='function')renderConsultDetail();
-    toast(`📺 ${stu.name} 학생 멘토링이 태블릿에 표시됩니다.`,'success');
+    toast(`${stu.name} 학생 멘토링이 태블릿에 표시됩니다.`,'success');
   }catch(e){toast('세션 시작 실패: '+e.message,'error');}
 }
 async function endTabletSession(){
@@ -1970,7 +1978,7 @@ async function endTabletSession(){
     await db.collection('sessions').doc('tablet').delete();
     S.tabletSession=null;
     if(S.tab==='consult'&&S.consultStuId===prevStu&&typeof renderConsultDetail==='function')renderConsultDetail();
-    toast('⏹ 멘토링 세션이 종료되었습니다.','success');
+    toast('멘토링 세션이 종료되었습니다.','success');
   }catch(e){toast('세션 종료 실패: '+e.message,'error');}
 }
 
@@ -2403,7 +2411,7 @@ function bookCardHtml(b){
   if(adminChangeReq){
     const slotBtns=adminChangeReq.offeredSlots.map((s,i)=>`<button class="sb" style="text-align:left;padding:10px 12px;height:auto" onclick="stuAcceptAdminChange('${adminChangeReq._docId}',${i})"><b>${s.dateLabel}</b> · ${s.slot}</button>`).join('');
     statusHtml+=`<div style="background:var(--primary-soft);border:1.5px solid #93c5fd;border-radius:12px;padding:14px 16px;margin-bottom:12px">
-      <p style="font-size:13px;color:var(--primary-text);font-weight:700;margin-bottom:4px">📣 관리자 예약 시간 변경 요청</p>
+      <p style="font-size:13px;color:var(--primary-text);font-weight:700;margin-bottom:4px">관리자 예약 시간 변경 요청</p>
       <p style="font-size:12px;color:#1e40af;margin-bottom:12px">현재 예약(<b>${adminChangeReq.currentDateLabel} ${adminChangeReq.currentSlot}</b>)을 아래 시간 중 하나로 변경해 주세요.</p>
       <div class="sg" style="margin-bottom:10px">${slotBtns}</div>
       <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="stuOpenRejectAdminChange('${adminChangeReq._docId}')">거절</button></div>
@@ -2411,7 +2419,7 @@ function bookCardHtml(b){
   }
   if(pendingReq){
     const typeLabel=pendingReq.type==='cancel'?'취소':'변경';
-    statusHtml+=`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">⏳ 예약 ${typeLabel} 요청이 승인 대기 중입니다.</p><p style="font-size:11px;color:#92400e;margin-top:4px">사유: ${pendingReq.reason}</p>${pendingReq.type==='change'?`<p style="font-size:11px;color:#92400e;margin-top:2px">변경 희망: ${pendingReq.newDateLabel} ${pendingReq.newSlot}</p>`:''}<p style="font-size:11px;color:#92400e;margin-top:6px">※ <b>최종 승인 안내</b>를 받으시기 전까지는 <b>예약이 유지될 수 있는 점</b> 양해 부탁드립니다.</p></div>`;
+    statusHtml+=`<div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:12px"><p style="font-size:12px;color:#92400e;font-weight:600">예약 ${typeLabel} 요청이 승인 대기 중입니다.</p><p style="font-size:11px;color:#92400e;margin-top:4px">사유: ${pendingReq.reason}</p>${pendingReq.type==='change'?`<p style="font-size:11px;color:#92400e;margin-top:2px">변경 희망: ${pendingReq.newDateLabel} ${pendingReq.newSlot}</p>`:''}<p style="font-size:11px;color:#92400e;margin-top:6px">※ <b>최종 승인 안내</b>를 받으시기 전까지는 <b>예약이 유지될 수 있는 점</b> 양해 부탁드립니다.</p></div>`;
   }
   notifications.forEach(r=>{
     const typeLabel=r.type==='cancel'?'취소':'변경';
@@ -2435,7 +2443,7 @@ function bookCardHtml(b){
     <div class="stcard"><div class="slabel">날짜</div><div class="sval" style="font-size:16px">${b.dateLabel}</div></div>
     <div class="stcard"><div class="slabel">시간</div><div class="sval">${b.slot}</div></div>
   </div>
-  <div class="info" style="margin-bottom:12px"><p>📍 상담 당일 6모 시험지를 반드시 지참해주세요.</p></div>
+  <div class="info" style="margin-bottom:12px"><p>상담 당일 6모 시험지를 반드시 지참해주세요.</p></div>
   ${statusHtml}${btns}
 </div>`;}
 
@@ -3461,7 +3469,7 @@ function bdCancelReply(){S.bdReplyTo=null;bdRerender();}
 
 function bdLockedCardHtml(q){
   return `<div style="background:var(--gray-50);border:1px dashed var(--gray-300);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-    <span style="font-size:14px">🔒</span>
+    <span style="display:inline-flex;color:var(--gray-400)">${fmIco('lock')}</span>
     <span style="font-size:13px;color:var(--gray-400)">비밀글입니다.</span>
     <span style="font-size:11px;color:var(--gray-300);margin-left:auto">${bdFmtTs(q.createdAt)}</span>
   </div>`;
@@ -3671,6 +3679,15 @@ const FM_ICONS={
   note:'M8 3.5h8a2 2 0 0 1 2 2V20l-6-3-6 3V5.5a2 2 0 0 1 2-2ZM9.5 9h5M9.5 12.5h3',
   users:'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M17.5 14.2A6.5 6.5 0 0 1 21.5 20',
   bell:'M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 13 6 9Zm4 8.5a2 2 0 0 0 4 0',
+  print:'M7 8.5V4h10v4.5M7 17H5.5A1.5 1.5 0 0 1 4 15.5v-5A1.5 1.5 0 0 1 5.5 9h13a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H17M7 14h10v6H7v-6Z',
+  refresh:'M20 11.5a8 8 0 1 1-2.4-5.2M20 4v4.5h-4.5',
+  sparkle:'m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3ZM18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z',
+  search:'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm5-2 4.5 4.5',
+  screen:'M3.5 6A1.5 1.5 0 0 1 5 4.5h14A1.5 1.5 0 0 1 20.5 6v9A1.5 1.5 0 0 1 19 16.5H5A1.5 1.5 0 0 1 3.5 15V6ZM9 20h6',
+  stop:'M5.5 7A1.5 1.5 0 0 1 7 5.5h10A1.5 1.5 0 0 1 18.5 7v10a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 17V7Z',
+  wrench:'M20 5.5 16.8 8.7a2.4 2.4 0 0 1-3.4-3.4L16.6 2A5.5 5.5 0 0 0 9.4 9.2L3.6 15a2.4 2.4 0 1 0 3.4 3.4l5.8-5.8A5.5 5.5 0 0 0 20 5.5Z',
+  ban:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM5.6 5.6l12.8 12.8',
+  cap:'M12 4 2.5 8.5 12 13l9.5-4.5L12 4ZM6.5 10.8V16c0 1.4 2.5 2.7 5.5 2.7s5.5-1.3 5.5-2.7v-5.2',
   speech:'M4 5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5v6A1.5 1.5 0 0 1 14.5 13H8l-4 3.5v-11ZM19 8.5h.5A1.5 1.5 0 0 1 21 10v6.5L18 14h-5',
   key:'M15.5 3.5a5 5 0 1 1-4.4 7.3L3.5 18.4V21h2.6l1-1v-2h2v-2h2l1.2-1.2A5 5 0 0 1 15.5 3.5Zm1.2 3.3h.01',
   ticket:'M3.5 8.5A1.5 1.5 0 0 1 5 7h14a1.5 1.5 0 0 1 1.5 1.5V10a2 2 0 0 0 0 4v1.5A1.5 1.5 0 0 1 19 17H5a1.5 1.5 0 0 1-1.5-1.5V14a2 2 0 0 0 0-4V8.5ZM9.5 7v10',
@@ -5163,7 +5180,7 @@ function noticeStudentCardHtml(){
     const date=fmtDate(n.createdAt);
     if(n.pinned){
       return `<div style="position:relative;border:1px solid #fcd34d;background:#fffbeb;border-left:4px solid var(--warning);border-radius:8px;padding:12px 14px;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--warning-text);display:inline-flex;align-items:center;gap:3px">📌 중요</span>${date?`<span style="font-size:11px;color:var(--gray-400);margin-left:auto">${date}</span>`:''}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--warning-text);display:inline-flex;align-items:center;gap:3px">중요</span>${date?`<span style="font-size:11px;color:var(--gray-400);margin-left:auto">${date}</span>`:''}</div>
         <p style="font-size:14px;color:var(--gray-900);white-space:pre-wrap;line-height:1.65">${escapeHtml(n.body||'')}</p>
       </div>`;
     }
@@ -5174,7 +5191,7 @@ function noticeStudentCardHtml(){
   }).join('');
   return `<div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <span style="font-size:16px">📣</span><p style="font-size:15px;font-weight:700">공지사항</p>
+      <span style="display:inline-flex;color:var(--primary)">${fmIco('megaphone')}</span><p style="font-size:15px;font-weight:700">공지사항</p>
     </div>
     ${items}
   </div>`;
@@ -5197,7 +5214,7 @@ function noticeBoardHtml(){
   if(list.length){
     itemsHtml=list.map(n=>{
       const isEditing=S.noticeEditId===n._docId;
-      const pinBadge=n.pinned?'<span class="bx bb" style="font-size:10px;font-weight:700;margin-right:6px">📌 고정</span>':'';
+      const pinBadge=n.pinned?'<span class="bx bb" style="font-size:10px;font-weight:700;margin-right:6px">고정</span>':'';
       const ts=n.createdAt?bdFmtTs(n.createdAt):'';
       const author=escapeHtml(n.authorName||'관리자');
       const adminBtns=`<div style="display:flex;gap:4px;margin-left:auto">
@@ -5389,7 +5406,7 @@ function popupRender(p,remaining,preview){
        <button class="pp-btn main" onclick="popupDismiss('${p._docId}',false)">확인</button>`;
   _('pCt').innerHTML=`
     <div class="pp-head">
-      <span class="pp-badge">📢 ${preview?'미리보기':'공지'}</span>
+      <span class="pp-badge">${preview?'미리보기':'공지'}</span>
       <p class="pp-title">${escapeHtml(p.title||'공지')}</p>
     </div>
     <div class="pp-body">
@@ -5682,7 +5699,7 @@ function requestCancelBook(){
   const c=_('stuC');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx br">예약 취소 요청</span><p style="font-size:15px;font-weight:700">예약 취소</p></div>
   <div style="background:var(--gray-50);border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px"><b>${myB.dateLabel} ${myB.slot}</b> 예약을 취소 요청합니다.</p></div>
-  <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">⚠️ 예약 취소는 선생님의 승인이 필요합니다.</p></div>
+  <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">예약 취소는 선생님의 승인이 필요합니다.</p></div>
   <div class="fg"><label class="fl">취소 사유 <span style="color:var(--danger)">*</span></label><textarea class="fi ta" id="cancelReason" rows="3" placeholder="취소 사유를 입력해주세요."></textarea></div>
   <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="renderStu()">← 돌아가기</button><button class="btn bd" style="flex:1" onclick="submitCancelRequest()">취소 요청</button></div></div>`;}
 
@@ -5717,7 +5734,7 @@ function renderChangeForm(){
   const slots=sel.slots.map(slot=>{const isMine=myB.date===sel.date&&myB.slot===slot;const isTaken=taken.includes(slot)||(!isMine&&!isSlotActive(sel.id,slot));const isSel=S.adminSel===sel.id+'|'+slot;return `<button class="sb ${isTaken?(isMine?'mn':'bk'):isSel?'sl':''}" ${isTaken?'disabled':''} onclick="${isTaken?'':'pickChangeSlot(\''+sel.id+'\',\''+slot+'\',this)'}">${slot}${isMine?' (현재)':''}</button>`;}).join('');
   c.innerHTML=`<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="bx bb">예약 변경 요청</span><p style="font-size:15px;font-weight:700">예약 변경</p></div>
   <div style="background:var(--gray-50);border-radius:10px;padding:12px;margin-bottom:14px"><p style="font-size:13px">현재 예약: <b>${myB.dateLabel} ${myB.slot}</b></p></div>
-  <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">⚠️ 예약 변경은 선생님의 승인이 필요합니다.</p></div>
+  <div style="background:#fff8e1;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:14px"><p style="font-size:12px;color:#92400e;font-weight:500">예약 변경은 선생님의 승인이 필요합니다.</p></div>
   <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">변경 희망 날짜/시간을 선택하세요.</p>
   <div class="dtabs">${dtabs}</div>
   <div style="background:var(--gray-50);border-radius:10px;padding:14px;margin-bottom:14px"><p style="font-size:12px;font-weight:600;color:var(--gray-500);margin-bottom:8px">${sel.label} 예약 가능 시간</p><div class="sg" id="changeSlots">${slots||'<p style="font-size:13px;color:var(--gray-400)">예약 가능한 시간이 없습니다.</p>'}</div></div>
@@ -5842,7 +5859,7 @@ function renderAdminConsult(){
   <div class="sh"><span class="shtitle">멘토링 <span style="font-size:13px;font-weight:400;color:var(--gray-500)">(${baseStu.length}명)</span></span></div>
   ${summaryHtml}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:12px;color:var(--gray-500);font-weight:600">정렬:</span>${sortBtns}
-    <button class="btn bs bsm" style="margin-left:auto" onclick="openBatchPrintModal()">🖨 여러 명 인쇄</button></div>
+    <button class="btn bs bsm" style="margin-left:auto" onclick="openBatchPrintModal()">${fmIco('print')}여러 명 인쇄</button></div>
   <div class="card" style="padding:0"><div class="tw tw-cards tw-wide"><table class="consult-tbl">
     <thead><tr><th>좌석</th><th>학년</th><th>이름</th><th>학교</th><th>예약</th><th>게시글</th>${examHeaders}<th>기록</th></tr></thead>
     <tbody>${rows||`<tr class="empty-row"><td colspan="${7+cExams.length}" class="empty">등록된 학생이 없습니다.</td></tr>`}</tbody>
@@ -6126,13 +6143,13 @@ function renderConsultDetail(){
   const _otherActive=_sess&&_sess.studentId&&_sess.studentId!==stu._docId;
   const _sessTitle=_isActive?'태블릿 표시 종료':(_otherActive?'현재 다른 학생 표시 중':'태블릿에 이 학생 표시');
   const _sessBtn=_isActive
-    ?`<button class="btn bd bsm" onclick="endTabletSession()" title="${_sessTitle}">⏹ 멘토링 종료</button>`
-    :`<button class="btn bp bsm" style="background:var(--primary);border-color:var(--primary)" onclick="startTabletSession('${stu._docId}')" title="${_sessTitle}">📺 ${_otherActive?'멘토링 변경':'멘토링 시작'}</button>`;
+    ?`<button class="btn bd bsm" onclick="endTabletSession()" title="${_sessTitle}">${fmIco('stop')}멘토링 종료</button>`
+    :`<button class="btn bp bsm" style="background:var(--primary);border-color:var(--primary)" onclick="startTabletSession('${stu._docId}')" title="${_sessTitle}">${fmIco('screen')}${_otherActive?'멘토링 변경':'멘토링 시작'}</button>`;
   _('adminC').innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn bs bsm" onclick="autoSaveConsultNote()">← 목록</button>
-      <div style="flex:1;min-width:120px"><p style="font-size:16px;font-weight:700">${escapeHtml(stu.name)}${_isActive?' <span class="bx bb" style="font-size:10px">📺 태블릿 표시 중</span>':''}</p><p style="font-size:12px;color:var(--gray-500)">${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}${booking?' · '+escapeHtml(booking.dateLabel||'')+' '+escapeHtml(booking.slot||''):''}</p></div>
-      <button class="btn bs bsm" onclick="openConsultPrintModal()">🖨 인쇄</button>
+      <div style="flex:1;min-width:120px"><p style="font-size:16px;font-weight:700">${escapeHtml(stu.name)}${_isActive?' <span class="bx bb" style="font-size:10px">태블릿 표시 중</span>':''}</p><p style="font-size:12px;color:var(--gray-500)">${escapeHtml(stu.school||'')} ${escapeHtml(stu.grade||'')}${booking?' · '+escapeHtml(booking.dateLabel||'')+' '+escapeHtml(booking.slot||''):''}</p></div>
+      <button class="btn bs bsm" onclick="openConsultPrintModal()">${fmIco('print')}인쇄</button>
       ${_sessBtn}
     </div>
     ${qInfo}
@@ -6205,7 +6222,7 @@ function consultNotesEditorHtml(stu){
         <span>학생에게 공개</span>
       </label>
       <div style="display:flex;gap:8px">
-        <button class="btn bs bsm" onclick="openMentorAiModal()">✨ AI 초안</button>
+        <button class="btn bs bsm" onclick="openMentorAiModal()">${fmIco('sparkle')}AI 초안</button>
         <button class="btn bp bsm" onclick="saveConsultNote('${stu._docId}','${selExam.id}')">저장</button>
       </div>
     </div>
@@ -6482,7 +6499,7 @@ function renderAdminLogins(){
   const sortOpts=[['recent','최근 로그인순'],['never','미접속 우선'],['count','로그인 횟수순']];
   const sortBtns=sortOpts.map(([k,l])=>`<button class="btn ${sortKey===k?'bp':'bs'} bsm" onclick="S.loginSort='${k}';renderAdminLogins()">${l}</button>`).join('');
   _('adminC').innerHTML=`
-  <div class="sh"><span class="shtitle">로그인 현황 <span style="font-size:13px;font-weight:400;color:var(--gray-500)">(${loggedIn}/${total}명 접속)</span></span><span style="display:flex;gap:6px;flex-wrap:wrap">${never?`<button class="btn bp bsm" onclick="startAccountInfoForNeverLoggedIn()">🔑 미접속 ${never}명 계정 안내</button>`:''}<button class="btn bs bsm" onclick="refreshLoginStatus()">↻ 새로고침</button></span></div>
+  <div class="sh"><span class="shtitle">로그인 현황 <span style="font-size:13px;font-weight:400;color:var(--gray-500)">(${loggedIn}/${total}명 접속)</span></span><span style="display:flex;gap:6px;flex-wrap:wrap">${never?`<button class="btn bp bsm" onclick="startAccountInfoForNeverLoggedIn()">${fmIco('key')}미접속 ${never}명 계정 안내</button>`:''}<button class="btn bs bsm" onclick="refreshLoginStatus()">${fmIco('refresh')}새로고침</button></span></div>
   <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
     <div class="card" style="flex:1;min-width:140px;padding:14px">
       <div style="font-size:11px;color:var(--gray-500);font-weight:600;margin-bottom:4px">전체 학생</div>
@@ -6541,7 +6558,7 @@ function renderOpStudents(){
   ${myReqCard}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span class="srch">
-      <span class="srch-ico">🔍</span>
+      <span class="srch-ico">${fmIco('search')}</span>
       <input id="stuSrch" type="text" inputmode="search" autocomplete="off" placeholder="이름 · 학교 · 연락처 · 좌석 검색" value="${escapeHtml(S.stuQuery)}" oninput="onStuSearch(this.value)" onkeydown="if(event.key==='Escape'){event.preventDefault();clearStuSearch();}">
       <button id="stuSrchX" class="srch-x" style="display:${S.stuQuery?'block':'none'}" onclick="clearStuSearch()" aria-label="검색어 지우기">✕</button>
     </span>
@@ -6598,7 +6615,7 @@ function renderAdminStudents(){
   const unbookedIds=sorted.filter(s=>!s.isTest&&!S.bookings.some(b=>b.studentId===s._docId)).map(s=>s._docId);
   const neverIds=sorted.filter(s=>!s.isTest&&!everLoggedIn(s)).map(s=>s._docId);
   const mode=ALIMTALK_MODES[S.alimtalkMode];
-  const ddBtn=mode?'':`<button class="btn bp bsm" onclick="openAlimtalkSheet()">📩 알림톡 발송</button>`;
+  const ddBtn=mode?'':`<button class="btn bp bsm" onclick="openAlimtalkSheet()">${fmIco('mail')}알림톡 발송</button>`;
   const modeBanner=mode?`<div class="alimtalk-bar">
     <div class="ab-info"><span class="ab-icon">${mode.icon}</span><div><b>${mode.title}</b><span>학생 카드를 탭하여 수신자를 선택하세요</span></div></div>
     <div class="ab-count">${selCount}명 선택</div>
@@ -6610,19 +6627,19 @@ function renderAdminStudents(){
   ${modeBanner}
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span class="srch">
-      <span class="srch-ico">🔍</span>
+      <span class="srch-ico">${fmIco('search')}</span>
       <input id="stuSrch" type="text" inputmode="search" autocomplete="off" placeholder="이름 · 학교 · 계정 ID · 연락처 · 좌석 검색" value="${escapeHtml(S.stuQuery)}" oninput="onStuSearch(this.value)" onkeydown="if(event.key==='Escape'){event.preventDefault();clearStuSearch();}">
       <button id="stuSrchX" class="srch-x" style="display:${S.stuQuery?'block':'none'}" onclick="clearStuSearch()" aria-label="검색어 지우기">✕</button>
     </span>
     ${mode?`<button class="btn bs bsm" onclick="selectUnbookedStudents()">미예약만 선택 (${unbookedIds.length})</button>`:''}
     ${S.alimtalkMode==='accountInfo'?`<button class="btn bs bsm" onclick="selectNeverLoggedInStudents()">미접속만 선택 (${neverIds.length})</button>`:''}
-    ${mode?'':`<button class="btn bd bsm" onclick="resetAllPw()">🔑 비밀번호 일괄 초기화</button>`}
+    ${mode?'':`<button class="btn bd bsm" onclick="resetAllPw()">${fmIco('key')}비밀번호 일괄 초기화</button>`}
     ${ddBtn}
   </div>
   <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:var(--gray-500);font-weight:600">정렬:</span>${sortBtns}
   </div>
-  <div class="card" style="padding:0"><div class="tw tw-cards"><table>
+  <div class="card" style="padding:0"><div class="tw tw-cards tw-slim"><table>
     <thead><tr><th style="width:36px;text-align:center"><input id="stuSelAll" type="checkbox" ${allSelected?'checked':''} ${selectableIds.length===0?'disabled':''} onchange="toggleStuSelectAll(this.checked)"></th><th style="text-align:left">학생</th><th style="text-align:right">관리</th></tr></thead>
     <tbody id="stuTbody">${rows||`<tr class="empty-row"><td colspan="3" class="empty">${q?'검색 결과가 없습니다.':'등록된 학생이 없습니다.'}</td></tr>`}</tbody>
   </table></div></div>
@@ -6644,7 +6661,7 @@ function renderWithdrawnStudents(){
     <thead><tr><th>이름</th><th>학년</th><th>학교</th><th>연락처</th><th>퇴원일</th><th>관리</th></tr></thead>
     <tbody>${rows||'<tr class="empty-row"><td colspan="6" class="empty">퇴원 처리된 학생이 없습니다.</td></tr>'}</tbody>
   </table></div></div>
-  <div style="margin-top:14px;padding:12px 14px;background:var(--warning-soft);border:1px solid #fcd34d;border-radius:10px;font-size:12px;color:#92400e">💡 <b>복구</b> 는 학생을 활성 목록으로 되돌립니다. <b>영구 삭제</b> 는 학생 정보와 관련 기록 전부를 삭제하며 되돌릴 수 없습니다.</div>`;}
+  <div style="margin-top:14px;padding:12px 14px;background:var(--warning-soft);border:1px solid #fcd34d;border-radius:10px;font-size:12px;color:#92400e"><b>복구</b> 는 학생을 활성 목록으로 되돌립니다. <b>영구 삭제</b> 는 학생 정보와 관련 기록 전부를 삭제하며 되돌릴 수 없습니다.</div>`;}
 
 async function withdrawStu(docId){
   const s=S.students.find(x=>x._docId===docId);if(!s)return;
@@ -7155,7 +7172,7 @@ function openStuModal(docId){
   const isOpAdd=!isAdmin&&!s;
   const title=s?'학생 정보 수정':(isOpAdd?'학생 추가 요청':'학생 추가');
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">${title}</p>
-    ${isOpAdd?`<div style="background:var(--warning-soft);border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e">⏳ 입력하신 정보로 관리자에게 학생 추가 요청을 보냅니다. 관리자 승인 후 실제로 추가됩니다.</div>`:''}
+    ${isOpAdd?`<div style="background:var(--warning-soft);border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e">입력하신 정보로 관리자에게 학생 추가 요청을 보냅니다. 관리자 승인 후 실제로 추가됩니다.</div>`:''}
     <div class="frow"><div class="fg"><label class="fl">이름</label><input class="fi" id="sn" value="${s?.name||''}" placeholder="홍길동" oninput="updPrev()"></div>
     <div class="fg"><label class="fl">학년</label><select class="fi fsel" id="sg"><option ${!s||s.grade==='고3'?'selected':''}>고3</option><option ${s?.grade==='고2'?'selected':''}>고2</option><option ${s?.grade==='고1'?'selected':''}>고1</option></select></div></div>
     <div class="fg"><label class="fl">학교 (예: 서울고 → 서울고등학교)</label><input class="fi" id="ss" value="${s?.school||''}" placeholder="서울고"></div>
@@ -7179,7 +7196,7 @@ function openStuModal(docId){
       <p style="font-size:13px">ID: <code id="prevId">${s?.accountId||''}</code></p>
       <p style="font-size:11px;color:var(--gray-500);margin-top:3px" id="prevPwHint">초기 비밀번호: ${noStu?'보호자':'학생'} 연락처 11자리 (하이픈 제외)</p>
     </div>
-    ${s?`<div style="margin-bottom:14px"><button class="btn bs bsm" onclick="resetPw('${docId}')">🔑 비밀번호 초기화</button></div>`:''}
+    ${s?`<div style="margin-bottom:14px"><button class="btn bs bsm" onclick="resetPw('${docId}')">${fmIco('key')}비밀번호 초기화</button></div>`:''}
     <div class="ferr" id="mErr"></div>
     <div style="display:flex;gap:8px"><button class="btn bs" style="flex:1" onclick="closeModal()">취소</button><button class="btn bp" style="flex:1" onclick="saveStu('${docId||''}')">${isOpAdd?'요청 보내기':'저장'}</button></div>`;
   openModal();}
@@ -8088,11 +8105,11 @@ function renderAdminSchedule(){
     const headerRight=`<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn bs bsm" onclick="editDate('${d.id}')">날짜 수정</button><button class="btn bd bsm" onclick="rmDate('${d.id}')">날짜 삭제</button></div>`;
     const bulkActiveBtns=selMode?`<button class="btn bs bsm" style="height:36px" onclick="setAllSlotsActive('${d.id}',true)">전부 활성</button><button class="btn bs bsm" style="height:36px" onclick="setAllSlotsActive('${d.id}',false)">전부 비활성</button>`:'';
     const helpLine=selMode
-      ?'<p style="font-size:11px;color:var(--gray-400);margin-top:14px;display:flex;align-items:center;gap:6px"><span>💡</span>빈 박스를 클릭하면 활성/비활성이 전환됩니다. 우상단 × 로 슬롯 삭제. 예약된 박스는 학생 상세로 이동.</p>'
-      :'<p style="font-size:11px;color:var(--gray-400);margin-top:14px;display:flex;align-items:center;gap:6px"><span>💡</span>비어있는 박스를 클릭하면 슬롯이 삭제됩니다. (우상단 × 도 동일) 점선 박스(12·18시 전후)는 클릭하여 활성/비활성 전환. 예약된 박스는 학생 상세로 이동.</p>';
+      ?'<p style="font-size:11px;color:var(--gray-400);margin-top:14px;display:flex;align-items:center;gap:6px">빈 박스를 클릭하면 활성/비활성이 전환됩니다. 우상단 × 로 슬롯 삭제. 예약된 박스는 학생 상세로 이동.</p>'
+      :'<p style="font-size:11px;color:var(--gray-400);margin-top:14px;display:flex;align-items:center;gap:6px">비어있는 박스를 클릭하면 슬롯이 삭제됩니다. (우상단 × 도 동일) 점선 박스(12·18시 전후)는 클릭하여 활성/비활성 전환. 예약된 박스는 학생 상세로 이동.</p>';
     mainCard=`<div class="card np" style="padding:18px;margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-        <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--primary-soft);border-radius:6px">📅</span>일정 관리 <span style="font-size:11px;font-weight:500;color:var(--gray-400);margin-left:4px">${d.date}</span></p>
+        <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--primary-soft);border-radius:6px;display:inline-flex;align-items:center;color:var(--primary)">${fmIco('calendar')}</span>일정 관리 <span style="font-size:11px;font-weight:500;color:var(--gray-400);margin-left:4px">${d.date}</span></p>
         ${headerRight}
       </div>
       <div class="dtabs">${dtabsHtml}</div>
@@ -8482,7 +8499,7 @@ function bpSetAll(on){
 function bpUpdateCount(){
   const btn=_('bprintGo');if(!btn)return;
   const n=bpStudents().filter(s=>bpSelected()[s._docId]).length;
-  btn.textContent=n?`🖨 ${n}명 인쇄`:'선택된 학생 없음';
+  btn.textContent=n?`${n}명 인쇄`:'선택된 학생 없음';
   btn.disabled=!n;
 }
 function openBatchPrintModal(){
@@ -8600,7 +8617,7 @@ function openConsultPrintModal(examId){
     <div id="cprintPrev" style="border:1px solid var(--gray-200);border-radius:10px;padding:14px;background:#fff;max-height:44vh;overflow:auto"></div>
     <div class="mactions">
       <button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button>
-      <button class="btn bp" style="flex:1" id="cprintGo" onclick="doConsultPrint()">🖨 인쇄</button>
+      <button class="btn bp" style="flex:1" id="cprintGo" onclick="doConsultPrint()">${fmIco('print')}인쇄</button>
     </div>`;
   openModal();
   refreshConsultPrintPreview();
@@ -8727,7 +8744,7 @@ function openBookPrintModal(){
     <div id="printPrev" style="border:1px solid var(--gray-200);border-radius:10px;padding:14px;background:#fff;max-height:44vh;overflow:auto"></div>
     <div class="mactions">
       <button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button>
-      <button class="btn bp" style="flex:1" id="printGo" onclick="doBookPrint()">🖨 인쇄</button>
+      <button class="btn bp" style="flex:1" id="printGo" onclick="doBookPrint()">${fmIco('print')}인쇄</button>
     </div>`;
   openModal();
   refreshPrintPreview();
@@ -8814,7 +8831,7 @@ function renderAdminBookings(){
     }).join('');
     dupCard=`<div class="card np" style="margin-bottom:14px;padding:16px;background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1px solid #fecaca;box-shadow:0 1px 3px rgba(220,38,38,.08)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <span style="font-size:18px">⚠️</span>
+        <span style="display:inline-flex;width:32px;height:32px;flex-shrink:0;border-radius:var(--radius-lg);background:var(--danger-soft);color:var(--danger);align-items:center;justify-content:center">${fmIco('ban')}</span>
         <div><p style="font-size:13px;font-weight:800;color:#991b1b">중복 예약 감지됨 (${dupCount}건)</p>
         <p style="font-size:11px;color:#b91c1c;margin-top:2px">버튼을 눌러 상세 확인 후 정리해 주세요.</p></div>
       </div>
@@ -8863,12 +8880,12 @@ function renderAdminBookings(){
     const bookedCnt=S.bookings.filter(b=>b.date===sel.date&&!isNoShow(b)).length;
     slotGridHtml=`<div class="card np" style="padding:18px;margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-        <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--primary-soft);border-radius:6px">📅</span>시간대별 예약</p>
+        <p style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--primary-soft);border-radius:6px;display:inline-flex;align-items:center;color:var(--primary)">${fmIco('calendar')}</span>시간대별 예약</p>
         <span style="font-size:12px;color:var(--gray-500)">예약 <b style="color:var(--primary)">${bookedCnt}</b> / ${sortedSlots.length}</span>
       </div>
       <div class="dtabs">${dtabsHtml}</div>
       <div class="sg" style="margin-top:6px">${slotBtns||'<p style="font-size:13px;color:var(--gray-400)">시간대가 등록되지 않았습니다.</p>'}</div>
-      <p style="font-size:11px;color:var(--gray-400);margin-top:14px;display:flex;align-items:center;gap:6px"><span>💡</span>예약된 슬롯은 학생 상세, 비어있는 슬롯은 학생 배정 화면이 열립니다.</p>
+      <p style="font-size:11px;color:var(--gray-400);margin-top:14px;display:flex;align-items:center;gap:6px">예약된 슬롯은 학생 상세, 비어있는 슬롯은 학생 배정 화면이 열립니다.</p>
     </div>`;
   }else{
     slotGridHtml=emptyStateHtml('calendar','등록된 일정이 없습니다',"[일정 관리] 탭에서 먼저 일정을 추가하세요.");
@@ -8893,7 +8910,7 @@ function renderAdminBookings(){
       <td data-label="연락처">${escapeHtml(stu?(stu.noStudentPhone?stu.guardianPhone:stu.studentPhone)||'—':'—')}</td>
       <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end"><button class="btn bs bsm" onclick="openBookDetail('${b._docId}')">상세</button><button class="btn bp bsm" onclick="openAdminBook('${b._docId}')">재배정</button><button class="btn bs bsm" onclick="setBookAttendance('${b._docId}','')" title="결석 처리 취소">↩</button></div></td>
     </tr>`;}).join('');
-  const noshowSection=noshowList.length?`<div class="sh np" style="margin-top:24px;margin-bottom:14px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--danger-soft);color:#991b1b;border-radius:6px;font-size:12px">🚫</span>결석 처리된 학생 <span style="font-size:12px;font-weight:500;color:var(--gray-400)">${noshowList.length}명</span></span></div>
+  const noshowSection=noshowList.length?`<div class="sh np" style="margin-top:24px;margin-bottom:14px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--danger-soft);color:#991b1b;border-radius:6px;font-size:12px;display:inline-flex;align-items:center">${fmIco('ban')}</span>결석 처리된 학생 <span style="font-size:12px;font-weight:500;color:var(--gray-400)">${noshowList.length}명</span></span></div>
     <p style="font-size:11px;color:var(--gray-400);margin:-6px 0 10px 4px">원래 예약된 슬롯은 비어있는 상태로 돌아가며, 빈 슬롯에서 이 학생을 다시 배정할 수 있습니다.</p>
     <div class="card np" style="padding:0;margin-bottom:24px"><div class="tw tw-cards"><table>
       <thead><tr><th>학생</th><th>원래 예약</th><th>좌석</th><th>학교</th><th>학년</th><th>연락처</th><th>관리</th></tr></thead>
@@ -8902,24 +8919,24 @@ function renderAdminBookings(){
   const adminDisabled=bookingAdminDisabled();
   const disableCard=S.user.type==='admin'?`<div class="card np" style="margin-bottom:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:${adminDisabled?'linear-gradient(135deg,#fef2f2,#fee2e2)':'linear-gradient(135deg,#f9fafb,#f3f4f6)'};border:1px solid ${adminDisabled?'#fecaca':'#e5e7eb'}">
     <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:10px">
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${adminDisabled?'#fee2e2':'#dcfce7'};font-size:14px">${adminDisabled?'🔒':'🔓'}</span>
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${adminDisabled?'#fee2e2':'#dcfce7'};font-size:14px">${adminDisabled?fmIco('lock'):''}</span>
       <div><p style="font-size:13px;font-weight:700;margin-bottom:2px">학생 예약 ${adminDisabled?'<span style="color:var(--danger)">비활성화됨</span>':'<span style="color:#16a34a">활성화됨</span>'}</p>
       <p style="font-size:11px;color:var(--gray-500)">${adminDisabled?'학생들이 "예약 기간이 아닙니다" 안내를 보게 됩니다.':'예약 기간 설정에 따라 학생들이 예약할 수 있습니다.'}</p></div>
     </div>
     <button class="btn ${adminDisabled?'bp':'bd'} bsm" onclick="toggleBookingDisabled()">${adminDisabled?'예약 활성화':'예약 비활성화'}</button>
   </div>`:'';
   _('adminC').innerHTML=`<div class="sh np" style="margin-bottom:14px"><span class="shtitle" style="font-size:17px;font-weight:800">예약 현황</span>
-    <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">↻ 새로고침</button><button class="btn bs bsm" onclick="openBookPrintModal()">🖨 인쇄</button></div></div>
+    <div style="display:flex;gap:8px"><button class="btn bs bsm" onclick="refreshBookings()">${fmIco('refresh')}새로고침</button><button class="btn bs bsm" onclick="openBookPrintModal()">${fmIco('print')}인쇄</button></div></div>
     ${statsCard}
     ${dupCard}
     ${disableCard}
     ${slotGridHtml}
     ${renderRequestsSection()}
     ${noshowSection}
-    <div class="sh np" style="margin-top:24px;margin-bottom:14px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--warning-soft);color:var(--warning-text);border-radius:6px;font-size:12px">⏳</span>예약하지 않은 학생 <span style="font-size:12px;font-weight:500;color:var(--gray-400)">${unbooked.length}명</span></span></div>
+    <div class="sh np" style="margin-top:24px;margin-bottom:14px"><span class="shtitle" style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:var(--warning-soft);color:var(--warning-text);border-radius:6px;font-size:12px;display:inline-flex;align-items:center">${fmIco('clock')}</span>예약하지 않은 학생 <span style="font-size:12px;font-weight:500;color:var(--gray-400)">${unbooked.length}명</span></span></div>
     <div class="card np" style="padding:0"><div class="tw tw-cards"><table>
       <thead><tr><th>좌석</th><th>이름</th><th>학교</th><th>학년</th><th>학생 연락처</th><th>보호자 연락처</th><th>관리</th></tr></thead>
-      <tbody>${unbookedRows||'<tr class="empty-row"><td colspan="7" class="empty">미예약 학생이 없습니다. 🎉</td></tr>'}</tbody>
+      <tbody>${unbookedRows||'<tr class="empty-row"><td colspan="7" class="empty">미예약 학생이 없습니다.</td></tr>'}</tbody>
     </table></div></div>`;}
 function adminBookSelDate(id){S.adminBookSelDate=id;renderAdminBookings();}
 
@@ -9086,7 +9103,7 @@ function openBookDetail(docId){
     <p style="font-size:11px;color:var(--gray-400);margin-top:6px">결석 처리 시 슬롯이 비워지고 학생은 '결석 처리된 학생' 목록으로 이동합니다.</p>
   </div>`:'';
   const actionsHtml=isAdmin
-    ?`<div style="display:flex;gap:8px;margin:14px 0 4px;flex-wrap:wrap"><button class="btn bs" style="flex:1;min-width:80px" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1;min-width:90px;background:#ea580c;border-color:#ea580c" onclick="closeModal();callStudent('${stuId}')" title="OP에게 학생을 호출합니다">📢 호출</button><button class="btn bs" style="flex:1;min-width:100px;color:var(--primary);border-color:var(--primary-soft-border)" onclick="openAdminChangeReq('${docId}')">변경 요청</button><button class="btn bp" style="flex:1;min-width:80px" onclick="openAdminBook('${docId}')">변경</button><button class="btn bd" style="flex:1;min-width:80px" onclick="closeModal();adminDelBook('${docId}')">삭제</button></div>`
+    ?`<div style="display:flex;gap:8px;margin:14px 0 4px;flex-wrap:wrap"><button class="btn bs" style="flex:1;min-width:80px" onclick="closeModal()">닫기</button><button class="btn bp" style="flex:1;min-width:90px;background:#ea580c;border-color:#ea580c" onclick="closeModal();callStudent('${stuId}')" title="OP에게 학생을 호출합니다">${fmIco('megaphone')}호출</button><button class="btn bs" style="flex:1;min-width:100px;color:var(--primary);border-color:var(--primary-soft-border)" onclick="openAdminChangeReq('${docId}')">변경 요청</button><button class="btn bp" style="flex:1;min-width:80px" onclick="openAdminBook('${docId}')">변경</button><button class="btn bd" style="flex:1;min-width:80px" onclick="closeModal();adminDelBook('${docId}')">삭제</button></div>`
     :`<div style="display:flex;gap:8px;margin:14px 0 4px"><button class="btn bs" style="flex:1" onclick="closeModal()">닫기</button><button class="btn bs" style="flex:1;color:var(--primary);border-color:var(--primary-soft-border)" onclick="openAdminChangeReq('${docId}')">변경 요청</button></div>`;
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:16px">예약 상세 정보</p>
     <div style="background:var(--gray-50);border-radius:10px;padding:14px;margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -9406,10 +9423,10 @@ function _renderAssignSlotModal(){
   const filtered=q?list.filter(({s})=>(s.name||'').toLowerCase().includes(q)||(s.school||'').toLowerCase().includes(q)||String(s.seat||'').includes(q)):list;
   const rows=filtered.map(({s,isNoShowStu})=>_assignSlotRowHtml(s,dateId,slot,isNoShowStu)).join('');
   const empty=list.length===0
-    ?'<div style="padding:30px 12px;text-align:center;color:var(--gray-400);font-size:13px">배정 가능한 학생이 없습니다. 🎉</div>'
+    ?'<div style="padding:30px 12px;text-align:center;color:var(--gray-400);font-size:13px">배정 가능한 학생이 없습니다.</div>'
     :(filtered.length===0?`<div style="padding:30px 12px;text-align:center;color:var(--gray-400);font-size:13px">"${escapeHtml(q)}" 검색 결과가 없습니다.</div>`:'');
   const noshowCount=list.filter(x=>x.isNoShowStu).length;
-  const noshowHint=noshowCount?`<p style="font-size:11px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;margin-bottom:10px">🚫 결석 처리된 학생 ${noshowCount}명이 목록 상단에 표시됩니다. 선택 시 기존 예약이 이 슬롯으로 이동됩니다.</p>`:'';
+  const noshowHint=noshowCount?`<p style="font-size:11px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;margin-bottom:10px">결석 처리된 학생 ${noshowCount}명이 목록 상단에 표시됩니다. 선택 시 기존 예약이 이 슬롯으로 이동됩니다.</p>`:'';
   _('mCt').innerHTML=`<p style="font-size:16px;font-weight:700;margin-bottom:4px">예약 배정</p>
     <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px"><b style="color:var(--primary)">${date.label} ${slot}</b> 슬롯에 배정할 학생을 선택하세요.</p>
     ${noshowHint}
@@ -9428,7 +9445,7 @@ function _renderAssignSlotList(){
   const cont=_('assignSlotList');if(!cont)return;
   const rows=filtered.map(({s,isNoShowStu})=>_assignSlotRowHtml(s,dateId,slot,isNoShowStu)).join('');
   const empty=list.length===0
-    ?'<div style="padding:30px 12px;text-align:center;color:var(--gray-400);font-size:13px">배정 가능한 학생이 없습니다. 🎉</div>'
+    ?'<div style="padding:30px 12px;text-align:center;color:var(--gray-400);font-size:13px">배정 가능한 학생이 없습니다.</div>'
     :(filtered.length===0?`<div style="padding:30px 12px;text-align:center;color:var(--gray-400);font-size:13px">검색 결과가 없습니다.</div>`:'');
   cont.innerHTML=rows+empty;
 }
@@ -9488,10 +9505,10 @@ function renderAdminAccounts(){
     const canSend=a.role!=='test'&&a.phone&&a.phone.replace(/\D/g,'').length>=9;
     const sendBtn=a.role==='test'?'':`<button class="btn bs bsm" ${canSend?'':'disabled style="opacity:.5;cursor:not-allowed" title="연락처를 먼저 등록하세요"'} onclick="openSendAdminAccountInfo('${a.id}')">계정 안내</button>`;
     const isOwn=a.id===S.user.id;
-    const pinBtn=(isOwn&&a.role==='admin')?`<button class="btn bs bsm" onclick="openPinSettingsModal()">🔒 2차 ${a.pinSet?'변경':'설정'}</button>`:'';
+    const pinBtn=(isOwn&&a.role==='admin')?`<button class="btn bs bsm" onclick="openPinSettingsModal()">${fmIco('lock')}2차 ${a.pinSet?'변경':'설정'}</button>`:'';
     return `<tr>
     <td data-label="ID"><code>${escapeHtml(a.id||'')}</code></td>
-    <td data-label="" class="cell-head"><span style="font-weight:700">${escapeHtml(a.name||'')}</span><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span>${(isOwn&&a.role==='admin'&&a.pinSet)?'<span class="bx" style="background:var(--success-soft);color:#166534;margin-left:4px" title="2차 비밀번호 설정됨">🔒</span>':''}</td>
+    <td data-label="" class="cell-head"><span style="font-weight:700">${escapeHtml(a.name||'')}</span><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span>${(isOwn&&a.role==='admin'&&a.pinSet)?`<span class="bx" style="background:var(--success-soft);color:#166534;margin-left:4px" title="2차 비밀번호 설정됨">${fmIco('lock')}</span>`:''}</td>
     <td data-label="연락처" style="color:var(--gray-500);font-size:12px">${escapeHtml(a.phone||'—')}</td>
     <td data-label="권한" class="cell-hide"><span class="bx ${roleBadgeClass(a.role)}">${roleLabel(a.role)}</span></td>
     <td data-label="" class="cell-actions" style="white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end">${sendBtn}${pinBtn}<button class="btn bs bsm" onclick="openAcctModal('${a.id}')">수정</button>${!isOwn?`<button class="btn bd bsm" onclick="delAcct('${a.id}')">삭제</button>`:'<span style="font-size:11px;color:var(--gray-400);padding:0 8px">본인</span>'}</div></td>
@@ -9499,7 +9516,7 @@ function renderAdminAccounts(){
   _('adminC').innerHTML=`<div class="sh"><span class="shtitle">ADMIN / OP / TEST 계정 <span style="font-size:13px;font-weight:400;color:var(--gray-500)">(${S.admins.length}개)</span></span><button class="btn bp bsm" onclick="openAcctModal(null)">+ 계정 추가</button></div>
   <div class="card" style="padding:0"><div class="tw tw-cards"><table><thead><tr><th>ID</th><th>이름</th><th>연락처</th><th>권한</th><th>관리</th></tr></thead>
   <tbody>${rows||'<tr class="empty-row"><td colspan="5" class="empty">계정이 없습니다.</td></tr>'}</tbody></table></div></div>
-  <div style="margin-top:14px;padding:14px;background:#fff8e1;border:1px solid #fde68a;border-radius:10px"><p style="font-size:12px;color:#92400e;font-weight:500">💡 OP 권한: 예약 현황 조회·상세보기 및 예약 등록·변경·취소 가능. 학생 정보·일정·계정 관리 불가.<br>🧪 TEST 권한: 학생과 동일한 화면으로 로그인되며, 학생 목록에는 표시되지 않습니다.</p></div>`;}
+  <div style="margin-top:14px;padding:14px;background:#fff8e1;border:1px solid #fde68a;border-radius:10px"><p style="font-size:12px;color:#92400e;font-weight:500">OP 권한: 예약 현황 조회·상세보기 및 예약 등록·변경·취소 가능. 학생 정보·일정·계정 관리 불가.<br>TEST 권한: 학생과 동일한 화면으로 로그인되며, 학생 목록에는 표시되지 않습니다.</p></div>`;}
 
 function openAcctModal(accId){
   const a=accId?S.admins.find(x=>x.id===accId):null;
@@ -10153,7 +10170,7 @@ function applyAdminPreviewBanner(){
     b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#fbbf24;color:#7c2d12;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.1)';
     document.body.appendChild(b);
   }
-  b.innerHTML=`<span>🔍 관리자 미리보기 — ${escapeHtml(S.user.name||'')} 학생 화면을 보고 있습니다</span><button class="btn bs bsm" style="background:#fff" onclick="exitAdminPreview()">← ADMIN으로 돌아가기</button>`;
+  b.innerHTML=`<span>관리자 미리보기 — ${escapeHtml(S.user.name||'')} 학생 화면을 보고 있습니다</span><button class="btn bs bsm" style="background:#fff" onclick="exitAdminPreview()">← ADMIN으로 돌아가기</button>`;
 }
 function goLoginView(){showView('vLogin');applyChips();}
 function goConsulting(){
@@ -10329,7 +10346,7 @@ function renderClass(){
   if(S.user?.type==='admin')return renderClassAdmin();
   if(S.config?.classroomMaintenance){
     box.innerHTML=`<div class="apply-hero">
-      <div class="ah-ico">🛠️</div>
+      <div class="ah-ico">${fmIco('wrench')}</div>
       <h2>강의실 준비중입니다</h2>
       <p>현재 강의실은 점검 중입니다.<br>잠시 후 다시 이용해주세요.</p>
     </div>`;return;
@@ -10361,7 +10378,7 @@ function renderClass(){
   }
   if(status==='pending'){
     box.innerHTML=`<div class="apply-hero">
-      <div class="ah-ico">⏳</div>
+      <div class="ah-ico">${fmIco('clock')}</div>
       <h2>강의 신청이 접수되었습니다</h2>
       <p>관리자 승인 후 이용하실 수 있습니다.<br>승인 완료 시 알림을 드립니다.</p>
       <span class="app-badge pending">승인 대기 중</span>
@@ -10369,7 +10386,7 @@ function renderClass(){
   }
   const rejected=status==='rejected';
   box.innerHTML=`<div class="apply-hero">
-    <div class="ah-ico">📺</div>
+    <div class="ah-ico">${fmIco('screen')}</div>
     <h2>${rejected?'강의 재신청이 필요합니다':'강의 신청이 필요합니다'}</h2>
     <p>${rejected?'이전 신청이 반려되었습니다. 아래 사유를 확인하고 다시 신청해주세요.':'강의실 이용을 위해 먼저 수강 신청을 해주세요.<br>관리자 승인 후 영상 시청이 가능합니다.'}</p>
     ${rejected&&stu?.classroomRejectReason?`<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;margin:0 auto 18px;max-width:360px;text-align:left"><p style="font-size:11px;color:#b91c1c;font-weight:700;margin-bottom:4px">반려 사유</p><p style="font-size:12px;color:#991b1b;white-space:pre-wrap">${escapeHtml(stu.classroomRejectReason)}</p></div>`:''}
@@ -10763,7 +10780,7 @@ function bootLand(){
     if(banner)return;
     banner=document.createElement('div');
     banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#1C64F2,#1A56DB);color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.18);font-family:inherit';
-    banner.innerHTML='<span>🔔 새 버전이 배포되었습니다. 새 기능을 사용하려면 페이지를 새로고침해 주세요.</span><button type="button" style="background:#fff;color:var(--primary);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">새로고침</button>';
+    banner.innerHTML='<span>새 버전이 배포되었습니다. 새 기능을 사용하려면 페이지를 새로고침해 주세요.</span><button type="button" style="background:#fff;color:var(--primary);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">새로고침</button>';
     banner.querySelector('button').addEventListener('click',function(){location.reload();});
     document.body.appendChild(banner);
     console.log('[verCheck] new version detected — banner shown');
