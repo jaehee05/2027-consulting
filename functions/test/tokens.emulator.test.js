@@ -438,15 +438,24 @@ describe("문제별 댓글", () => {
     expect((await commentsOf(id))[0].pi).toBe(1);
   });
 
-  test("문제를 가리지 않은 댓글에는 칸 자체가 없다", async () => {
+  // 칸 없이 오는 경로가 둘 있다(기능 이전의 댓글, index.html 을 번들로 든 스토어 앱).
+  // 어디에도 붙지 않는 댓글을 만들면 화면에 그것만 모으는 칸이 따로 생긴다.
+  test("어느 문제인지 없이 오면 첫 문제에 붙는다", async () => {
     const id = await twoProblems();
     await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "그냥" });
-    expect((await commentsOf(id))[0]).not.toHaveProperty("pi");
+    expect((await commentsOf(id))[0].pi).toBe(0);
   });
 
-  test("범위를 벗어난 값은 문제를 가리지 않은 것으로 본다", async () => {
+  test("범위를 벗어난 값도 첫 문제로 본다", async () => {
     const id = await twoProblems();
     await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "x", problemIndex: 7 });
+    expect((await commentsOf(id))[0].pi).toBe(0);
+  });
+
+  test("문제가 하나면 칸을 두지 않는다", async () => {
+    await setBalance(student.id, 5);
+    const id = (await tokens.createQuestion(fs, { student, title: "t", body: "b" })).id;
+    await tokens.addQuestionComment(fs, { questionId: id, actor: me, body: "c", problemIndex: 0 });
     expect((await commentsOf(id))[0]).not.toHaveProperty("pi");
   });
 
@@ -472,10 +481,12 @@ describe("문제별 댓글", () => {
     expect(await statusOf(id)).toBe("pending");
   });
 
-  // 번들 앱이 문제를 가리지 않고 보낸 답변. 둘 다 답한 것으로 봐야 답변대기에 영원히 남지 않는다.
-  test("문제를 가리지 않은 관리자 답변 하나면 답변완료다", async () => {
+  // 번들 앱이 칸 없이 보낸 답변은 첫 문제에 붙는다 — 둘째 문제는 그대로 답변대기다.
+  test("칸 없이 온 관리자 답변은 첫 문제만 답한 것이다", async () => {
     const id = await twoProblems();
-    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "둘 다 답합니다" });
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "18번 답" });
+    expect(await statusOf(id)).toBe("pending");
+    await tokens.addQuestionComment(fs, { questionId: id, actor: adminActor, body: "20번 답", problemIndex: 1 });
     expect(await statusOf(id)).toBe("answered");
   });
 

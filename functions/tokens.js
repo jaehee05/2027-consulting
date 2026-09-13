@@ -226,26 +226,26 @@ function normProblems(v) {
 }
 
 /* 문제가 둘이면 댓글도 문제마다 따로 달린다. 어느 문제에 달렸는지는 `pi`(0부터)로 남긴다.
-   값이 없는 댓글은 두 문제에 함께 달린 것으로 본다 — 이 기능 이전의 댓글과, index.html 을
-   번들로 들고 있어 이 칸 없이 보내는 스토어 배포본이 그렇다. 거부하지 않는다. */
-function normProblemIndex(v, count) {
-  if (v === undefined || v === null || v === "") return null;
+   값이 없거나 범위를 벗어나면 **첫 문제**로 본다 — 이 칸 없이 오는 경로가 둘 있는데
+   (기능 이전에 달린 댓글, index.html 을 번들로 들고 있는 스토어 배포본) 어디에도 붙지 않는
+   댓글을 만들면 화면에 '가리지 않은 댓글' 같은 칸을 따로 둬야 한다. 문제가 하나면 null. */
+function normProblemIndex(v, problems) {
+  const count = normProblems(problems);
+  if (count <= 1) return null;
   const n = Math.floor(Number(v));
-  if (!Number.isFinite(n) || n < 0 || n >= count) return null;
+  if (!Number.isFinite(n) || n < 0 || n >= count) return 0;
   return n;
 }
 
 /* 문제마다 답을 받아야 답변완료다. 하나만 답하고 답변완료가 되면 남은 문제가 답변대기
    필터에서 사라지는 데다, 자동 종료 시계까지 돌기 시작해 답을 못 받은 채 닫힌다. */
 function allAnswered(comments, problems) {
+  const count = normProblems(problems);
   const adm = (Array.isArray(comments) ? comments : []).filter((c) => c.role === "admin");
   if (!adm.length) return false;
-  const count = normProblems(problems);
   if (count <= 1) return true;
-  // 문제를 가리지 않은 관리자 댓글은 둘 다 답한 것으로 본다.
-  if (adm.some((c) => normProblemIndex(c.pi, count) === null)) return true;
   for (let i = 0; i < count; i++) {
-    if (!adm.some((c) => c.pi === i)) return false;
+    if (!adm.some((c) => normProblemIndex(c.pi, count) === i)) return false;
   }
   return true;
 }
@@ -348,7 +348,7 @@ async function addQuestionComment(fs, { questionId, actor, body, photos, problem
     if (actor.role !== "admin" && q.authorId !== actor.id) {
       throw new ApiError(403, "본인 질문에만 댓글을 달 수 있습니다.");
     }
-    const pi = normProblemIndex(problemIndex, normProblems(q.problems));
+    const pi = normProblemIndex(problemIndex, q.problems);
     const comment = {
       _id: `c_${now.toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       role: actor.role === "admin" ? "admin" : "student",

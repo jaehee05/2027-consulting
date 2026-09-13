@@ -164,6 +164,8 @@ label.btn{display:inline-flex!important}
 .qa-pb-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 .qa-pb-n{font-size:11px;color:#4338ca;font-weight:700}
 .qa-pb-more{font-size:11px;color:var(--primary);font-weight:600;margin-left:auto}
+.qa-pb-back{margin-left:auto;border:none;background:none;font-family:inherit;font-size:11px;font-weight:600;color:var(--primary);cursor:pointer;padding:2px 4px}
+.qa-pb-back:hover{text-decoration:underline}
 
 /* 자유게시판 플로팅 글쓰기 버튼. 카카오톡 채널 런처와 겹치지 않게 그 위에 앉힌다. */
 .bd-fab{position:fixed;right:20px;bottom:88px;z-index:880;height:44px;padding:0 18px;border-radius:999px;border:none;background:var(--primary);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(28,100,242,.32);display:inline-flex;align-items:center;gap:6px}
@@ -4514,23 +4516,28 @@ function qaFeedRowHtml(q,admin){
 
 /* ── 문제별 댓글 ──
    문제가 둘인 스레드는 댓글도 문제마다 따로 단다. 댓글의 `pi`(0부터)가 어느 문제에 달린 것인지
-   말한다. 이 칸이 없는 댓글은 문제를 가리지 않은 것으로 본다 — 기능이 생기기 전에 달린 댓글과,
-   index.html 을 번들로 들고 있어 이 칸 없이 보내는 스토어 배포본이 그렇다. 그런 댓글은 어느
-   한 문제에 밀어 넣지 않고 문제 아래에 따로 모아 보여 준다(양쪽에 겹쳐 그리면 같은 글이 두 번
-   보인다). 입력칸 id 와 사진 스코프도 문제마다 갈라 둔다 — 한 화면에 입력칸이 둘 떠 있다. */
-function qaCmtPi(c){const v=c&&c.pi;return v===undefined||v===null?null:Math.floor(Number(v));}
-function qaCmtsOf(q,pi){return (Array.isArray(q.comments)?q.comments:[]).filter(c=>qaCmtPi(c)===pi);}
+   말하고, 칸이 없거나 범위를 벗어나면 **첫 문제**로 본다(서버 tokens.js 의 normProblemIndex 와
+   같은 판정) — 기능 이전에 달린 댓글과 번들 앱이 보낸 댓글이 그렇다. 어디에도 붙지 않는 댓글을
+   두면 화면에 그것만 모으는 칸이 따로 생긴다. 입력칸 id 와 사진 스코프도 문제마다 갈라 둔다 —
+   한 화면에 입력칸이 둘 떠 있어 같은 id 면 서로 덮는다. */
+function qaCmtPi(q,c){
+  const n=qaBodies(q).length;
+  if(n<=1)return null;
+  const v=Math.floor(Number(c&&c.pi));
+  return Number.isFinite(v)&&v>=0&&v<n?v:0;
+}
+function qaCmtsOf(q,pi){return (Array.isArray(q.comments)?q.comments:[]).filter(c=>qaCmtPi(q,c)===pi);}
 function qaCmtTaId(id,pi){return pi===null?'qa-cmt-'+id:`qa-cmt-${id}-p${pi}`;}
 function qaCmtScope(id,pi){return pi===null?'qa_c_'+id:`qa_c_${id}_p${pi}`;}
 /* 문제마다 관리자 답이 있어야 답변완료다(서버 tokens.js 의 allAnswered 와 같은 판정).
    여기서는 어느 칸이 아직 비었는지 칩으로 알리는 데 쓴다. */
 function qaProblemAnswered(q,i){
-  return (Array.isArray(q.comments)?q.comments:[]).some(c=>c.role==='admin'&&(qaCmtPi(c)===i||qaCmtPi(c)===null));
+  return (Array.isArray(q.comments)?q.comments:[]).some(c=>c.role==='admin'&&qaCmtPi(q,c)===i);
 }
 
-/* ── 확대 보기 ──
+/* ── 자세히 보기 ──
    나란히 놓인 문제 하나를 눌러 한 질문처럼 넓게 본다. 보이는 내용은 같고 폭만 넓어진다 —
-   좁은 칸에서는 긴 풀이와 댓글을 읽기 어렵다. */
+   좁은 칸에서는 긴 풀이와 댓글을 읽기 어렵다. 나가면 나란히 놓인 원래 화면으로 돌아온다. */
 function qaFocusProblem(i){S.qa.focusPi=i;renderQa();try{window.scrollTo({top:0});}catch(_){}}
 function qaUnfocus(){S.qa.focusPi=null;renderQa();try{window.scrollTo({top:0});}catch(_){}}
 /* 본문을 드래그해 글자를 고르려던 것이면 확대하지 않는다. */
@@ -4607,16 +4614,18 @@ function qaProblemColHtml(q,i,admin,closed,solo){
   /* 머리줄과 본문을 한 덩이로 감싸 그 덩이만 누름 자리로 둔다. 사진은 뺀다 —
      눌러서 크게 보는 라이트박스가 이미 붙어 있다. */
   const open=solo?'<div>':`<div class="qa-pb-tap" onclick="qaTapProblem(${i})">`;
-  /* 확대 보기에서는 머리줄을 두지 않는다 — 바로 위의 탭이 [문제 1] 을, 그 옆의 칩이 상태를
-     이미 말하고 있어 두 줄이 같은 말을 되풀이한다. */
+  /* 머리줄의 오른쪽이 여는 자리이자 나가는 자리다 — 눌러서 커지고, 나가면 원래대로 돌아온다. */
+  const toggle=solo
+    ?`<button type="button" class="qa-pb-back" onclick="qaUnfocus()">← 돌아가기</button>`
+    :'<span class="qa-pb-more">자세히 보기 →</span>';
   return `<div class="qa-pb${solo?' solo':''}">
     ${open}
-      ${solo?'':`<div class="qa-pb-h">
+      <div class="qa-pb-h">
         <span class="qa-pb-n">문제 ${i+1}</span>
         ${qaChip(QA_Q_STATUS,done?'answered':'pending')}
         ${list.length?`<span style="font-size:11px;color:var(--gray-400)">댓글 ${list.length}</span>`:''}
-        <span class="qa-pb-more">자세히 보기 →</span>
-      </div>`}
+        ${toggle}
+      </div>
       <p class="qa-body pd-b">${qaBodyHtml(bs[i])}</p>
     </div>
     ${bp?bdPhotosHtml(bp[i]):''}
@@ -4650,28 +4659,18 @@ function qaDetailHtml(q,admin){
   const fp=raw===null||raw===undefined?NaN:Math.floor(Number(raw));
   const focus=multi&&Number.isFinite(fp)&&fp>=0&&fp<bs.length?fp:null;
 
-  /* 문제를 가리지 않은 댓글(예전 글·번들 앱). 어느 칸에도 넣지 않고 아래에 따로 모은다. */
-  const common=qaCmtsOf(q,null);
-  const commonHtml=multi?qaCmtListHtml(q,admin,closed,common,'문제를 가리지 않은 댓글',''):'';
-
   let bodyHtml;
   if(!multi){
     bodyHtml=`<p class="qa-body pd-b">${qaBodyHtml(bs[0])}</p>${bdPhotosHtml(q.photos)}
-      ${qaCmtListHtml(q,admin,closed,common,'댓글','아직 댓글이 없습니다.')}`;
-  }else if(focus!==null){
-    bodyHtml=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 10px">
-        <div class="tabs" style="margin:0">${bs.map((_b,i)=>`<button class="tab ${i===focus?'on':''}" onclick="qaFocusProblem(${i})">문제 ${i+1}</button>`).join('')}</div>
-        ${qaChip(QA_Q_STATUS,qaProblemAnswered(q,focus)?'answered':'pending')}
-        <button class="btn bs bsm" style="font-size:11px;padding:6px 10px;margin-left:auto" onclick="qaUnfocus()">나란히 보기</button>
-      </div>
-      ${qaProblemColHtml(q,focus,admin,closed,true)}
-      ${bp?'':bdPhotosHtml(q.photos)}
-      ${commonHtml}`;
+      ${qaCmtListHtml(q,admin,closed,qaCmtsOf(q,null),'댓글','아직 댓글이 없습니다.')}`;
   }else{
-    /* 관리자가 두 문제를 함께 보면서 답할 수 있어야 한다. 좁으면 flex-wrap 이 위아래로 접는다. */
-    bodyHtml=`<div class="qa-pcols">${bs.map((_b,i)=>qaProblemColHtml(q,i,admin,closed,false)).join('')}</div>
-      ${bp?'':bdPhotosHtml(q.photos)}
-      ${commonHtml}`;
+    /* 자세히 보기는 고른 한 칸만 폭을 다 쓰는 것뿐이다 — 나가면 다시 나란히 놓인다.
+       나란히 두는 것이 기본이라야 관리자가 두 문제를 함께 보면서 답할 수 있다.
+       좁은 화면에서는 flex-wrap 이 저절로 위아래로 접는다. */
+    const cols=focus!==null
+      ?qaProblemColHtml(q,focus,admin,closed,true)
+      :`<div class="qa-pcols">${bs.map((_b,i)=>qaProblemColHtml(q,i,admin,closed,false)).join('')}</div>`;
+    bodyHtml=`${cols}${bp?'':bdPhotosHtml(q.photos)}`;
   }
 
   return `<button class="btn bs bsm" style="margin-bottom:12px" onclick="qaCloseDetail()">← 목록</button>
