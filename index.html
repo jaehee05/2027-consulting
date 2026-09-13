@@ -504,6 +504,26 @@ tr:last-child td{border-bottom:none}
 .mactions{display:flex;gap:8px;padding-top:14px;margin-top:6px;border-top:1px solid var(--gray-100)}
 .head-meta{display:none}
 .seat-chip{display:inline-flex;align-items:center;color:var(--primary);font-size:13px;font-weight:700;letter-spacing:.02em}
+/* ── 관리자 화면 글자 크기 ──
+   같은 화면에 표·칩·버튼이 잔뜩 들어가는 곳이라 학생 화면과 같은 크기로 두면 빽빽해 보인다.
+   #vAdmin 안에서만 한 단계 줄인다(학생 화면은 그대로). 더 줄이거나 되돌릴 때 이 블록만 손대면 된다. */
+#vAdmin table{font-size:12.5px}
+#vAdmin th{font-size:11.5px;letter-spacing:.02em;padding:9px 12px}
+#vAdmin td{padding:9px 12px}
+#vAdmin .shtitle{font-size:14.5px}
+#vAdmin .bx{font-size:10.5px;padding:2px 7px}
+#vAdmin .tab{font-size:12.5px}
+#vAdmin .stu-line .stu-nm{font-size:13px}
+#vAdmin .stu-line .stu-sch{font-size:12px}
+#vAdmin .seat-chip{font-size:12px}
+/* 누르는 자리는 글자만 줄이고 높이는 그대로 둔다 — 작아지면 손가락이 빗나간다. */
+#vAdmin .bsm{font-size:11.5px}
+@media(max-width:640px){
+  #vAdmin table{font-size:12px}
+  #vAdmin .shtitle{font-size:14px}
+  #vAdmin th,#vAdmin td{padding:8px 6px}
+}
+
 /* 학생 한 명이 한 줄 — 좌석·학년·학교를 이름 옆에 붙인다. */
 .stu-line{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0}
 .stu-line>*{flex:0 0 auto}
