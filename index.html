@@ -154,7 +154,7 @@ label.btn{display:inline-flex!important}
 .qa-body .katex-display{display:inline-block;margin:0 .15em;text-align:left;vertical-align:middle;max-width:100%;overflow-x:auto;overflow-y:hidden}
 .qa-body .katex-display>.katex{display:inline-block;text-align:left}
 /* 문제가 둘인 질문은 한 문제가 한 칸이다. 넓으면 좌우로 놓이고 좁으면 저절로 위아래로 접힌다
-   (미디어 쿼리 없이 flex-wrap). 칸을 누르면 그 문제만 넓게 보는 확대 보기로 들어가므로
+   (미디어 쿼리 없이 flex-wrap). 칸을 누르면 그 문제만 팝업으로 크게 뜨므로
    머리줄과 본문에만 커서를 준다 — 댓글·입력칸까지 누름 자리로 두면 글을 쓸 수가 없다. */
 .qa-pcols{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
 .qa-pb{flex:1 1 280px;min-width:0;border:1px solid var(--gray-200);border-radius:10px;padding:12px 14px;background:var(--gray-50)}
@@ -164,8 +164,13 @@ label.btn{display:inline-flex!important}
 .qa-pb-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 .qa-pb-n{font-size:11px;color:#4338ca;font-weight:700}
 .qa-pb-more{font-size:11px;color:var(--primary);font-weight:600;margin-left:auto}
-.qa-pb-back{margin-left:auto;border:none;background:none;font-family:inherit;font-size:11px;font-weight:600;color:var(--primary);cursor:pointer;padding:2px 4px}
-.qa-pb-back:hover{text-decoration:underline}
+/* 자세히 보기로 띄운 칸이 뒤에 남긴 자리. 팝업이 닫히면 원래대로 돌아온다. */
+.qa-pb.ghost{opacity:.55;border-style:dashed}
+/* 자세히 보기 팝업. 상자 안의 또 다른 상자가 되지 않게 칸 테두리는 지운다. */
+#qpOv{display:none;z-index:990}
+#qpOv.on{display:flex}
+#qpOv .modal{max-width:820px}
+#qpCt .qa-pb.solo{border:none;background:transparent;padding:0}
 
 /* 자유게시판 플로팅 글쓰기 버튼. 카카오톡 채널 런처와 겹치지 않게 그 위에 앉힌다. */
 .bd-fab{position:fixed;right:20px;bottom:88px;z-index:880;height:44px;padding:0 18px;border-radius:999px;border:none;background:var(--primary);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(28,100,242,.32);display:inline-flex;align-items:center;gap:6px}
@@ -254,6 +259,7 @@ label.btn{display:inline-flex!important}
    어느 화면에 있든 다섯 자리로 바로 건너뛴다. 휴대폰에서는 화면 아래에 붙이고(엄지가 닿는 자리),
    넓은 화면에서는 가운데에 띄운 알약으로 둔다. */
 .snav{position:fixed;left:0;right:0;bottom:0;z-index:950;display:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
   padding:6px calc(8px + var(--sar)) calc(6px + var(--sab)) calc(8px + var(--sal));
   background:rgba(255,255,255,.92);-webkit-backdrop-filter:saturate(180%) blur(12px);backdrop-filter:saturate(180%) blur(12px);
   border-top:1px solid var(--gray-200)}
@@ -448,9 +454,11 @@ tr:last-child td{border-bottom:none}
 /* 사진 크게 보기. 예약 상세 같은 모달(z 1000) 안에서도 열리므로 그 위에 둔다. */
 #lbOv{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:1500;display:none;align-items:center;justify-content:center;padding:calc(16px + var(--sat)) 16px calc(16px + var(--sab))}
 #lbOv.on{display:flex}
-#lbOv img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;-webkit-user-select:none;user-select:none}
+#lbOv img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:default}
 .lb-btn{position:absolute;border:none;background:rgba(255,255,255,.16);color:#fff;border-radius:50%;width:40px;height:40px;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;-webkit-tap-highlight-color:transparent}
 .lb-x{top:calc(14px + var(--sat));right:14px}
+.lb-copy{top:calc(14px + var(--sat));right:62px;width:auto;padding:0 14px;border-radius:var(--radius-pill);font-size:13px;font-weight:600;gap:6px}
+.lb-copy svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .lb-prev{left:12px;top:50%;transform:translateY(-50%)}
 .lb-next{right:12px;top:50%;transform:translateY(-50%)}
 .lb-count{position:absolute;bottom:calc(14px + var(--sab));left:0;right:0;text-align:center;color:#fff;font-size:12px;opacity:.8}
@@ -1033,6 +1041,11 @@ code{font-size:11px;background:var(--gray-100);padding:2px 6px;border-radius:4px
 <div id="lbOv" onclick="if(event.target===this)bdClosePhoto()"></div>
 <div id="mOv" class="overlay hidden" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="mCt"></div>
+</div>
+
+<!-- 질문게시판 자세히 보기. 확인 대화상자(mOv)가 이 위로 떠야 하므로 z-index 를 그 아래에 둔다. -->
+<div id="qpOv" class="overlay" onclick="if(event.target===this)qaUnfocus()">
+  <div class="modal" id="qpCt"></div>
 </div>
 
 <!-- 카카오톡 채널 문의 버튼 (학생·비로그인 화면에서만 노출) -->
@@ -2040,7 +2053,7 @@ function showView(id){
     if(['vSetup','vLogin','vPin'].includes(v))el.style.display=v===id?'flex':'none';
   });
   /* 질문게시판 구독은 그 화면에서만 유지한다 — 원장·결제 내역은 전교생 분량이다. */
-  if(id!=='vQa')qaStopListeners();
+  if(id!=='vQa'){qaStopListeners();qaCloseFocusModal();}
   /* 게시판 화면은 화면 아래에 버튼이 몰려 카카오 런처와 겹친다. */
   document.body.classList.toggle('has-fab',id==='vBoard'||id==='vQa');
   renderStuNav(id);
@@ -3199,12 +3212,44 @@ function bdLbDraw(){
   const ov=_('lbOv');if(!ov)return;
   const many=_lbList.length>1;
   ov.innerHTML=`<img src="${_lbList[_lbIdx]||''}" alt="">
+    <button type="button" class="lb-btn lb-copy" onclick="bdCopyPhoto(this)" title="사진 복사">${fmIco('copy')}복사</button>
     <button type="button" class="lb-btn lb-x" onclick="bdClosePhoto()" title="닫기">×</button>
     ${many?`<button type="button" class="lb-btn lb-prev" onclick="bdLbMove(-1)" title="이전">‹</button>
       <button type="button" class="lb-btn lb-next" onclick="bdLbMove(1)" title="다음">›</button>
       <div class="lb-count">${_lbIdx+1} / ${_lbList.length}</div>`:''}`;
 }
 function bdLbMove(d){if(_lbList.length<2)return;_lbIdx=(_lbIdx+d+_lbList.length)%_lbList.length;bdLbDraw();}
+/* ── 사진 복사 ──
+   우클릭 메뉴는 앱 전체에서 막아 두었고(아래 contextmenu 는 이미지에서만 풀었다),
+   앱(WebView)에는 길게 눌러 복사하는 길이 아예 없다. 그래서 버튼을 둔다.
+   PNG 로 바꿔 담는 것은 크롬이 클립보드에 이미지로 받는 타입이 PNG 뿐이기 때문이고,
+   사파리는 사용자 동작이 끝나기 전에 ClipboardItem 을 만들어야 해서 Promise 를 그대로 넘긴다.
+   이미지로 못 담으면 주소라도 담는다 — 아무 일도 안 일어난 것처럼 보이면 안 된다. */
+function bdPhotoPngBlob(url){
+  return fetch(url,{mode:'cors'}).then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.blob();}).then(b=>
+    b.type==='image/png'?b:new Promise((res,rej)=>{
+      const img=new Image(),src=URL.createObjectURL(b);
+      img.onload=()=>{
+        const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;
+        c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(src);
+        c.toBlob(bb=>bb?res(bb):rej(new Error('encode')),'image/png');
+      };
+      img.onerror=()=>{URL.revokeObjectURL(src);rej(new Error('decode'));};
+      img.src=src;
+    }));
+}
+async function bdCopyPhoto(btn){
+  const url=_lbList[_lbIdx];if(!url)return;
+  if(btn)btn.disabled=true;
+  try{
+    if(!navigator.clipboard||!window.ClipboardItem)throw new Error('unsupported');
+    await navigator.clipboard.write([new ClipboardItem({'image/png':bdPhotoPngBlob(url)})]);
+    toast('사진을 복사했습니다.','success');
+  }catch(_){
+    try{await navigator.clipboard.writeText(url);toast('사진 주소를 복사했습니다.');}
+    catch(__){toast('사진을 복사할 수 없습니다.','error');}
+  }finally{if(btn)btn.disabled=false;}
+}
 function bdClosePhoto(){
   const ov=_('lbOv');if(ov){ov.classList.remove('on');ov.innerHTML='';}
   document.removeEventListener('keydown',bdLbKey);
@@ -3751,6 +3796,7 @@ const FM_ICONS={
   gear:'M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4ZM19.4 12a7.4 7.4 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7.4 7.4 0 0 0-2-1.2L14.6 3H9.4l-.4 2.7a7.4 7.4 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5a7.4 7.4 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-1a7.4 7.4 0 0 0 2 1.2l.4 2.7h5.2l.4-2.7a7.4 7.4 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.06-.4.1-.8.1-1.2Z',
   lock:'M7 10.5V8a5 5 0 0 1 10 0v2.5M5.5 10.5h13v9h-13v-9Z',
   clock:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5.2l3.2 1.9',
+  copy:'M9 9V6.5A1.5 1.5 0 0 1 10.5 5h7A1.5 1.5 0 0 1 19 6.5v7a1.5 1.5 0 0 1-1.5 1.5H15M5 10.5A1.5 1.5 0 0 1 6.5 9h7a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 5 17.5v-7Z',
 };
 /* 크기·선 색을 **속성**으로 박아 둔다. 속성은 CSS 보다 우선순위가 낮아서
    `.btn svg` `.sn-ico` 같은 규칙이 그대로 이기고, 그런 규칙이 없는 자리에서도 아이콘이 보인다.
@@ -4401,6 +4447,7 @@ function renderQa(){
   qaApplyFont(el);
   qaRenderMath(el);
   qaRefreshPreviews(el);
+  qaSyncProblemModal();
 }
 
 /* ── 질문 목록 (학생=내 것만, 관리자=전체) ── */
@@ -4537,13 +4584,56 @@ function qaProblemAnswered(q,i){
 
 /* ── 자세히 보기 ──
    나란히 놓인 문제 하나를 눌러 한 질문처럼 넓게 본다. 보이는 내용은 같고 폭만 넓어진다 —
-   좁은 칸에서는 긴 풀이와 댓글을 읽기 어렵다. 나가면 나란히 놓인 원래 화면으로 돌아온다. */
-function qaFocusProblem(i){S.qa.focusPi=i;renderQa();try{window.scrollTo({top:0});}catch(_){}}
-function qaUnfocus(){S.qa.focusPi=null;renderQa();try{window.scrollTo({top:0});}catch(_){}}
+   좁은 칸에서는 긴 풀이와 댓글을 읽기 어렵다. **팝업으로 띄운다** — 화면을 통째로 갈아 끼우면
+   목록에서 어디까지 읽었는지가 사라지고, 나갈 때 스크롤이 처음으로 튄다. */
+function qaFocusProblem(i){S.qa.focusPi=i;renderQa();}
+function qaUnfocus(){S.qa.focusPi=null;renderQa();}
 /* 본문을 드래그해 글자를 고르려던 것이면 확대하지 않는다. */
 function qaTapProblem(i){
   try{if(String(window.getSelection()||'').length)return;}catch(_){}
   qaFocusProblem(i);
+}
+/* 지금 열려 있는 질문. 남의 질문이면 없는 것으로 본다(목록과 같은 판정). */
+function qaOpenQuestion(){
+  if(!S.qa.openId)return null;
+  const q=S.qa.questions.find(x=>x._docId===S.qa.openId);
+  if(!q)return null;
+  return (qaIsAdmin()||q.authorId===S.studentDocId)?q:null;
+}
+/* 자세히 보기로 띄운 문제 번호. Number(null) 이 0 이라 그냥 Number 로 받으면
+   확대하지 않은 상태가 0번 문제 확대가 된다. 문제가 하나면 띄울 것도 없다. */
+function qaFocusIdx(q){
+  const n=qaBodies(q).length;
+  if(n<2)return null;
+  const raw=S.qa.focusPi;
+  if(raw===null||raw===undefined)return null;
+  const i=Math.floor(Number(raw));
+  return Number.isFinite(i)&&i>=0&&i<n?i:null;
+}
+/* 팝업을 화면 상태에 맞춘다(renderQa 끝에서 한 번). 뒤에 남는 같은 칸은 입력칸을
+   들어내고 그린다 — id 가 겹치면 _('…') 가 문서에서 앞선 뒤쪽 칸을 집어,
+   팝업에 쓴 댓글이 빈 채로 등록된다. */
+let _qaModalOn=false;
+function qaSyncProblemModal(){
+  const ov=_('qpOv'),ct=_('qpCt');if(!ov||!ct)return;
+  const q=qaOpenQuestion(),pi=q?qaFocusIdx(q):null;
+  if(pi===null){_qaModalOn=false;ov.classList.remove('on');ct.innerHTML='';return;}
+  const closed=q.status==='closed'||qaIsIdle(q);
+  const n=qaCmtsOf(q,pi).length;
+  ct.innerHTML=`<div class="sh"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="shtitle">문제 ${pi+1}</span>
+      ${qaChip(QA_Q_STATUS,qaProblemAnswered(q,pi)?'answered':'pending')}
+      ${n?`<span style="font-size:11px;color:var(--gray-400)">댓글 ${n}</span>`:''}
+    </span><button class="btn bs bsm" onclick="qaUnfocus()">닫기</button></div>
+    ${qaProblemColHtml(q,pi,qaIsAdmin(),closed,'solo')}`;
+  qaApplyFont(ct);qaRenderMath(ct);qaRefreshPreviews(ct);
+  if(!_qaModalOn){_qaModalOn=true;ov.classList.add('on');ct.scrollTop=0;}
+}
+/* 화면을 떠날 때처럼 renderQa 를 거치지 않는 길에서 닫는다. */
+function qaCloseFocusModal(){
+  if(!_qaModalOn)return;
+  S.qa.focusPi=null;
+  qaSyncProblemModal();
 }
 
 /* 댓글 한 덩이. 수정 중이면 그 자리가 입력칸이 된다. */
@@ -4606,31 +4696,32 @@ function qaCmtBoxHtml(q,admin,pi){
 }
 
 /* 문제 한 칸 — 머리줄 + 본문 + 사진 + 그 문제의 댓글 + 입력칸.
-   `solo` 는 확대 보기(한 칸이 폭을 다 쓴다)다. 나란히 있을 때만 눌러서 확대한다. */
-function qaProblemColHtml(q,i,admin,closed,solo){
+   mode 는 셋이다: `col` 나란히 놓인 칸(눌러서 팝업을 연다) / `solo` 팝업 안의 한 칸 /
+   `ghost` 팝업이 떠 있는 동안 뒤에 남는 자리. ghost 는 댓글과 입력칸을 들어낸다 —
+   같은 id 가 둘이면 팝업에 쓴 글을 못 집는다. */
+function qaProblemColHtml(q,i,admin,closed,mode){
+  const solo=mode==='solo',ghost=mode==='ghost';
   const bs=qaBodies(q),bp=qaBodyPhotos(q);
   const list=qaCmtsOf(q,i);
   const done=qaProblemAnswered(q,i);
   /* 머리줄과 본문을 한 덩이로 감싸 그 덩이만 누름 자리로 둔다. 사진은 뺀다 —
      눌러서 크게 보는 라이트박스가 이미 붙어 있다. */
-  const open=solo?'<div>':`<div class="qa-pb-tap" onclick="qaTapProblem(${i})">`;
-  /* 머리줄의 오른쪽이 여는 자리이자 나가는 자리다 — 눌러서 커지고, 나가면 원래대로 돌아온다. */
-  const toggle=solo
-    ?`<button type="button" class="qa-pb-back" onclick="qaUnfocus()">← 돌아가기</button>`
-    :'<span class="qa-pb-more">자세히 보기 →</span>';
-  return `<div class="qa-pb${solo?' solo':''}">
-    ${open}
-      <div class="qa-pb-h">
+  const open=(solo||ghost)?'<div>':`<div class="qa-pb-tap" onclick="qaTapProblem(${i})">`;
+  /* 팝업에서는 머리줄을 그리지 않는다 — 모달 제목줄이 이미 문제 번호·상태를 말한다. */
+  const head=solo?'':`<div class="qa-pb-h">
         <span class="qa-pb-n">문제 ${i+1}</span>
         ${qaChip(QA_Q_STATUS,done?'answered':'pending')}
         ${list.length?`<span style="font-size:11px;color:var(--gray-400)">댓글 ${list.length}</span>`:''}
-        ${toggle}
-      </div>
+        <span class="qa-pb-more">${ghost?'자세히 보기 중':'자세히 보기 →'}</span>
+      </div>`;
+  return `<div class="qa-pb${solo?' solo':''}${ghost?' ghost':''}">
+    ${open}
+      ${head}
       <p class="qa-body pd-b">${qaBodyHtml(bs[i])}</p>
     </div>
     ${bp?bdPhotosHtml(bp[i]):''}
-    ${qaCmtListHtml(q,admin,closed,list,'댓글','아직 댓글이 없습니다.')}
-    ${closed?'':`<div style="margin-top:10px;padding-top:12px;border-top:1px solid var(--gray-200)">${qaCmtBoxHtml(q,admin,i)}</div>`}
+    ${ghost?'':qaCmtListHtml(q,admin,closed,list,'댓글','아직 댓글이 없습니다.')}
+    ${(ghost||closed)?'':`<div style="margin-top:10px;padding-top:12px;border-top:1px solid var(--gray-200)">${qaCmtBoxHtml(q,admin,i)}</div>`}
   </div>`;
 }
 
@@ -4654,22 +4745,16 @@ function qaDetailHtml(q,admin){
 
   const bs=qaBodies(q),bp=qaBodyPhotos(q);
   const multi=bs.length>=2;
-  /* Number(null) 은 0 이라 그냥 Number 로 받으면 확대하지 않은 상태가 0번 문제 확대가 된다. */
-  const raw=S.qa.focusPi;
-  const fp=raw===null||raw===undefined?NaN:Math.floor(Number(raw));
-  const focus=multi&&Number.isFinite(fp)&&fp>=0&&fp<bs.length?fp:null;
+  const focus=qaFocusIdx(q);
 
   let bodyHtml;
   if(!multi){
     bodyHtml=`<p class="qa-body pd-b">${qaBodyHtml(bs[0])}</p>${bdPhotosHtml(q.photos)}
       ${qaCmtListHtml(q,admin,closed,qaCmtsOf(q,null),'댓글','아직 댓글이 없습니다.')}`;
   }else{
-    /* 자세히 보기는 고른 한 칸만 폭을 다 쓰는 것뿐이다 — 나가면 다시 나란히 놓인다.
-       나란히 두는 것이 기본이라야 관리자가 두 문제를 함께 보면서 답할 수 있다.
-       좁은 화면에서는 flex-wrap 이 저절로 위아래로 접는다. */
-    const cols=focus!==null
-      ?qaProblemColHtml(q,focus,admin,closed,true)
-      :`<div class="qa-pcols">${bs.map((_b,i)=>qaProblemColHtml(q,i,admin,closed,false)).join('')}</div>`;
+    /* 자세히 보기는 팝업으로 뜨므로 여기 칸 배치는 그대로다 — 나란히 두는 것이 기본이라야
+       관리자가 두 문제를 함께 보면서 답할 수 있다. 좁은 화면에서는 flex-wrap 이 저절로 접는다. */
+    const cols=`<div class="qa-pcols">${bs.map((_b,i)=>qaProblemColHtml(q,i,admin,closed,focus===i?'ghost':'col')).join('')}</div>`;
     bodyHtml=`${cols}${bp?'':bdPhotosHtml(q.photos)}`;
   }
 
@@ -10966,9 +11051,18 @@ function bootLand(){
 (function(){
   document.addEventListener('keydown',function(e){
     if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'||e.key==='C'))||(e.ctrlKey&&e.key==='u')){e.preventDefault();}
-    if(e.key==='Escape'){const ov=document.getElementById('mOv');if(ov&&!ov.classList.contains('hidden')){e.preventDefault();closeModal();}}
+    if(e.key==='Escape'){
+      const ov=document.getElementById('mOv');
+      if(ov&&!ov.classList.contains('hidden')){e.preventDefault();closeModal();return;}
+      const qp=document.getElementById('qpOv');
+      if(qp&&qp.classList.contains('on')){e.preventDefault();qaUnfocus();}
+    }
   });
-  document.addEventListener('contextmenu',function(e){e.preventDefault();});
+  /* 사진은 우클릭해서 복사할 수 있어야 한다 — 그 자리만 열어 둔다. */
+  document.addEventListener('contextmenu',function(e){
+    if(e.target&&e.target.tagName==='IMG')return;
+    e.preventDefault();
+  });
 })();
 // 기존에 등록된 Service Worker가 있으면 해제해서 캐시·푸시 잔재 제거
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister();});}).catch(function(){});}
