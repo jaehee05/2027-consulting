@@ -265,6 +265,39 @@ describe("질문 작성 토큰 차감", () => {
     expect((await fs.doc(`questions/${c.id}`).get()).data()).toMatchObject({ subject: "" });
   });
 
+  test("문제 번호·정답은 선택이고, 문제마다 따로 남는다", async () => {
+    await setPolicy({ questionCost: 1 });
+    await setBalance(student.id, 10);
+    const a = await tokens.createQuestion(fs, {
+      student, title: "t", bodies: ["b1", "b2"], problems: 2,
+      probNos: ["29", "15"], probAnswers: ["4", "x=2"],
+    });
+    expect((await fs.doc(`questions/${a.id}`).get()).data()).toMatchObject({
+      probNos: ["29", "15"], probAnswers: ["4", "x=2"],
+    });
+    // 안 보내도 질문은 열린다 — 문제 수만큼 빈 칸으로 채운다(번들로 나간 앱이 이 칸 없이 보낸다).
+    const c = await tokens.createQuestion(fs, { student, title: "t", bodies: ["b1", "b2"], problems: 2 });
+    expect((await fs.doc(`questions/${c.id}`).get()).data()).toMatchObject({
+      probNos: ["", ""], probAnswers: ["", ""],
+    });
+    // 한 칸만 적어도 나머지는 빈 칸이다
+    const d = await tokens.createQuestion(fs, {
+      student, title: "t", bodies: ["b1", "b2"], problems: 2, probNos: ["29"],
+    });
+    expect((await fs.doc(`questions/${d.id}`).get()).data().probNos).toEqual(["29", ""]);
+  });
+
+  test("문제 번호·정답이 길면 잘라 담는다", async () => {
+    await setPolicy({ questionCost: 1 });
+    await setBalance(student.id, 5);
+    const r = await tokens.createQuestion(fs, {
+      student, title: "t", body: "b", probNos: ["9".repeat(50)], probAnswers: ["답".repeat(80)],
+    });
+    const d = (await fs.doc(`questions/${r.id}`).get()).data();
+    expect(d.probNos[0]).toHaveLength(20);
+    expect(d.probAnswers[0]).toHaveLength(40);
+  });
+
   test("과목이 길면 잘라 담는다", async () => {
     await setBalance(student.id, 5);
     const r = await tokens.createQuestion(fs, { student, title: "t", body: "b", subject: "과".repeat(80) });

@@ -164,6 +164,11 @@ label.btn{display:inline-flex!important}
 .qa-pb-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
 .qa-pb-n{font-size:11px;color:#4338ca;font-weight:700}
 .qa-pb-more{font-size:11px;color:var(--primary);font-weight:600;margin-left:auto}
+/* 문제 번호·정답(선택). 안 적은 문제에는 줄 자체가 없다. */
+.qa-pmeta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+/* 작성 화면의 번호·정답 칸. 좁으면 위아래로 접힌다. */
+.qa-pnums{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.qa-pnums .fi{flex:1 1 120px;min-width:0}
 /* 자세히 보기로 띄운 칸이 뒤에 남긴 자리. 팝업이 닫히면 원래대로 돌아온다. */
 .qa-pb.ghost{opacity:.55;border-style:dashed}
 /* 자세히 보기 팝업. 상자 안의 또 다른 상자가 되지 않게 칸 테두리는 지운다. */
@@ -4120,6 +4125,17 @@ function qaBodies(q){
   const a=Array.isArray(q&&q.bodies)?q.bodies.map(x=>String(x||'').trim()).filter(Boolean):[];
   return a.length?a:[String(q&&q.body||'')];
 }
+/* 문제 번호·정답은 학생이 적어 넣는 선택 항목이다(`probNos`/`probAnswers`, 문제 순서대로).
+   이 칸이 없던 때의 글과 번들로 나간 앱이 올린 글에는 아예 없으므로 빈 배열로 본다. */
+function qaProbNos(q){return Array.isArray(q&&q.probNos)?q.probNos:[];}
+function qaProbAnswers(q){return Array.isArray(q&&q.probAnswers)?q.probAnswers:[];}
+/* 적지 않았으면 줄 자체를 두지 않는다 — `정답 —` 같은 빈 칸은 답을 안 알려 준 것처럼 읽힌다. */
+function qaProbMetaHtml(q,i){
+  const no=String(qaProbNos(q)[i]||'').trim(),an=String(qaProbAnswers(q)[i]||'').trim();
+  if(!no&&!an)return '';
+  const chip=(label,v)=>`<span class="bx bgr" style="font-weight:600">${label} ${escapeHtml(v)}</span>`;
+  return `<div class="qa-pmeta">${no?chip('번호',no):''}${an?chip('정답',an):''}</div>`;
+}
 /* 사진도 문제마다 하나씩. Firestore 가 배열 안의 배열을 담지 못해 [{photos:[…]},…] 로 들어 있다.
    이 칸이 없는 예전 글은 null 을 돌려주고, 부르는 쪽이 사진을 본문 아래에 통째로 보여 준다. */
 function qaBodyPhotos(q){
@@ -4142,6 +4158,10 @@ function qaProblemLabel(q){const n=Math.floor(Number(q&&q.problems)||1);return n
 function qaNewBodyId(i){return i===1?'qa-new-body':`qa-new-body${i}`;}
 /* 사진도 문제마다 따로 붙는다. 첫 칸은 예전 스코프('qa_new')를 그대로 써서 초안 버킷이 어긋나지 않게 한다. */
 function qaNewPhotoScope(i){return i===1?'qa_new':`qa_new${i}`;}
+/* 문제 번호·정답은 **선택**이다 — 안 적어도 질문은 열린다. 관리자가 답할 때 어느 문항인지,
+   답이 몇 번인지 먼저 알면 되물을 일이 줄어든다. 문제마다 따로 받는다. */
+function qaNewNoId(i){return `qa-new-no${i}`;}
+function qaNewAnsId(i){return `qa-new-ans${i}`;}
 function qaNewBodyColHtml(i){
   const id=qaNewBodyId(i),sc=qaNewPhotoScope(i),two=qaNewProblems()>=2;
   /* 두 칸은 하는 일이 같으므로 안내도 같다. 어느 칸인지는 위의 [문제 N] 이 말해 준다 —
@@ -4149,6 +4169,10 @@ function qaNewBodyColHtml(i){
   const ph='어디까지 풀었고 어디서 막혔는지 적어 주세요.';
   return `<div class="qa-bcol" data-col="${i}" style="flex:1 1 260px;min-width:0;${i>1&&!two?'display:none':''}">
     <p class="qa-blabel" style="font-size:11px;color:#4338ca;font-weight:700;margin-bottom:4px;${two?'':'display:none'}">문제 ${i}</p>
+    <div class="qa-pnums">
+      <input class="fi" id="${qaNewNoId(i)}" maxlength="20" placeholder="문제 번호 (선택)">
+      <input class="fi" id="${qaNewAnsId(i)}" maxlength="40" placeholder="정답 (선택)">
+    </div>
     ${qaFmtBar(id)}
     <textarea class="fi ta" id="${id}" rows="14" style="min-height:280px" placeholder="${ph}" oninput="qaOnBodyInput('${id}')"></textarea>
     ${qaPrevBoxHtml(id)}
@@ -4717,6 +4741,7 @@ function qaProblemColHtml(q,i,admin,closed,mode){
   return `<div class="qa-pb${solo?' solo':''}${ghost?' ghost':''}">
     ${open}
       ${head}
+      ${qaProbMetaHtml(q,i)}
       <p class="qa-body pd-b">${qaBodyHtml(bs[i])}</p>
     </div>
     ${bp?bdPhotosHtml(bp[i]):''}
@@ -4749,7 +4774,7 @@ function qaDetailHtml(q,admin){
 
   let bodyHtml;
   if(!multi){
-    bodyHtml=`<p class="qa-body pd-b">${qaBodyHtml(bs[0])}</p>${bdPhotosHtml(q.photos)}
+    bodyHtml=`${qaProbMetaHtml(q,0)}<p class="qa-body pd-b">${qaBodyHtml(bs[0])}</p>${bdPhotosHtml(q.photos)}
       ${qaCmtListHtml(q,admin,closed,qaCmtsOf(q,null),'댓글','아직 댓글이 없습니다.')}`;
   }else{
     /* 자세히 보기는 팝업으로 뜨므로 여기 칸 배치는 그대로다 — 나란히 두는 것이 기본이라야
@@ -5200,6 +5225,8 @@ async function qaCreateQuestion(){
   /* 감춰 둔 둘째 칸의 글은 보내지 않는다 — 2개로 골랐다가 1개로 되돌린 학생이
      지우지도 않은 글에 토큰을 더 내면 안 된다. */
   const bodies=Array.from({length:problems},(_2,i)=>(_(qaNewBodyId(i+1))?.value||'').trim());
+  const probNos=Array.from({length:problems},(_2,i)=>(_(qaNewNoId(i+1))?.value||'').trim());
+  const probAnswers=Array.from({length:problems},(_2,i)=>(_(qaNewAnsId(i+1))?.value||'').trim());
   if(!subject){toast('과목을 선택하세요.','warn');return;}
   if(!title){toast('제목을 입력하세요.','warn');return;}
   const miss=bodies.findIndex(b=>!b);
@@ -5209,7 +5236,7 @@ async function qaCreateQuestion(){
     /* 칸마다 따로 올린다. 감춰 둔 둘째 칸의 사진은 본문과 같이 빠진다. */
     const bodyPhotos=[];
     for(let i=1;i<=problems;i++)bodyPhotos.push(await qaUploadDrafts(qaNewPhotoScope(i),'post'));
-    const r=await qaCall('createQuestion',{title,bodies,bodyPhotos,problems,subject});
+    const r=await qaCall('createQuestion',{title,bodies,bodyPhotos,problems,subject,probNos,probAnswers});
     qaClearNewDrafts();
     S.qa.composerOpen=false;S.qa.newProblems=1;S.qa.openId=r.id;
     toast(`질문을 등록했습니다 · 남은 토큰 ${r.balance}개`,'success');

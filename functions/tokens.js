@@ -219,6 +219,16 @@ function normPhotos(a) {
    답변하는 품이 문제 수에 비례하기 때문이다. 화면 쪽 상한(QA_MAX_PROBLEMS)과 같은 값이어야 한다. */
 const MAX_PROBLEMS = 2;
 
+/* 문제 번호·정답은 학생이 적어 넣는 **선택** 항목이다. 안 적어도 질문은 열려야 하므로
+   검사하지 않고 길이만 잘라 담는다 — 과목과 같은 이유로, 표시용 라벨이라 막아서 지킬 게 없다.
+   칸이 아예 없이 오는 요청(index.html 을 번들로 들고 있는 스토어 배포본)은 빈 칸으로 채운다. */
+function normLabels(v, count, max) {
+  const a = Array.isArray(v) ? v.map((x) => String(x == null ? "" : x).trim().slice(0, max)) : [];
+  const out = a.slice(0, count);
+  while (out.length < count) out.push("");
+  return out;
+}
+
 function normProblems(v) {
   const n = Math.floor(Number(v));
   if (!Number.isFinite(n) || n < 1) return 1;
@@ -254,7 +264,7 @@ function allAnswered(comments, problems) {
  * 질문 작성 + 토큰 차감을 한 트랜잭션으로.
  * 잔액 확인과 차감이 같은 트랜잭션 안에 있어야 동시 작성으로 음수가 되지 않는다.
  */
-async function createQuestion(fs, { student, title, body, bodies, photos, bodyPhotos, problems, subject }) {
+async function createQuestion(fs, { student, title, body, bodies, photos, bodyPhotos, problems, subject, probNos, probAnswers }) {
   const t = String(title || "").trim();
   /* 과목 목록을 서버에 다시 두지 않는다 — 과목이 늘 때마다 두 군데가 어긋나고,
      학생 자기 질문에 붙는 표시 라벨일 뿐이라 막아서 지킬 게 없다. 고르게 하는 건 화면 몫이고,
@@ -281,6 +291,9 @@ async function createQuestion(fs, { student, title, body, bodies, photos, bodyPh
   const phList = (rawPh.length ? rawPh : [normPhotos(photos)]).slice(0, count);
   while (phList.length < count) phList.push([]);
 
+  const nos = normLabels(probNos, count, 20);
+  const answers = normLabels(probAnswers, count, 40);
+
   const policy = await getPolicy(fs);
   const cost = policy.questionCost * count;
   const now = Date.now();
@@ -298,6 +311,8 @@ async function createQuestion(fs, { student, title, body, bodies, photos, bodyPh
       bodies: list,
       photos: phList.flat(),
       bodyPhotos: phList.map((ps) => ({ photos: ps })),
+      probNos: nos,
+      probAnswers: answers,
       authorId: student.id,
       authorName: student.name || "",
       authorGrade: student.grade || "",
