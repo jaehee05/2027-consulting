@@ -1,7 +1,7 @@
 "use strict";
 
 // 에뮬레이터 없이 도는 순수 계산 테스트 (금액 산정).
-const { packagePrice, normalizePackages } = require("../tokens");
+const { packagePrice, normalizePackages, questionPrice } = require("../tokens");
 
 describe("packagePrice", () => {
   test("할인이 없으면 정가 그대로", () => {
@@ -76,5 +76,19 @@ describe("normalizePackages", () => {
 
   test("알 수 없는 할인 타입은 none 으로 떨어진다", () => {
     expect(normalizePackages([{ id: "z", tokens: 1, discountType: "weird" }], 100)[0].discountType).toBe("none");
+  });
+});
+
+describe("questionPrice", () => {
+  const policy = { questionCost: 2 };
+
+  test("일반 과목은 문제 수 × questionCost", () => {
+    expect(questionPrice(policy, "수학", 2)).toEqual({ count: 2, cost: 4 });
+    expect(questionPrice(policy, "국어", undefined)).toEqual({ count: 1, cost: 2 });
+  });
+
+  test("추론/학습법은 문제 수와 정책에 상관없이 질문당 5토큰", () => {
+    expect(questionPrice(policy, "추론/학습법", 2)).toEqual({ count: 1, cost: 5 });
+    expect(questionPrice({ questionCost: 0 }, " 추론/학습법 ", 1)).toEqual({ count: 1, cost: 5 });
   });
 });

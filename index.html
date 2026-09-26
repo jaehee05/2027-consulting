@@ -4112,7 +4112,12 @@ const QA_SUBJECT_GROUPS=[
   {group:'',items:['국어','수학','영어']},
   {group:'사회탐구',items:EXP_SOCIAL_SUBJS},
   {group:'과학탐구',items:EXP_SCI1_SUBJS.concat(EXP_SCI2_SUBJS)},
+  {group:'그 외',items:['추론/학습법']},
 ];
+/* 문제 풀이가 아닌 질문은 문제 수로 셀 수 없어 질문 하나에 정액이다(문제 수 1 고정).
+   서버 tokens.js 의 FLAT_COST_SUBJECTS 와 같은 값이어야 한다 — 차감은 서버가 한다. */
+const QA_FLAT_COST={'추론/학습법':5};
+function qaFlatCost(subj){const v=QA_FLAT_COST[String(subj||'').trim()];return v===undefined?null:v;}
 function qaSubjOpts(sel){
   return `<option value="">과목 선택</option>`+QA_SUBJECT_GROUPS.map(g=>{
     const opts=g.items.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
@@ -4150,8 +4155,9 @@ function qaSubjChip(q){
 /* ── 한 스레드의 문제 수 ──
    한 스레드에 문제를 2개까지 담을 수 있고, 토큰은 문제 수만큼 곱해 받는다(서버 tokens.js 의 MAX_PROBLEMS 와 같은 값). */
 const QA_MAX_PROBLEMS=2;
-function qaNewProblems(){const n=Math.floor(Number(S.qa.newProblems)||1);return n>=1&&n<=QA_MAX_PROBLEMS?n:1;}
-function qaNewCost(){return qaCost()*qaNewProblems();}
+function qaNewFlat(){return qaFlatCost(S.qa.newSubject);}
+function qaNewProblems(){if(qaNewFlat()!==null)return 1;const n=Math.floor(Number(S.qa.newProblems)||1);return n>=1&&n<=QA_MAX_PROBLEMS?n:1;}
+function qaNewCost(){const f=qaNewFlat();return f!==null?f:qaCost()*qaNewProblems();}
 function qaProblemLabel(q){const n=Math.floor(Number(q&&q.problems)||1);return n>1?n:0;}
 /* 본문은 문제마다 한 칸씩 나란히 둔다(넓으면 좌우, 좁으면 위아래로 접힌다 — flex-wrap).
    두 칸을 늘 그려 두고 보이고 감추기만 한다: 1개로 되돌렸다가 다시 2개를 골라도 쳐 둔 글이 남는다. */
@@ -4190,24 +4196,40 @@ function qaSetProblems(n){
   const v=Math.max(1,Math.min(QA_MAX_PROBLEMS,Math.floor(Number(n)||1)));
   if(qaNewProblems()===v)return;
   S.qa.newProblems=v;
+  qaSyncComposer();
+}
+/* 과목도 같은 이유로 그 자리에서만 바꾼다. 정액 과목(추론/학습법)이면 문제 수를 1로 두고
+   문제 번호·정답 칸을 감춘다 — 풀이 질문이 아니라 적을 게 없다. */
+function qaSetSubject(v){
+  S.qa.newSubject=v;
+  qaSyncComposer();
+}
+function qaSyncComposer(){
   const box=_('qa-np-box');if(box)box.innerHTML=qaProblemPickInner();
   const btn=_('qa-new-submit');if(btn)btn.textContent=`토큰 ${qaNewCost()}개로 질문하기`;
-  const two=v>=2;
+  const two=qaNewProblems()>=2,flat=qaNewFlat()!==null;
   document.querySelectorAll('.qa-bcol').forEach(el=>{
     if(Number(el.dataset.col)>1)el.style.display=two?'':'none';
   });
   document.querySelectorAll('.qa-blabel').forEach(el=>{el.style.display=two?'':'none';});
+  document.querySelectorAll('.qa-bcol .qa-pnums').forEach(el=>{el.style.display=flat?'none':'';});
   if(two)qaUpdatePreview(qaNewBodyId(2));
 }
 function qaProblemPickInner(){
-  const unit=qaCost(),bal=qaMyBalance(),cur=qaNewProblems();
+  const unit=qaCost(),bal=qaMyBalance(),cur=qaNewProblems(),idle=qaIdleHours(),flat=qaNewFlat();
+  if(flat!==null){
+    const short=bal<flat;
+    return `<p style="font-size:11px;color:var(--gray-500);margin-bottom:5px">${escapeHtml(S.qa.newSubject)} 질문은 문제 수와 상관없이 질문당 토큰 ${flat}개</p>
+    <p style="font-size:11px;color:${short?'var(--warning-text)':'var(--gray-400)'};line-height:1.55">
+      ${short?'토큰이 모자랍니다':`토큰 <b style="color:var(--primary)">${flat}개</b> 사용 · 내 토큰 ${bal}개`}${idle?`<br>답변 후 ${idle}시간 동안 대화가 없으면 자동으로 닫힙니다.`:''}</p>`;
+  }
   const btns=Array.from({length:QA_MAX_PROBLEMS},(_,i)=>{
     const n=i+1,on=cur===n,short=bal<unit*n;
     return `<button onclick="qaSetProblems(${n})" ${short?'disabled':''} style="flex:1;border:1px solid ${on?'#1C64F2':'#e5e7eb'};background:${on?'#eff6ff':'#fff'};color:${short?'#d1d5db':(on?'#1C64F2':'#6b7280')};border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;cursor:${short?'not-allowed':'pointer'};line-height:1.4">
       ${n}문제<br><span style="font-size:11px;font-weight:600">토큰 ${unit*n}개</span>
     </button>`;
   }).join('');
-  const short=bal<unit*cur,idle=qaIdleHours();
+  const short=bal<unit*cur;
   return `<p style="font-size:11px;color:var(--gray-500);margin-bottom:5px">물어볼 문제 개수</p>
     <div style="display:flex;gap:6px">${btns}</div>
     <p style="font-size:11px;color:${short?'var(--warning-text)':'var(--gray-400)'};margin-top:6px;line-height:1.55">
@@ -4488,8 +4510,8 @@ function qaSetFilter(f){S.qa.filter=f;S.qa.openId=null;S.qa.focusPi=null;renderQ
 function qaOpen(id){S.qa.openId=id;S.qa.focusPi=null;S.qa.composerOpen=false;S.qa.cmtEdit=null;renderQa();try{window.scrollTo({top:0});}catch(_){}}
 function qaCloseDetail(){S.qa.openId=null;S.qa.focusPi=null;S.qa.cmtEdit=null;renderQa();}
 function qaClearNewDrafts(){for(let i=1;i<=QA_MAX_PROBLEMS;i++)delete S.bdDraftFiles[qaNewPhotoScope(i)];}
-function qaOpenComposer(){S.qa.composerOpen=true;S.qa.newProblems=1;qaClearNewDrafts();S.qa.openId=null;S.qa.focusPi=null;renderQa();}
-function qaCloseComposer(){S.qa.composerOpen=false;S.qa.newProblems=1;qaClearNewDrafts();renderQa();}
+function qaOpenComposer(){S.qa.composerOpen=true;S.qa.newProblems=1;S.qa.newSubject='';qaClearNewDrafts();S.qa.openId=null;S.qa.focusPi=null;renderQa();}
+function qaCloseComposer(){S.qa.composerOpen=false;S.qa.newProblems=1;S.qa.newSubject='';qaClearNewDrafts();renderQa();}
 
 function qaQuestionsHtml(admin){
   /* 상세는 자유게시판과 같이 목록을 밀어내고 한 화면을 차지한다. */
@@ -4534,7 +4556,7 @@ function qaQuestionsHtml(admin){
      지금은 문제 수 상자 하나가 값·잔액·자동 종료를 다 말하고, 규칙은 그 아래 한 줄이다. */
   const composer=(!admin&&S.qa.composerOpen)?`<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:12px;margin-bottom:14px">
     <div id="qa-np-box" style="background:var(--surface);border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:8px">${qaProblemPickInner()}</div>
-    <select class="fi" id="qa-new-subject" style="margin-bottom:8px">${qaSubjOpts('')}</select>
+    <select class="fi" id="qa-new-subject" style="margin-bottom:8px" onchange="qaSetSubject(this.value)">${qaSubjOpts(S.qa.newSubject||'')}</select>
     <input class="fi" id="qa-new-title" maxlength="120" placeholder="제목 (예: 미적분 29번 풀이)" style="margin-bottom:8px">
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       ${qaNewBodyColHtml(1)}${qaNewBodyColHtml(2)}
@@ -4844,6 +4866,7 @@ function qaStuTokensHtml(){
     </div>
     <p style="font-size:12px;color:var(--gray-500)">질문할 때 <b>문제 수만큼</b> 토큰을 사용합니다. 댓글은 몇 번을 주고받아도 더 들지 않습니다.</p>
     <p style="font-size:12px;color:var(--gray-500);margin-top:4px">한 번에 <b>${QA_MAX_PROBLEMS}문제까지</b> 물어볼 수 있습니다.</p>
+    <p style="font-size:12px;color:var(--gray-500);margin-top:4px"><b>추론/학습법</b> 질문은 문제 수와 상관없이 <b>질문당 ${QA_FLAT_COST['추론/학습법']}토큰</b>입니다.</p>
   </div>
 
   <div class="card" style="margin-bottom:12px">
@@ -5225,8 +5248,10 @@ async function qaCreateQuestion(){
   /* 감춰 둔 둘째 칸의 글은 보내지 않는다 — 2개로 골랐다가 1개로 되돌린 학생이
      지우지도 않은 글에 토큰을 더 내면 안 된다. */
   const bodies=Array.from({length:problems},(_2,i)=>(_(qaNewBodyId(i+1))?.value||'').trim());
-  const probNos=Array.from({length:problems},(_2,i)=>(_(qaNewNoId(i+1))?.value||'').trim());
-  const probAnswers=Array.from({length:problems},(_2,i)=>(_(qaNewAnsId(i+1))?.value||'').trim());
+  /* 정액 과목은 번호·정답 칸을 감춰 두므로, 감춘 칸에 남은 글은 보내지 않는다. */
+  const flat=qaFlatCost(subject)!==null;
+  const probNos=Array.from({length:problems},(_2,i)=>flat?'':(_(qaNewNoId(i+1))?.value||'').trim());
+  const probAnswers=Array.from({length:problems},(_2,i)=>flat?'':(_(qaNewAnsId(i+1))?.value||'').trim());
   if(!subject){toast('과목을 선택하세요.','warn');return;}
   if(!title){toast('제목을 입력하세요.','warn');return;}
   const miss=bodies.findIndex(b=>!b);
@@ -5238,7 +5263,7 @@ async function qaCreateQuestion(){
     for(let i=1;i<=problems;i++)bodyPhotos.push(await qaUploadDrafts(qaNewPhotoScope(i),'post'));
     const r=await qaCall('createQuestion',{title,bodies,bodyPhotos,problems,subject,probNos,probAnswers});
     qaClearNewDrafts();
-    S.qa.composerOpen=false;S.qa.newProblems=1;S.qa.openId=r.id;
+    S.qa.composerOpen=false;S.qa.newProblems=1;S.qa.newSubject='';S.qa.openId=r.id;
     toast(`질문을 등록했습니다 · 남은 토큰 ${r.balance}개`,'success');
     renderQa();
   }catch(e){toast(e.message,'error');}

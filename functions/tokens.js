@@ -219,6 +219,19 @@ function normPhotos(a) {
    답변하는 품이 문제 수에 비례하기 때문이다. 화면 쪽 상한(QA_MAX_PROBLEMS)과 같은 값이어야 한다. */
 const MAX_PROBLEMS = 2;
 
+/* 문제 풀이가 아닌 질문(추론/학습법)은 문제 수로 셀 수 없으므로 질문 하나에 정액을 받는다.
+   문제 수는 1로 고정하고, 정책의 questionCost 와 상관없이 이 값을 차감한다.
+   화면 쪽 QA_FLAT_COST 와 같은 값이어야 한다. */
+const FLAT_COST_SUBJECTS = { "추론/학습법": 5 };
+
+/* 질문 하나의 토큰 값. 정액 과목이면 문제 수는 1, 아니면 questionCost × 문제 수. */
+function questionPrice(policy, subject, problems) {
+  const flat = FLAT_COST_SUBJECTS[String(subject || "").trim()];
+  if (flat !== undefined) return { count: 1, cost: flat };
+  const count = normProblems(problems);
+  return { count, cost: policy.questionCost * count };
+}
+
 /* 문제 번호·정답은 학생이 적어 넣는 **선택** 항목이다. 안 적어도 질문은 열려야 하므로
    검사하지 않고 길이만 잘라 담는다 — 과목과 같은 이유로, 표시용 라벨이라 막아서 지킬 게 없다.
    칸이 아예 없이 오는 요청(index.html 을 번들로 들고 있는 스토어 배포본)은 빈 칸으로 채운다. */
@@ -272,7 +285,8 @@ async function createQuestion(fs, { student, title, body, bodies, photos, bodyPh
   const subj = String(subject || "").trim().slice(0, 30);
   if (!t) throw new ApiError(400, "제목을 입력해 주세요.");
 
-  const count = normProblems(problems);
+  const policy = await getPolicy(fs);
+  const { count, cost } = questionPrice(policy, subj, problems);
   /* 문제마다 본문이 하나씩 온다. `bodies` 가 없으면 예전 한 칸짜리 요청(번들로 나간 앱)이므로
      `body` 를 한 칸으로 본다. 저장할 때 `body` 는 둘을 이어 붙인 값으로도 같이 남긴다 —
      목록 미리보기·검색이 한 필드만 보고 있어, 그쪽을 전부 고치는 것보다 낫다. */
@@ -294,8 +308,6 @@ async function createQuestion(fs, { student, title, body, bodies, photos, bodyPh
   const nos = normLabels(probNos, count, 20);
   const answers = normLabels(probAnswers, count, 40);
 
-  const policy = await getPolicy(fs);
-  const cost = policy.questionCost * count;
   const now = Date.now();
 
   return fs.runTransaction(async (tx) => {
@@ -717,6 +729,8 @@ module.exports = {
   adjustTokens,
   createQuestion,
   MAX_PROBLEMS,
+  FLAT_COST_SUBJECTS,
+  questionPrice,
   addQuestionComment,
   editQuestionComment,
   deleteQuestionComment,
